@@ -71,11 +71,21 @@ press *Start OCR* — or run the pipeline headless (see below).
 
 ## Install & run
 
+Two ways to get SubVision:
+
+- **Download the latest release** — grab the source zip from
+  [Releases → latest](https://github.com/Interstellar0verdrive/SubVision/releases/latest),
+  unzip it and double-click `run.command` (first time: right-click → Open).
+- **Clone the repo**:
+
 ```bash
-git clone https://github.com/<you>/SubVision.git
+git clone https://github.com/Interstellar0verdrive/SubVision.git
 cd SubVision
 ./run.command
 ```
+
+The app checks GitHub for a newer release at most once a day (2.5s timeout,
+silent when offline) and shows a small notice in the sidebar if there is one.
 
 `run.command` creates a virtualenv, installs the dependencies (only the first
 time or when `requirements.txt` changes) and starts the GUI. Or manually:

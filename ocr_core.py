@@ -44,6 +44,9 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
+__version__ = "1.0.0"
+REPO_URL = "https://github.com/Interstellar0verdrive/SubVision"
+
 # ocrmac is imported lazily inside the OCR functions so the module loads
 # even where Apple Vision is not available (useful for SRT-only tests).
 
@@ -968,6 +971,9 @@ _QC_TEMPLATE = r"""<!DOCTYPE html>
  .legend span{margin-right:16px;font-size:13px}
  .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
  .saved{color:#7fd07f;font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s}
+ .foot{margin-top:48px;padding-top:12px;border-top:1px solid #2a2d33;color:#777;
+       font-size:12px;text-align:center}
+ .foot a{color:#9ecbff;text-decoration:none} .foot a:hover{text-decoration:underline}
 </style></head><body>
 <div class="topbar">
  <b>🎬 __T_TITLE__ — __VIDEO__</b>
@@ -994,6 +1000,7 @@ _QC_TEMPLATE = r"""<!DOCTYPE html>
 <div id="dropped"></div>
 <h2>__T_GAPS_H__</h2>
 <div id="gaps"></div>
+<div class="foot">__FOOTER__</div>
 </div>
 <script type="application/json" id="qcdata">__DATA__</script>
 <script>
@@ -1396,6 +1403,7 @@ _QC_I18N = {
             "Frame: {frames} · OCR: {ocr} · "
             "confini raffinati: {refined} · tempo: {elapsed}"
         ),
+        "footer": "Generato con SubVision v{version} — <a href=\"{url}\">{host}</a>",
     },
     "en": {
         "html": {
@@ -1456,6 +1464,7 @@ _QC_I18N = {
             "Frames: {frames} · OCR: {ocr} · "
             "boundaries refined: {refined} · time: {elapsed}"
         ),
+        "footer": "Generated with SubVision v{version} — <a href=\"{url}\">{host}</a>",
     },
 }
 
@@ -1511,6 +1520,8 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
         dropped=len(dropped), gaps=len(gaps), frames=stats.frames,
         ocr=stats.ocr_calls, refined=stats.refined,
         elapsed=fmt_hms(stats.elapsed))
+    footer = tr["footer"].format(version=__version__, url=REPO_URL,
+                                 host=REPO_URL.split("://", 1)[-1])
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     jstr = json.dumps(tr["js"], ensure_ascii=False).replace("</", "<\\/")
     html = _QC_TEMPLATE.replace("__LANG__", ui_lang).replace("__JSTR__", jstr)
@@ -1519,6 +1530,7 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
     html = (html
             .replace("__VIDEO__", _esc(video_name))
             .replace("__SUMMARY__", summary)
+            .replace("__FOOTER__", footer)
             .replace("__DATA__", payload))
     path.write_text(html, encoding="utf-8")
 

@@ -27,6 +27,7 @@ from PIL import Image, ImageDraw
 
 import ocr_core as core
 import i18n
+import updates
 
 # ---------------------------------------------------------------- Config
 BASE_DIR = Path(__file__).resolve().parent
@@ -83,8 +84,16 @@ def load_ui_lang() -> str:
 
 
 def save_ui_lang(lang: str) -> None:
+    # merge: .ui_prefs.json also holds the update-check cache
     try:
-        PREFS_FILE.write_text(json.dumps({"lang": lang}), encoding="utf-8")
+        prefs = json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+        if not isinstance(prefs, dict):
+            prefs = {}
+    except Exception:
+        prefs = {}
+    prefs["lang"] = lang
+    try:
+        PREFS_FILE.write_text(json.dumps(prefs), encoding="utf-8")
     except Exception:
         pass
 
@@ -208,6 +217,17 @@ ignore_lines = core.load_ignore(IGNORE_FILE) if use_ignore else []
 if use_ignore and not IGNORE_FILE.exists():
     st.sidebar.info(L["ignore_missing"])
 corrections = core.load_corrections(CORRECTIONS_FILE) if use_corrections else []
+
+# ---------------------------------------------------------------- Footer / updates
+# once per browser session; network at most once a day (cache in .ui_prefs.json)
+if "update_tag" not in st.session_state:
+    st.session_state["update_tag"] = updates.check_for_update(PREFS_FILE, core.__version__)
+with st.sidebar:
+    st.divider()
+    if st.session_state["update_tag"]:
+        st.info(L["update_available"].format(tag=st.session_state["update_tag"],
+                                             url=updates.RELEASES_PAGE))
+    st.caption(L["footer"].format(version=core.__version__, url=core.REPO_URL))
 
 
 def make_params() -> core.OcrParams:

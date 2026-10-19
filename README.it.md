@@ -51,6 +51,12 @@ elaborazione per clip su Mac Apple Silicon):
 
 ## 🚀 Avvio
 
+0. Scarica SubVision in uno dei due modi:
+   - **ultima release**: lo zip dei sorgenti da
+     [Releases → latest](https://github.com/Interstellar0verdrive/SubVision/releases/latest),
+     poi scompattalo;
+   - **git clone**:
+     `git clone https://github.com/Interstellar0verdrive/SubVision.git`
 1. Metti i video in `./videos` (`.mkv .mp4 .mov .avi .m4v .webm`)
 2. Doppio clic su `run.command`
    (la prima volta: clic destro → Apri; se serve `chmod +x run.command`)
@@ -59,6 +65,10 @@ Il launcher installa le dipendenze SOLO la prima volta o quando
 `requirements.txt` cambia: gli avvii successivi sono immediati (~1s).
 
 **Requisiti:** macOS 10.15+, ffmpeg (`brew install ffmpeg`), Python 3.10+.
+
+L'app controlla su GitHub se c'è una release più recente al massimo una volta
+al giorno (timeout 2.5s, silenziosa se sei offline) e in quel caso mostra un
+piccolo avviso nella sidebar.
 
 Ogni opzione della GUI ha un'icona **(?)** con la spiegazione contestuale:
 passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
@@ -226,6 +236,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 | `app.py` | GUI Streamlit |
 | `ocr_core.py` | logica pura, senza UI (testabile headless) |
 | `i18n.py` | stringhe dell'interfaccia (it/en) |
+| `updates.py` | controllo aggiornamenti (GitHub releases, max 1×/giorno) |
 | `requirements.txt` | streamlit, pillow, numpy, ocrmac |
 | `run.command` | launcher macOS |
 | `ignore.txt` | frasi da ignorare |
@@ -255,10 +266,12 @@ top_band=False, refine_timing=False)`. Il parametro `ui_lang` di
 
 ### Cronologia
 
-- **v3.0 (ott 2026)** — il progetto diventa **SubVision** (prima si chiamava
+- **SubVision v1.0.0 (ott 2026)** — prima release pubblica (internamente
+  v3.0): il progetto diventa **SubVision** (prima si chiamava
   *video-OCR-2026*) e diventa open source: interfaccia bilingue it/en con
   selettore (la scelta viene ricordata), report di revisione nella lingua
-  scelta, demo Sintel (CC-BY) con benchmark di accuratezza.
+  scelta, demo Sintel (CC-BY) con benchmark di accuratezza, versione nel
+  footer e controllo aggiornamenti all'avvio.
 - **v2.9 (lug 2026)** — velocità negli step di Elabora (fps live e media a
   fine step); il "report QC" diventa *report di revisione*
   (`.revisione.html`); a-capo bilanciato in 2-3 righe con taglio dopo

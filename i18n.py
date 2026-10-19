@@ -297,6 +297,11 @@ STRINGS = {
         "no_valid_segments": "Nessun segmento valido dopo la pulizia.",
         "fix_created": "Creato: {name} ({n} righe)",
         "generic_error": "Errore: {e}",
+
+        # --- footer / aggiornamenti
+        "footer": "SubVision v{version} — [⭐ GitHub]({url})",
+        "update_available": "🆕 Nuova versione **{tag}** disponibile — "
+                            "[vai alle release]({url})",
     },
 
     # ================================================================ ENGLISH
@@ -583,5 +588,10 @@ STRINGS = {
         "no_valid_segments": "No valid segments after cleanup.",
         "fix_created": "Created: {name} ({n} lines)",
         "generic_error": "Error: {e}",
+
+        # --- footer / updates
+        "footer": "SubVision v{version} — [⭐ GitHub]({url})",
+        "update_available": "🆕 New version **{tag}** available — "
+                            "[go to releases]({url})",
     },
 }
