@@ -37,14 +37,14 @@ La demo usa un clip di 55 secondi di dialoghi da
 [Sintel](https://durian.blender.org), l'open movie della Blender Foundation
 (CC-BY 3.0, **© copyright Blender Foundation | durian.blender.org**), con i
 sottotitoli impressi in italiano e in inglese. Per tenere leggero il repo, i
-file della demo sono allegati alla [release v1.0.0](https://github.com/Interstellar0verdrive/SubVision/releases/tag/v1.0.0) (link di download
+file della demo sono allegati alla [release Demo material](https://github.com/Interstellar0verdrive/SubVision/releases/tag/demo-assets) (link di download
 diretto):
 
 | File | Cos'è |
 | --- | --- |
-| [`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.mp4) / [`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.mp4) | clip di 55s con i sub impressi (IT / EN), ~9 MB l'uno |
-| [`sintel_ita_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.srt) / [`sintel_eng_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.srt) | l'SRT estratto da SubVision |
-| [`sintel_ita_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.revisione.html) / [`sintel_eng_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.revisione.html) | il report di revisione interattivo di ogni run (scaricalo e aprilo nel browser) |
+| [`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.mp4) / [`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.mp4) | clip di 55s con i sub impressi (IT / EN), ~9 MB l'uno |
+| [`sintel_ita_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.srt) / [`sintel_eng_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.srt) | l'SRT estratto da SubVision |
+| [`sintel_ita_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.revisione.html) / [`sintel_eng_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.revisione.html) | il report di revisione interattivo di ogni run (scaricalo e aprilo nel browser) |
 
 Per riprovare tu: scarica un clip, mettilo in `./videos` e premi *Avvia OCR*.
 
