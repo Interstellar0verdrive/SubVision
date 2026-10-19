@@ -3,27 +3,27 @@
 """
 SubVision — core pipeline (no UI).
 
-Estrae hardsub (sottotitoli incisi nel video) e li converte in .srt usando
-Apple Vision (framework OCR nativo di macOS, via il wrapper `ocrmac`).
+Extracts hardsubs (subtitles burned into the video) and converts them to
+.srt using Apple Vision (macOS native OCR framework, via the `ocrmac`
+wrapper).
 
-Filosofia: MASSIMA ACCURATEZZA, la velocita' non e' una priorita'.
-L'obiettivo e' minimizzare il rework manuale (sottotitoli saltati, tempi
-imprecisi, typo), quindi:
+Philosophy: MAXIMUM ACCURACY, speed is not a priority. The goal is to
+minimize manual rework (skipped subtitles, imprecise timing, typos), so:
 
-1. OCR MULTI-VARIANTE con voto: ogni frame viene OCR-ato in piu' versioni
-   (raw, contrasto+sharpen, grayscale) e il testo si decide a maggioranza
-   pesata per confidenza. Nessuna variante vince sempre da sola (misurato).
-2. VOTO DI SEGMENTO: il testo finale di un sottotitolo e' quello che ha
-   raccolto piu' peso su tutti i frame del segmento (non "il piu' lungo").
-3. RAFFINAMENTO TIMING: i confini inizio/fine vengono ricalcolati al
-   framerate NATIVO del video (precisione ~1 frame, ~±20ms).
-4. BANDA SUPERIORE opzionale per i cartelli/insegne tradotti ({\\an8}).
-5. REPORT DI REVISIONE (.revisione.html): ogni riga porta con se'
-   confidenza, accordo tra varianti e thumbnail; le righe dubbie, i flash
-   scartati e i buchi lunghi finiscono in un report/editor HTML per una
-   revisione manuale guidata.
+1. MULTI-VARIANT OCR with voting: every frame is OCRed in several versions
+   (raw, contrast+sharpen, grayscale) and the text is decided by a majority
+   weighted by confidence. No single variant always wins alone (measured).
+2. SEGMENT VOTING: the final text of a subtitle is the one that gathered
+   the most weight across all the frames of the segment (not "the longest").
+3. TIMING REFINEMENT: the start/end boundaries are recomputed at the
+   video's NATIVE frame rate (~1 frame precision, ~±20ms).
+4. Optional TOP BAND for translated signs/banners ({\\an8}).
+5. REVIEW REPORT (.revisione.html): every line carries its confidence,
+   agreement between variants and a thumbnail; doubtful lines, dropped
+   flashes and long gaps end up in an HTML report/editor for guided
+   manual review.
 
-Questo modulo non importa streamlit: puo' essere testato/eseguito headless.
+This module does not import streamlit: it can be tested/run headless.
 """
 
 from __future__ import annotations
@@ -44,10 +44,10 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
-# ocrmac e' importato "lazy" dentro le funzioni OCR cosi' il modulo si carica
-# anche dove Apple Vision non e' disponibile (utile per i test sugli SRT).
+# ocrmac is imported lazily inside the OCR functions so the module loads
+# even where Apple Vision is not available (useful for SRT-only tests).
 
-# ---------------------------------------------------------------- Lingue
+# ---------------------------------------------------------------- Languages
 LANG_MAP = {
     "italian": "it-IT", "italiano": "it-IT",
     "english": "en-US", "inglese": "en-US",
@@ -70,51 +70,95 @@ def resolve_langs(lang_hint: str) -> List[str]:
     return [lang_hint.strip()]
 
 
-# ---------------------------------------------------------------- Parametri
+# Progress/log strings emitted by the pipeline (shown by the GUI and written
+# to the per-file .log). Text only, zero logic; "it" must stay byte-identical
+# to the historical strings. The numeric formats are preserved because the
+# GUI parses the leading count with a regex.
+_CORE_I18N = {
+    "it": {
+        "frames_progress": "{cnt}/~{exp} frame",
+        "frames_done": "{n} frame estratti",
+        "analyze_frame": "Analisi frame {i}/{n}",
+        "to_read": "{t}/{n} frame da leggere",
+        "ocr_progress": "{done}/{n} frame",
+        "refine_rows": "{i}/{n} righe",
+        "log_frames": "{n} frame @ {fps}fps",
+        "log_to_ocr": "{t}/{n} frame da OCR-are",
+        "log_ocr_err": "OCR errore su un frame: {e}",
+        "log_refining": "raffinamento confini a {fps:.3f} fps nativi…",
+        "log_moved": "{n} confini spostati",
+        "log_srt": "SRT scritto: {path} ({segments} righe, {ocr} OCR, "
+                   "{refined} confini raffinati, {elapsed:.1f}s)",
+        "log_qc": "Report di revisione: {path}",
+        "vision_err": "Apple Vision non disponibile (pip install ocrmac). "
+                      "Serve macOS 10.15+.",
+    },
+    "en": {
+        "frames_progress": "{cnt}/~{exp} frames",
+        "frames_done": "{n} frames extracted",
+        "analyze_frame": "Analyzing frame {i}/{n}",
+        "to_read": "{t}/{n} frames to read",
+        "ocr_progress": "{done}/{n} frames",
+        "refine_rows": "{i}/{n} lines",
+        "log_frames": "{n} frames @ {fps}fps",
+        "log_to_ocr": "{t}/{n} frames to OCR",
+        "log_ocr_err": "OCR error on one frame: {e}",
+        "log_refining": "refining boundaries at {fps:.3f} native fps…",
+        "log_moved": "{n} boundaries moved",
+        "log_srt": "SRT written: {path} ({segments} lines, {ocr} OCR, "
+                   "{refined} boundaries refined, {elapsed:.1f}s)",
+        "log_qc": "Review report: {path}",
+        "vision_err": "Apple Vision not available (pip install ocrmac). "
+                      "Requires macOS 10.15+.",
+    },
+}
+
+
+# ---------------------------------------------------------------- Parameters
 @dataclass
 class OcrParams:
     """
-    Default = MASSIMA ACCURATEZZA (fps alto, nessuno skip, 3 varianti, banda
-    cartelli attiva, raffinamento tempi). Con questi valori una puntata da
-    20-24 min richiede ~1.5-2 ore. Per un profilo veloce (~10-15 min):
+    Defaults = MAXIMUM ACCURACY (high fps, no skipping, 3 variants, signs
+    band enabled, timing refinement). With these values a 20-24 min episode
+    takes ~1.5-2 hours. For a fast profile (~10-15 min):
     fps=6, skip_hamming=1, multi_variant=False, top_band=False.
     """
-    fps: float = 12.0                  # frame/sec analizzati (12 = max precisione
-                                       # nel rilevare sub brevissimi e confini)
+    fps: float = 12.0                  # frames/sec analyzed (12 = max precision
+                                       # in detecting very short subs and boundaries)
     lang_hint: str = "Italian"
-    # banda inferiore (dialoghi)
-    bottom_keep_pct: int = 28          # altezza tenuta dal basso (%)
-    keep_w_pct: int = 96               # larghezza centrata tenuta (%)
-    # banda superiore (cartelli / insegne / note del traduttore)
-    top_band: bool = True              # ON di default: cattura i cartelli {\an8}
-    top_keep_pct: int = 22             # altezza tenuta dall'alto (%)
-    top_keep_w_pct: int = 100          # larghezza centrata banda cartelli (%)
-                                       # (riduci per escludere watermark negli angoli)
+    # bottom band (dialogue)
+    bottom_keep_pct: int = 28          # height kept from the bottom (%)
+    keep_w_pct: int = 96               # centered width kept (%)
+    # top band (signs / banners / translator notes)
+    top_band: bool = True              # ON by default: captures {\an8} signs
+    top_keep_pct: int = 22             # height kept from the top (%)
+    top_keep_w_pct: int = 100          # centered width of the signs band (%)
+                                       # (reduce to exclude watermarks in the corners)
     # OCR
     recognition_level: str = "accurate"
     min_confidence: float = 0.30
-    multi_variant: bool = True         # OCR in 3 varianti + voto (consigliato)
-    # skip frame ridondanti (dhash vs frame precedente):
-    # 0 = OCR di OGNI frame, nessuna assunzione (max accuratezza, default);
-    # 1 = salta i quasi-identici (~20-30% piu' veloce, tempi identici misurati);
-    # >=2 = piu' veloce ma i confini base si spostano (il raffinamento recupera).
+    multi_variant: bool = True         # OCR in 3 variants + voting (recommended)
+    # skip redundant frames (dhash vs previous frame):
+    # 0 = OCR EVERY frame, no assumptions (max accuracy, default);
+    # 1 = skip near-identical ones (~20-30% faster, measured identical timing);
+    # >=2 = faster but the base boundaries drift (refinement recovers them).
     skip_hamming: int = 0
     # timing
-    refine_timing: bool = True         # raffina inizio/fine al framerate nativo
-    # segmenti
-    min_duration: float = 0.20         # sotto questa durata -> scartato (ma nel report di revisione)
-    merge_gap: float = 0.6             # unisci segmenti vicini con testo simile
+    refine_timing: bool = True         # refine start/end at the native frame rate
+    # segments
+    min_duration: float = 0.20         # below this duration -> dropped (but kept in the review report)
+    merge_gap: float = 0.6             # merge nearby segments with similar text
     wrap_width: int = 42
     workers: int = 4
     # QC
     qc_report: bool = True
-    qc_gap_warn: float = 6.0           # buchi senza sub piu' lunghi di X sec nel report di revisione
-    qc_conf_warn: float = 0.80         # sotto questa confidenza -> riga "gialla"
-    qc_agree_warn: float = 0.70        # sotto questo accordo varianti -> "gialla"
+    qc_gap_warn: float = 6.0           # gaps without subs longer than X sec go in the review report
+    qc_conf_warn: float = 0.80         # below this confidence -> "yellow" line
+    qc_agree_warn: float = 0.70        # below this variant agreement -> "yellow"
     ignore_lines: List[str] = field(default_factory=list)
-    # correzioni automatiche "sbagliato => giusto" (da correzioni.txt):
-    # per i typo RICORRENTI che l'OCR non risolvera' mai (es. nomi propri su
-    # font impossibili: "Flamilion => Hamilton"). Applicate a fine pipeline.
+    # automatic "wrong => right" corrections (from correzioni.txt):
+    # for the RECURRING typos the OCR will never fix (e.g. proper nouns on
+    # impossible fonts: "Flamilion => Hamilton"). Applied at pipeline end.
     corrections: List[Tuple[str, str]] = field(default_factory=list)
 
 
@@ -123,13 +167,13 @@ class SegInfo:
     start: float
     end: float
     text: str
-    conf: float = 1.0                  # confidenza media pesata del testo vincente
-    agree: float = 1.0                 # quota di voti del testo vincente (0-1)
-    nframes: int = 0                   # frame che compongono il segmento
-    top: bool = False                  # True = banda superiore (cartello)
-    thumb: str = ""                    # thumbnail JPEG base64 (per il report di revisione)
-    alts: List[str] = field(default_factory=list)   # letture alternative scartate
-    flags: List[str] = field(default_factory=list)  # note QC
+    conf: float = 1.0                  # weighted average confidence of the winning text
+    agree: float = 1.0                 # vote share of the winning text (0-1)
+    nframes: int = 0                   # frames that make up the segment
+    top: bool = False                  # True = top band (sign)
+    thumb: str = ""                    # base64 JPEG thumbnail (for the review report)
+    alts: List[str] = field(default_factory=list)   # discarded alternative readings
+    flags: List[str] = field(default_factory=list)  # QC notes
 
 
 @dataclass
@@ -158,7 +202,7 @@ def ffprobe_duration(video: str) -> float:
 
 
 def ffprobe_fps(video: str) -> float:
-    """Framerate nativo del video (per il raffinamento dei confini)."""
+    """Native frame rate of the video (for boundary refinement)."""
     for entry in ("avg_frame_rate", "r_frame_rate"):
         try:
             val = _run(["ffprobe", "-v", "error", "-select_streams", "v:0",
@@ -177,7 +221,7 @@ def ffprobe_fps(video: str) -> float:
 
 
 def band_crop(p: OcrParams, band: str) -> str:
-    """Espressione crop ffmpeg per la banda richiesta ('bottom' | 'top')."""
+    """ffmpeg crop expression for the requested band ('bottom' | 'top')."""
     if band == "top":
         vb = max(1, min(100, int(p.top_keep_pct)))
         kw = max(1, min(100, int(p.top_keep_w_pct)))
@@ -192,13 +236,15 @@ def band_crop(p: OcrParams, band: str) -> str:
 
 
 def extract_frames(video: str, outdir: Path, p: OcrParams, band: str,
-                   progress_cb: Optional[Callable[[float, str], None]] = None
+                   progress_cb: Optional[Callable[[float, str], None]] = None,
+                   ui_lang: str = "it"
                    ) -> Tuple[List[Path], float]:
     """
-    Estrae i frame della banda richiesta, SENZA filtri di enhancement:
-    l'immagine raw legge meglio (misurato); le varianti si generano in PIL
-    al momento dell'OCR, cosi' possono votare.
+    Extracts the frames of the requested band, WITHOUT enhancement filters:
+    the raw image reads better (measured); the variants are generated in PIL
+    at OCR time, so they can vote.
     """
+    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     outdir.mkdir(parents=True, exist_ok=True)
     vf = f"fps={p.fps},{band_crop(p, band)}"
     pattern = str(outdir / "f_%08d.jpg")
@@ -211,17 +257,18 @@ def extract_frames(video: str, outdir: Path, p: OcrParams, band: str,
         time.sleep(0.3)
         cnt = sum(1 for _ in outdir.glob("f_*.jpg"))
         if progress_cb and expected:
-            progress_cb(min(0.99, cnt / expected), f"{cnt}/~{expected} frame")
+            progress_cb(min(0.99, cnt / expected),
+                        tr["frames_progress"].format(cnt=cnt, exp=expected))
     _, err = proc.communicate()
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=err)
     frames = sorted(outdir.glob("f_*.jpg"))
     if progress_cb:
-        progress_cb(1.0, f"{len(frames)} frame estratti")
+        progress_cb(1.0, tr["frames_done"].format(n=len(frames)))
     return frames, 1.0 / max(p.fps, 0.001)
 
 
-# ---------------------------------------------------------------- immagini
+# ---------------------------------------------------------------- images
 def dhash(path: Path, hash_size: int = 16) -> int:
     im = Image.open(path)
     im = ImageOps.grayscale(im).resize((hash_size + 1, hash_size), Image.BILINEAR)
@@ -250,12 +297,12 @@ def livetext_available() -> bool:
 
 def gen_variants(im: Image.Image, multi: bool) -> List[Tuple[str, Image.Image, str]]:
     """
-    Varianti per il voto: (nome, immagine, framework).
-    Scelte MISURATE su frame difficili reali (font corsivo con alone):
-    - raw/vision ed enhanced/vision sbagliano su righe diverse;
-    - raw/livetext (il secondo motore OCR di Apple, quello di "Testo attivo")
-      e' forte ovunque ed essendo un motore INDIPENDENTE diversifica il voto;
-    - grayscale e downscale sono stati provati e scartati (instabili/peggiori).
+    Variants for the vote: (name, image, framework).
+    Choices MEASURED on real difficult frames (italic font with halo):
+    - raw/vision and enhanced/vision fail on different lines;
+    - raw/livetext (Apple's second OCR engine, the "Live Text" one) is
+      strong everywhere and, being an INDEPENDENT engine, diversifies the vote;
+    - grayscale and downscale were tried and discarded (unstable/worse).
     """
     out = [("raw", im, "vision")]
     if multi:
@@ -265,7 +312,7 @@ def gen_variants(im: Image.Image, multi: bool) -> List[Tuple[str, Image.Image, s
         if livetext_available():
             out.append(("lt", im, "livetext"))
         else:
-            # fallback per macOS < 13: terza variante vision in grayscale
+            # fallback for macOS < 13: third vision variant in grayscale
             gray = ImageOps.grayscale(im).convert("RGB")
             gray = ImageEnhance.Contrast(gray).enhance(1.6)
             out.append(("gray", gray, "vision"))
@@ -273,7 +320,7 @@ def gen_variants(im: Image.Image, multi: bool) -> List[Tuple[str, Image.Image, s
 
 
 def thumb_b64(path: Path, width: int = 440) -> str:
-    """Thumbnail JPEG base64 per il report di revisione (autonomo, niente file esterni)."""
+    """Base64 JPEG thumbnail for the review report (self-contained, no external files)."""
     try:
         im = Image.open(path).convert("RGB")
         if im.width > width:
@@ -314,14 +361,14 @@ def warmup(langs: List[str], level: str = "accurate") -> None:
 def ocr_conf(img: Image.Image, langs: List[str], level: str,
              min_conf: float, framework: str = "vision") -> Tuple[str, float]:
     """
-    OCR di una singola immagine. Ritorna (testo multi-riga, confidenza media).
-    framework: "vision" (VNRecognizeText) o "livetext" (motore di Testo attivo).
+    OCR of a single image. Returns (multi-line text, average confidence).
+    framework: "vision" (VNRecognizeText) or "livetext" (Live Text engine).
 
-    Entrambi possono SPEZZARE una singola riga visiva in piu' osservazioni
-    (LiveText addirittura in token), e l'ordine di ritorno non e' affidabile:
-    ordinare solo per y puo' invertire i pezzi della stessa riga. Quindi:
-    raggruppiamo i box in RIGHE VISIVE (per sovrapposizione verticale) e
-    dentro ogni riga ordiniamo da sinistra a destra, unendo con spazi.
+    Both can SPLIT a single visual line into several observations (LiveText
+    even into tokens), and the return order is not reliable: sorting by y
+    alone can invert the pieces of the same line. So: we group the boxes
+    into VISUAL LINES (by vertical overlap) and inside each line we sort
+    left to right, joining with spaces.
     """
     from ocrmac import ocrmac
     if framework == "livetext":
@@ -330,18 +377,18 @@ def ocr_conf(img: Image.Image, langs: List[str], level: str,
     else:
         res = ocrmac.OCR(img, recognition_level=level,
                          language_preference=langs).recognize()
-    # res: (text, confidence, bbox) con bbox=(x, y, w, h) normalizzato,
-    # origine in basso a sinistra (convenzione Vision) -> y grande = in alto.
+    # res: (text, confidence, bbox) with normalized bbox=(x, y, w, h),
+    # origin at the bottom left (Vision convention) -> large y = at the top.
     items = [(t.strip(), c, box) for (t, c, box) in res if t.strip() and c >= min_conf]
     if not items:
         return "", 0.0
 
     lines: List[dict] = []
-    # scorri dall'alto verso il basso (centro verticale decrescente)
+    # scan top to bottom (decreasing vertical center)
     for t, c, (x, y, w, h) in sorted(items, key=lambda r: -(r[2][1] + r[2][3] / 2)):
         yc = y + h / 2
         for ln in lines:
-            # stessa riga visiva se i centri distano meno di ~mezza altezza
+            # same visual line if the centers are less than ~half a height apart
             if abs(yc - ln["yc"]) < max(h, ln["h"]) * 0.6:
                 ln["parts"].append((x, t))
                 ln["yc"] = (ln["yc"] + yc) / 2
@@ -358,10 +405,10 @@ def ocr_conf(img: Image.Image, langs: List[str], level: str,
 
 def vote_texts(cands: List[Tuple[str, float]]) -> Tuple[str, float, float, List[str]]:
     """
-    Voto a maggioranza pesata per confidenza tra letture alternative.
-    Ritorna (testo_vincente, confidenza, quota_accordo, alternative_scartate).
-    Le letture vuote non votano: qualunque testo batte il vuoto (Vision non
-    inventa testo dove non c'e'; se una variante legge, di norma c'e' testo).
+    Confidence-weighted majority vote among alternative readings.
+    Returns (winning_text, confidence, agreement_share, discarded_alternatives).
+    Empty readings do not vote: any text beats emptiness (Vision does not
+    invent text where there is none; if a variant reads, there usually is text).
     """
     groups: Dict[str, dict] = {}
     for text, conf in cands:
@@ -376,7 +423,7 @@ def vote_texts(cands: List[Tuple[str, float]]) -> Tuple[str, float, float, List[
         return "", 0.0, 1.0, []
     total = sum(g["w"] for g in groups.values())
     key, g = max(groups.items(), key=lambda kv: kv[1]["w"])
-    # forma raw piu' frequente del gruppo vincente (a parita': la piu' lunga)
+    # most frequent raw form of the winning group (ties: the longest)
     raw = max(g["raw"].items(), key=lambda kv: (kv[1], len(kv[0])))[0]
     conf = sum(g["confs"]) / len(g["confs"])
     agree = g["w"] / total if total > 0 else 1.0
@@ -384,7 +431,7 @@ def vote_texts(cands: List[Tuple[str, float]]) -> Tuple[str, float, float, List[
     return raw, conf, agree, alts
 
 
-# ---------------------------------------------------------------- testo/filtri
+# ---------------------------------------------------------------- text/filters
 _NO_SUB_REGEX = [
     r"non\s+c(?:i\s+)?sono\s+sottotitol",
     r"nessun\s+sottotitol",
@@ -424,7 +471,7 @@ def texts_similar(a: str, b: str, ratio: float = 0.10) -> bool:
         return True
     if not a1 or not b1:
         return False
-    # parziali di dissolvenza: un testo e' contenuto nell'altro
+    # fade partials: one text is contained in the other
     short, long = (a1, b1) if len(a1) <= len(b1) else (b1, a1)
     if len(short) >= 10 and short in long:
         return True
@@ -463,11 +510,11 @@ def sanitize(text: str, ignore_lines: List[str]) -> str:
     return t
 
 
-# Parole "legate" al seguito: spezzare la riga DOPO una di queste e' brutto
-# (es. "intenzione di / mangiare", "I don't have the / slightest idea").
-# Penalizzate nella scelta del punto di taglio. Liste per le lingue usate
-# davvero (it/en); per le ALTRE lingue si usano solo le regole universali
-# (bilanciamento + punteggiatura), che restano efficaci ovunque.
+# Words "bound" to what follows: breaking the line AFTER one of these is ugly
+# (e.g. "intenzione di / mangiare", "I don't have the / slightest idea").
+# Penalized when choosing the break point. Lists for the languages actually
+# used (it/en); for the OTHER languages only the universal rules are used
+# (balancing + punctuation), which remain effective everywhere.
 _FUNC_WORDS_IT = frozenset({
     "di", "a", "da", "in", "con", "su", "per", "tra", "fra", "e", "o", "ma",
     "che", "non", "il", "lo", "la", "i", "gli", "le", "un", "uno", "una",
@@ -495,28 +542,28 @@ def _func_words(lang_hint: str) -> frozenset:
         return _FUNC_WORDS_IT
     if code.startswith("en"):
         return _FUNC_WORDS_EN
-    return frozenset()      # altre lingue: solo bilanciamento + punteggiatura
+    return frozenset()      # other languages: balancing + punctuation only
 
 
 def _break_cost(words: List[str], i: int, left: str, func_words: frozenset) -> int:
-    """Qualita' di un taglio DOPO la parola i-1 (piu' basso = meglio)."""
+    """Quality of a break AFTER word i-1 (lower = better)."""
     cost = 0
     if left[-1] in ",;:!?…—":
-        cost -= 10                       # pausa naturale: ottimo punto di taglio
+        cost -= 10                       # natural pause: excellent break point
     if words[i - 1].lower().strip("'\",.;:!?…") in func_words:
-        cost += 14                       # non staccare articoli/preposizioni dal seguito
+        cost += 14                       # don't detach articles/prepositions from what follows
     return cost
 
 
 def smart_wrap(s: str, width: int, lang_hint: str = "Italian") -> str:
     """
-    A capo BILANCIATO (stile sottotitolaggio professionale):
-    - <= width: una riga sola;
-    - altrimenti 2 righe (poi 3) di lunghezza il piu' possibile SIMILE,
-      spezzando solo agli spazi, preferendo la punteggiatura ed evitando
-      di lasciare articoli/preposizioni a fine riga (it/en; altre lingue:
-      solo regole universali);
-    - mai spezzare le parole; fallback greedy per i casi estremi.
+    BALANCED line wrapping (professional subtitling style):
+    - <= width: a single line;
+    - otherwise 2 lines (then 3) of lengths as SIMILAR as possible,
+      breaking only at spaces, preferring punctuation and avoiding
+      leaving articles/prepositions at the end of a line (it/en; other
+      languages: universal rules only);
+    - never break words; greedy fallback for extreme cases.
     """
     s = s.strip()
     if "\n" in s or len(s) <= width or " " not in s:
@@ -524,7 +571,7 @@ def smart_wrap(s: str, width: int, lang_hint: str = "Italian") -> str:
     words = s.split()
     fw = _func_words(lang_hint)
 
-    # --- 2 righe bilanciate
+    # --- 2 balanced lines
     best2, c2 = None, None
     for i in range(1, len(words)):
         left, right = " ".join(words[:i]), " ".join(words[i:])
@@ -534,12 +581,12 @@ def smart_wrap(s: str, width: int, lang_hint: str = "Italian") -> str:
         if c2 is None or c < c2:
             c2, best2 = c, (left, right)
 
-    # 2 righe "buone" (taglio pulito e bilanciato) vincono sempre
+    # 2 "good" lines (clean, balanced break) always win
     if best2 and c2 < 14:
         return best2[0] + "\n" + best2[1]
 
-    # --- 3 righe bilanciate (anche come rimedio a un 2-righe brutto,
-    #     es. quando l'unico taglio possibile cade dopo un articolo)
+    # --- 3 balanced lines (also as a remedy for an ugly 2-line split,
+    #     e.g. when the only possible break falls after an article)
     n = len(words)
     best3, c3 = None, None
     for i in range(1, n - 1):
@@ -558,15 +605,15 @@ def smart_wrap(s: str, width: int, lang_hint: str = "Italian") -> str:
             if c3 is None or c < c3:
                 c3, best3 = c, (l1, l2, l3)
 
-    # preferisci comunque 2 righe, a meno che 3 righe non siano migliori
-    # (+8 = "costo" della riga in piu'; a parita' vincono le 3 righe,
-    # perche' qui il 2-righe ha per forza un taglio brutto: c2 >= 14)
+    # still prefer 2 lines, unless 3 lines are better
+    # (+8 = "cost" of the extra line; ties go to the 3 lines, because
+    # here the 2-line split necessarily has an ugly break: c2 >= 14)
     if best2 and (best3 is None or c3 + 8 > c2):
         return best2[0] + "\n" + best2[1]
     if best3:
         return "\n".join(best3)
 
-    # --- fallback greedy (testi estremi): righe piene, mai parole spezzate
+    # --- greedy fallback (extreme texts): full lines, never broken words
     lines, cur = [], ""
     for w in words:
         cand = (cur + " " + w).strip()
@@ -581,7 +628,7 @@ def smart_wrap(s: str, width: int, lang_hint: str = "Italian") -> str:
 
 
 def apply_corrections(text: str, corrections: List[Tuple[str, str]]) -> str:
-    """Sostituzioni 'sbagliato => giusto' (case-insensitive, le piu' lunghe prima)."""
+    """'wrong => right' replacements (case-insensitive, longest first)."""
     if not text or not corrections:
         return text
     for wrong, right in corrections:
@@ -614,7 +661,7 @@ def fmt_hms(sec: float) -> str:
 
 
 def srt_ts(sec: float) -> str:
-    # calcolo in millisecondi totali: evita il bug ms=1000 con frazioni ~.9995+
+    # computed in total milliseconds: avoids the ms=1000 bug with ~.9995+ fractions
     total_ms = max(0, int(round(sec * 1000)))
     ms = total_ms % 1000
     s = (total_ms // 1000) % 60
@@ -654,7 +701,7 @@ def parse_srt(path: Path) -> List[Tuple[float, float, str]]:
 def merge_segments(segs: List[Tuple[float, float, str]], merge_gap: float,
                    min_duration: float, ignore_lines: List[str],
                    wrap: int, lang_hint: str = "Italian") -> List[Tuple[float, float, str]]:
-    """Versione su tuple usata dalla scheda Sub fix (pulizia SRT esistenti)."""
+    """Tuple-based version used by the Sub fix tab (cleanup of existing SRTs)."""
     if not segs:
         return []
     out: List[Tuple[float, float, str]] = []
@@ -676,12 +723,15 @@ def merge_segments(segs: List[Tuple[float, float, str]], merge_gap: float,
 
 # ---------------------------------------------------------------- pipeline
 def select_ocr_targets(frames: List[Path], skip_hamming: int,
-                       progress_cb: Optional[Callable[[float, str], None]] = None
+                       progress_cb: Optional[Callable[[float, str], None]] = None,
+                       ui_lang: str = "it"
                        ) -> List[int]:
     """
-    Frame da OCR-are: il frame 0 e ogni frame che differisce dal PRECEDENTE
-    (dhash) piu' di skip_hamming. Gli altri ereditano il testo (forward-fill).
+    Frames to OCR: frame 0 and every frame that differs from the PREVIOUS
+    one (dhash) by more than skip_hamming. The others inherit the text
+    (forward-fill).
     """
+    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     n = len(frames)
     targets: List[int] = []
     prev = None
@@ -694,7 +744,7 @@ def select_ocr_targets(frames: List[Path], skip_hamming: int,
             targets.append(i)
         prev = h
         if progress_cb and (i % 300 == 0):
-            progress_cb(i / max(n, 1), f"Analisi frame {i}/{n}")
+            progress_cb(i / max(n, 1), tr["analyze_frame"].format(i=i, n=n))
     return targets
 
 
@@ -702,16 +752,16 @@ def segments_from_frames(per_text: List[str], per_conf: List[float],
                          per_alts: List[List[str]], dt: float
                          ) -> List[SegInfo]:
     """
-    Segmenti dal testo per-frame, con voto di segmento:
-    - frame vuoto  -> chiude il segmento;
-    - testo simile -> estende e ACCUMULA il voto (peso = confidenza);
-    - testo diverso -> chiude e apre un nuovo segmento.
-    Il testo finale e' il gruppo col peso maggiore tra i frame del segmento.
+    Segments from the per-frame text, with segment voting:
+    - empty frame   -> closes the segment;
+    - similar text  -> extends and ACCUMULATES the vote (weight = confidence);
+    - different text -> closes and opens a new segment.
+    The final text is the group with the highest weight among the segment frames.
     """
     segs: List[SegInfo] = []
     cs: Optional[int] = None
     groups: Dict[str, dict] = {}
-    rep = ""            # rappresentante corrente per il confronto di similarita'
+    rep = ""            # current representative for the similarity comparison
     alts_seen: Dict[str, int] = {}
 
     def close(end_idx: int):
@@ -740,7 +790,7 @@ def segments_from_frames(per_text: List[str], per_conf: List[float],
         g["confs"].append(cf)
         for a in al:
             alts_seen[a] = alts_seen.get(a, 0) + 1
-        # il rappresentante e' il raw del gruppo attualmente piu' pesante
+        # the representative is the raw text of the currently heaviest group
         bk, bg = max(groups.items(), key=lambda kv: kv[1]["w"])
         rep = max(bg["raw"].items(), key=lambda kv: (kv[1], len(kv[0])))[0]
 
@@ -763,9 +813,9 @@ def segments_from_frames(per_text: List[str], per_conf: List[float],
 
 def merge_seginfos(segs: List[SegInfo], merge_gap: float) -> List[SegInfo]:
     """
-    Unisce segmenti adiacenti con testo simile (soglia LEGGERMENTE piu' larga:
-    qui si ricompongono i pezzi di fade con qualche typo). Vince il testo del
-    segmento con piu' frame (piu' stabile).
+    Merges adjacent segments with similar text (SLIGHTLY wider threshold:
+    this is where fade pieces with some typos get recomposed). The text of
+    the segment with more frames wins (more stable).
     """
     if not segs:
         return []
@@ -793,13 +843,15 @@ def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
                           native_fps: float, crop_expr: str, langs: List[str],
                           p: OcrParams, tmp_root: Path,
                           progress_cb: Optional[Callable[[float, str], None]] = None,
+                          ui_lang: str = "it",
                           ) -> int:
     """
-    Raffina inizio/fine di ogni segmento al framerate NATIVO: estrae una
-    finestra ±dt attorno al confine e cerca il primo/ultimo frame in cui il
-    testo del segmento e' visibile. Precisione ~1 frame nativo (~±20ms).
-    Ritorna il numero di confini spostati.
+    Refines the start/end of every segment at the NATIVE frame rate: extracts
+    a ±dt window around the boundary and looks for the first/last frame in
+    which the segment text is visible. Precision ~1 native frame (~±20ms).
+    Returns the number of boundaries moved.
     """
+    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     moved = 0
     ndt = 1.0 / max(native_fps, 1.0)
 
@@ -815,7 +867,7 @@ def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
             out = []
             for k, fp in enumerate(sorted(d.glob("w_*.jpg"))):
                 im = Image.open(fp).convert("RGB")
-                # per la sola presenza/assenza basta la variante raw
+                # for mere presence/absence the raw variant is enough
                 txt, _ = ocr_conf(im, langs, p.recognition_level, p.min_confidence)
                 out.append((max(0.0, t0) + k * ndt, txt))
             return out
@@ -825,7 +877,7 @@ def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
             shutil.rmtree(d, ignore_errors=True)
 
     for n, seg in enumerate(segs):
-        # confine di INIZIO: primo frame nativo con testo simile
+        # START boundary: first native frame with similar text
         win = window_texts(seg.start - dt, seg.start + dt)
         for t, txt in win:
             if txt and texts_similar(txt, seg.text, ratio=0.25):
@@ -833,7 +885,7 @@ def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
                     moved += 1
                 seg.start = t
                 break
-        # confine di FINE: ultimo frame nativo con testo simile
+        # END boundary: last native frame with similar text
         win = window_texts(seg.end - dt, seg.end + dt)
         last = None
         for t, txt in win:
@@ -846,9 +898,9 @@ def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
             seg.end = new_end
         if progress_cb:
             progress_cb((n + 1) / max(1, len(segs)),
-                        f"{n + 1}/{len(segs)} righe")
+                        tr["refine_rows"].format(i=n + 1, n=len(segs)))
 
-    # elimina piccole sovrapposizioni introdotte dal raffinamento
+    # remove small overlaps introduced by the refinement
     segs.sort(key=lambda s: s.start)
     for a, b in zip(segs, segs[1:]):
         if b.start < a.end:
@@ -863,10 +915,10 @@ def _esc(s: str) -> str:
              .replace("\n", "<br>"))
 
 
-# Template dell'editor di revisione. NON e' una f-string: i valori dinamici entrano via
-# .replace() sui token __TOKEN__ (il JS/CSS e' pieno di graffe).
-# Le stringhe visibili (it/en) vivono in _QC_I18N: entrano anch'esse via token
-# (__T_*__ nell'HTML, oggetto T=__JSTR__ nel JS).
+# Review-editor template. NOT an f-string: dynamic values enter via
+# .replace() on __TOKEN__ tokens (the JS/CSS is full of braces).
+# The visible strings (it/en) live in _QC_I18N: they also enter via tokens
+# (__T_*__ in the HTML, the T=__JSTR__ object in the JS).
 _QC_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="__LANG__"><head><meta charset="utf-8">
 <title>__T_TITLE__ — __VIDEO__</title>
@@ -1284,10 +1336,10 @@ updateCounter();
 """
 
 
-# Stringhe del report di revisione (solo testo, zero logica).
-# "html": token __T_*__ del markup; "js": oggetto T usato dagli script;
-# "flags": traduzione delle note QC generate dalla pipeline (in italiano);
-# "summary": riepilogo in testa al report.
+# Review-report strings (text only, zero logic).
+# "html": __T_*__ tokens of the markup; "js": the T object used by the scripts;
+# "flags": translation of the QC notes generated by the pipeline (in Italian);
+# "summary": the recap at the top of the report.
 _QC_I18N = {
     "it": {
         "html": {
@@ -1335,7 +1387,7 @@ _QC_I18N = {
             "addHere": "➕ aggiungi riga qui",
             "addedFlag": "aggiunta a mano",
         },
-        "flags": {},    # le note QC nascono già in italiano
+        "flags": {},    # the QC notes are generated in Italian already
         "summary": (
             "SRT: <b>{srt}</b><br>"
             "Righe: <b>{rows}</b> · da ricontrollare: <b>{warn}</b> · "
@@ -1413,14 +1465,14 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
                   gaps: List[Tuple[float, float, str]], stats: RunStats,
                   p: OcrParams, ui_lang: str = "it") -> None:
     """
-    Report di revisione INTERATTIVO e autonomo (un solo file HTML, offline):
-    - testo di ogni riga editabile; le letture alternative si applicano con
-      un click; righe includibili/escludibili (anche recuperare le scartate);
-    - righe nuove aggiungibili nei "buchi" (tempi precompilati);
-    - tempi editabili; tag {\\an8} attivabile per riga;
-    - "Salva SRT revisionato" genera l'SRT finale; le modifiche restano
-      salvate nel browser (localStorage) tra una sessione e l'altra.
-    ui_lang ("it" | "en") sceglie la lingua dei testi del report.
+    INTERACTIVE, self-contained review report (a single offline HTML file):
+    - every line's text is editable; alternative readings apply with one
+      click; lines can be included/excluded (dropped ones recoverable);
+    - new lines can be added in the "gaps" (prefilled times);
+    - editable times; {\\an8} tag toggleable per line;
+    - "Save reviewed SRT" generates the final SRT; changes stay saved in
+      the browser (localStorage) across sessions.
+    ui_lang ("it" | "en") picks the language of the report texts.
     """
     import json
 
@@ -1471,17 +1523,18 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
     path.write_text(html, encoding="utf-8")
 
 
-# ---------------------------------------------------------------- orchestrazione
+# ---------------------------------------------------------------- orchestration
 def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
                   workdir: Path, stats: RunStats,
-                  progress_cb, log_cb) -> Tuple[List[SegInfo], List[SegInfo], List[Tuple[float, float, str]]]:
+                  progress_cb, log_cb,
+                  ui_lang: str = "it") -> Tuple[List[SegInfo], List[SegInfo], List[Tuple[float, float, str]]]:
     """
-    Elabora una banda ('bottom' o 'top') e ritorna (segmenti, scartati, gaps).
-    I thumbnail report di revisione vengono catturati QUI, prima che i frame vengano cancellati.
+    Processes one band ('bottom' or 'top') and returns (segments, dropped, gaps).
+    The review-report thumbnails are captured HERE, before the frames are deleted.
     """
     def stage(name):
-        # chiave "stage:banda" (es. "ocr:bottom") cosi' la GUI puo' dedicare
-        # una riga di avanzamento a ogni step di ogni banda.
+        # "stage:band" key (e.g. "ocr:bottom") so the GUI can dedicate a
+        # progress row to every step of every band.
         def cb(ratio, text):
             if progress_cb:
                 progress_cb(f"{name}:{band}", ratio, text)
@@ -1491,17 +1544,20 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
         if log_cb:
             log_cb(f"[{band}] {msg}")
 
-    frames, dt = extract_frames(video, workdir / f"frames_{band}", p, band, stage("extract"))
+    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
+    frames, dt = extract_frames(video, workdir / f"frames_{band}", p, band,
+                                stage("extract"), ui_lang=ui_lang)
     stats.frames += len(frames)
-    log(f"{len(frames)} frame @ {p.fps}fps")
+    log(tr["log_frames"].format(n=len(frames), fps=p.fps))
     if not frames:
         return [], [], []
 
-    targets = select_ocr_targets(frames, p.skip_hamming, stage("group"))
-    stage("group")(1.0, f"{len(targets)}/{len(frames)} frame da leggere")
-    log(f"{len(targets)}/{len(frames)} frame da OCR-are")
+    targets = select_ocr_targets(frames, p.skip_hamming, stage("group"),
+                                 ui_lang=ui_lang)
+    stage("group")(1.0, tr["to_read"].format(t=len(targets), n=len(frames)))
+    log(tr["log_to_ocr"].format(t=len(targets), n=len(frames)))
 
-    # ---- OCR multi-variante in parallelo
+    # ---- multi-variant OCR in parallel
     nvar = len(gen_variants(Image.new("RGB", (2, 2)), p.multi_variant))
     results: Dict[int, Tuple[str, float, List[str]]] = {}
     done = 0
@@ -1521,12 +1577,12 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
                 idx, res = fut.result()
                 results[idx] = res
             except Exception as e:
-                log(f"OCR errore su un frame: {e}")
+                log(tr["log_ocr_err"].format(e=e))
             done += 1
             stats.ocr_calls += nvar
             if progress_cb and (done % 10 == 0 or done == len(targets)):
                 progress_cb(f"ocr:{band}", done / len(targets),
-                            f"{done}/{len(targets)} frame")
+                            tr["ocr_progress"].format(done=done, n=len(targets)))
 
     # ---- forward-fill + sanitize
     per_text: List[str] = []
@@ -1541,19 +1597,19 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
         per_conf.append(cur[1] if t else 0.0)
         per_alts.append(cur[2] if t else [])
 
-    # ---- segmenti + merge
+    # ---- segments + merge
     segs = segments_from_frames(per_text, per_conf, per_alts, dt)
     segs = merge_seginfos(segs, p.merge_gap)
     for s in segs:
         s.top = (band == "top")
 
-    # ---- anti-flash + anti-rumore: separa (NON butta: tutto finisce nel report di revisione)
+    # ---- anti-flash + anti-noise: separates (does NOT discard: everything goes in the review report)
     def is_noise(s: SegInfo) -> bool:
         """
-        Letture brevissime quasi senza lettere (". L", "10)"): di norma sono
-        elementi grafici della scena, non sottotitoli. I sub veri cortissimi
-        ("Si'", "Eh?") hanno >=2 lettere o durano di piu'. In caso di dubbio
-        finiscono comunque nel report di revisione con thumbnail.
+        Very short readings with almost no letters (". L", "10)"): they are
+        usually graphic elements of the scene, not subtitles. Real very short
+        subs ("Si'", "Eh?") have >=2 letters or last longer. When in doubt
+        they still end up in the review report with a thumbnail.
         """
         letters = sum(c.isalpha() for c in s.text)
         dur = s.end - s.start
@@ -1570,7 +1626,7 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
         else:
             kept.append(s)
 
-    # ---- thumbnails (prima che i frame spariscano)
+    # ---- thumbnails (before the frames disappear)
     def snap(seg: SegInfo):
         mid = int(((seg.start + seg.end) / 2) / dt)
         mid = max(0, min(len(frames) - 1, mid))
@@ -1579,7 +1635,7 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
     for s in kept + dropped:
         snap(s)
 
-    # ---- gap lunghi senza sub (solo banda dialoghi) con thumbnail a meta'
+    # ---- long gaps without subs (dialogue band only) with mid-gap thumbnail
     gaps: List[Tuple[float, float, str]] = []
     if band == "bottom":
         anchors = [0.0] + [s.end for s in kept]
@@ -1590,14 +1646,15 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
                 mid = max(0, min(len(frames) - 1, mid))
                 gaps.append((a, b, thumb_b64(frames[mid])))
 
-    # ---- raffinamento confini al framerate nativo
+    # ---- boundary refinement at the native frame rate
     if p.refine_timing and kept:
         native = ffprobe_fps(video)
-        log(f"raffinamento confini a {native:.3f} fps nativi…")
+        log(tr["log_refining"].format(fps=native))
         moved = refine_segment_bounds(video, kept, dt, native, band_crop(p, band),
-                                      langs, p, workdir, stage("refine"))
+                                      langs, p, workdir, stage("refine"),
+                                      ui_lang=ui_lang)
         stats.refined += moved
-        log(f"{moved} confini spostati")
+        log(tr["log_moved"].format(n=moved))
 
     return kept, dropped, gaps
 
@@ -1609,14 +1666,14 @@ def process_video(video: str, out_path: str, p: OcrParams,
                   ui_lang: str = "it"
                   ) -> Tuple[List[Tuple[float, float, str]], RunStats]:
     """
-    Pipeline completa. progress_cb(stage, ratio, text) con stage in
-    {"extract","group","ocr","refine"}. Ritorna (segmenti_tuple, stats);
-    stats.qc_path contiene il percorso del report di revisione (se generato).
-    ui_lang ("it" | "en") e' solo la lingua dei testi del report di revisione.
+    Full pipeline. progress_cb(stage, ratio, text) with stage in
+    {"extract","group","ocr","refine"}. Returns (tuple_segments, stats);
+    stats.qc_path holds the path of the review report (if generated).
+    ui_lang ("it" | "en") is only the language of the review-report texts.
     """
+    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     if not vision_available():
-        raise RuntimeError("Apple Vision non disponibile (pip install ocrmac). "
-                           "Serve macOS 10.15+.")
+        raise RuntimeError(tr["vision_err"])
     langs = resolve_langs(p.lang_hint)
     tmp_root = Path(tmp_root or tempfile.gettempdir())
     tmp_root.mkdir(parents=True, exist_ok=True)
@@ -1633,14 +1690,15 @@ def process_video(video: str, out_path: str, p: OcrParams,
         bands = ["bottom"] + (["top"] if p.top_band else [])
         for band in bands:
             kept, dropped, g = _process_band(video, band, p, langs, workdir,
-                                             stats, progress_cb, log_cb)
+                                             stats, progress_cb, log_cb,
+                                             ui_lang=ui_lang)
             all_segs += kept
             all_dropped += dropped
             gaps += g
 
         all_segs.sort(key=lambda s: (s.start, s.top))
 
-        # postprocess del testo (incl. correzioni) + tag {\an8} per i cartelli
+        # text postprocess (incl. corrections) + {\an8} tag for the signs
         final: List[Tuple[float, float, str]] = []
         for s in all_segs:
             txt = postprocess(s.text, p.wrap_width, p.ignore_lines, p.corrections,
@@ -1655,9 +1713,10 @@ def process_video(video: str, out_path: str, p: OcrParams,
 
         write_srt(final, out_path)
         if log_cb:
-            log_cb(f"SRT scritto: {out_path} ({stats.segments} righe, "
-                   f"{stats.ocr_calls} OCR, {stats.refined} confini raffinati, "
-                   f"{stats.elapsed:.1f}s)")
+            log_cb(tr["log_srt"].format(path=out_path, segments=stats.segments,
+                                        ocr=stats.ocr_calls,
+                                        refined=stats.refined,
+                                        elapsed=stats.elapsed))
 
         if p.qc_report:
             qc = Path(out_path).with_suffix(".revisione.html")
@@ -1666,7 +1725,7 @@ def process_video(video: str, out_path: str, p: OcrParams,
                           all_dropped, gaps, stats, p, ui_lang=ui_lang)
             stats.qc_path = str(qc)
             if log_cb:
-                log_cb(f"Report di revisione: {qc}")
+                log_cb(tr["log_qc"].format(path=qc))
 
         return final, stats
     finally:
@@ -1685,10 +1744,10 @@ def load_ignore(path: Path) -> List[str]:
 
 def load_corrections(path: Path) -> List[Tuple[str, str]]:
     """
-    Carica correzioni.txt: una regola per riga nel formato
-        sbagliato => giusto
-    Righe vuote e commenti (#) ignorati. Le regole piu' lunghe si applicano
-    per prime (evita che una regola corta "rompa" una piu' specifica).
+    Loads correzioni.txt: one rule per line in the format
+        wrong => right
+    Empty lines and comments (#) are ignored. Longer rules apply first
+    (prevents a short rule from "breaking" a more specific one).
     """
     out: List[Tuple[str, str]] = []
     try:

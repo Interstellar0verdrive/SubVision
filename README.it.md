@@ -23,6 +23,14 @@ revisione viene generato nella lingua scelta.
 | --- | --- |
 | ![Schermata principale](demo/screenshots/app_main_it.png) | ![Anteprima](demo/screenshots/app_preview_en.png) |
 
+| Elabora (avanzamento a step, ETA, velocità) | Test OCR su un frame (voto + confidenza) |
+| --- | --- |
+| ![Elabora](demo/screenshots/app_processing_en.png) | ![Test OCR](demo/screenshots/app_testocr_en.png) |
+
+| Sub fix | Report di revisione interattivo |
+| --- | --- |
+| ![Sub fix](demo/screenshots/app_subfix_en.png) | ![Report di revisione](demo/screenshots/review_report_en.png) |
+
 ## 🧪 Demo (Sintel)
 
 La cartella [`demo/`](demo) contiene un clip di 55 secondi di dialoghi da
@@ -267,6 +275,24 @@ top_band=False, refine_timing=False)`. Il parametro `ui_lang` di
 - **v2.2** — default massima accuratezza + hint completi.
 - **v2.1** — report di revisione interattivo. **v2** — multi-variante+voto,
   raffinamento tempi, banda cartelli. **v1** — prima versione Apple Vision.
+
+## Credits / Riconoscimenti
+
+SubVision poggia su questi progetti (non distribuiti col repository: si
+installano via `pip` da `requirements.txt`, o a parte per ffmpeg):
+
+- **[ocrmac](https://github.com/straussmaximilian/ocrmac)** — l'abilitatore
+  chiave: un wrapper Python sottile sui framework Vision / LiveText di Apple,
+  che rende usabile da Python l'OCR nativo e offline di macOS.
+- [Streamlit](https://github.com/streamlit/streamlit) — il framework della GUI.
+- [Pillow](https://github.com/python-pillow/Pillow) — gestione immagini e
+  varianti OCR.
+- [NumPy](https://github.com/numpy/numpy) — utilità numeriche.
+- [ffmpeg](https://ffmpeg.org) — dipendenza esterna richiesta (da installare
+  a parte, es. `brew install ffmpeg`), invocato come binario esterno per
+  l'estrazione dei frame.
+- I framework **Vision** e **LiveText** di Apple — i motori OCR veri e
+  propri, parte di macOS.
 
 ## Licenza
 

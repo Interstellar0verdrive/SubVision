@@ -3,14 +3,15 @@
 """
 SubVision — GUI (Streamlit)
 
-Estrae hardsub (sottotitoli incisi) dai video in ./videos e li converte in .srt
-usando Apple Vision (OCR nativo di macOS). Pensato per la MASSIMA accuratezza:
-OCR multi-variante con voto, raffinamento dei tempi al framerate nativo,
-banda cartelli opzionale e report di revisione per la revisione guidata.
+Extracts hardsubs (burned-in subtitles) from the videos in ./videos and
+converts them to .srt using Apple Vision (macOS native OCR). Designed for
+MAXIMUM accuracy: multi-variant OCR with voting, timing refinement at the
+native frame rate, optional signs band and a review report for guided
+manual review.
 
-Avvio:  ./run.command   (oppure)  streamlit run app.py
-La logica vive in ocr_core.py (testabile senza UI).
-Le stringhe dell'interfaccia (it/en) vivono in i18n.py.
+Start:  ./run.command   (or)  streamlit run app.py
+The logic lives in ocr_core.py (testable without the UI).
+The interface strings (it/en) live in i18n.py.
 """
 
 import re
@@ -38,7 +39,7 @@ VIDEO_EXT = {".mp4", ".mkv", ".mov", ".avi", ".m4v", ".webm"}
 
 st.set_page_config(page_title="SubVision", page_icon="🎬", layout="wide")
 
-# Tooltip (?) leggibili: sfondo distinto dal resto della pagina + liste spaziate.
+# Readable (?) tooltips: background distinct from the rest of the page + spaced lists.
 st.markdown("""
 <style>
 div[data-testid="stTooltipContent"]{
@@ -62,7 +63,7 @@ div[data-testid="stTooltipContent"] li{ margin-bottom:3px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------------- Stato / lock
+# ---------------------------------------------------------------- State / lock
 defaults = {"busy": False, "start_requested": False, "completed_msgs": [],
             "prev_paths": [], "prev_video": None, "prev_idx": 0}
 for k, v in defaults.items():
@@ -71,9 +72,9 @@ for k, v in defaults.items():
 BUSY = bool(st.session_state["busy"])
 
 
-# ---------------------------------------------------------------- Lingua UI
+# ---------------------------------------------------------------- UI language
 def load_ui_lang() -> str:
-    """Lingua salvata all'ultimo avvio (.ui_prefs.json); fallback: inglese."""
+    """Language saved at the last launch (.ui_prefs.json); fallback: English."""
     try:
         lang = json.loads(PREFS_FILE.read_text(encoding="utf-8")).get("lang")
         return lang if lang in i18n.STRINGS else "en"
@@ -125,13 +126,13 @@ def crop_overlay(img_path: str, bottom_pct: int, width_pct: int,
     im = Image.open(img_path).convert("RGB")
     w, h = im.size
     d = ImageDraw.Draw(im, "RGBA")
-    # banda dialoghi (verde)
+    # dialogue band (green)
     ch = int(h * max(1, min(100, bottom_pct)) / 100)
     cw = int(w * max(1, min(100, width_pct)) / 100)
     x0 = (w - cw) // 2
     d.rectangle([x0, h - ch, x0 + cw - 1, h - 1], outline=(0, 200, 0, 255), width=3)
     d.rectangle([x0, h - ch, x0 + cw - 1, h - 1], fill=(0, 200, 0, 40))
-    # banda cartelli (azzurra) con larghezza propria
+    # signs band (blue) with its own width
     if top_band:
         th = int(h * max(1, min(100, top_pct)) / 100)
         tw = int(w * max(1, min(100, top_w_pct)) / 100)
@@ -227,7 +228,7 @@ def make_params() -> core.OcrParams:
 # ---------------------------------------------------------------- Tabs
 tab_run, tab_prev, tab_fix = st.tabs([L["tab_run"], L["tab_prev"], L["tab_fix"]])
 
-# ===== ELABORA =====
+# ===== PROCESS =====
 with tab_run:
     st.subheader(L["select_videos"])
     videos = list_videos()
@@ -254,7 +255,7 @@ with tab_run:
                 st.session_state["completed_msgs"] = []
                 st.rerun()
 
-        # primo click: blocca la UI e fai rerun (i widget si disabilitano)
+        # first click: lock the UI and rerun (the widgets get disabled)
         if start_btn and not BUSY:
             st.session_state["busy"] = True
             st.session_state["start_requested"] = True
@@ -270,11 +271,11 @@ with tab_run:
                 else:
                     params = make_params()
 
-                    # ---- piano degli step (una riga ciascuno, visibili da subito)
+                    # ---- step plan (one row each, visible from the start)
                     bands_plan = [("bottom", L["band_dialogues"])]
                     if params.top_band:
                         bands_plan.append(("top", L["band_signs"]))
-                    step_plan = []          # [(chiave, etichetta breve)]
+                    step_plan = []          # [(key, short label)]
                     for bkey, blabel in bands_plan:
                         step_plan.append((f"extract:{bkey}", f"{L['step_extract']} · {blabel}"))
                         step_plan.append((f"group:{bkey}", f"{L['step_group']} · {blabel}"))
@@ -284,15 +285,15 @@ with tab_run:
                             step_plan.append((f"refine:{bkey}", f"{L['step_refine']} · {blabel}"))
                     NSTEP = len(step_plan)
                     order = [k for k, _ in step_plan]
-                    # durate degli step del file precedente -> stime per i prossimi
+                    # step durations from the previous file -> estimates for the next ones
                     prev_dur = st.session_state.setdefault("step_durations", {})
 
                     for n, video in enumerate(chosen, 1):
                         st.markdown(L["file_header"].format(n=n, tot=len(chosen),
                                                             name=video.name))
 
-                        # log per-file: creato PRIMA degli step, cosi' ogni step
-                        # puo' scriverci inizio/fine con durata (specchio della UI)
+                        # per-file log: created BEFORE the steps, so every step
+                        # can write its start/end with duration (mirror of the UI)
                         out = video.with_suffix(".srt")
                         note = ""
                         if out.exists():
@@ -326,7 +327,7 @@ with tab_run:
                                           "start": None, "done": False, "last": ""}
 
                         def _rate_unit(key):
-                            # il raffinamento processa righe SRT, gli altri step frame
+                            # refinement processes SRT lines, the other steps frames
                             return L["unit_rows_s"] if key.startswith("refine") else L["unit_fps"]
 
                         def finish(key, _state=state, _logcb=logcb):
@@ -338,7 +339,7 @@ with tab_run:
                             row["dur"] = dur
                             prev_dur[key] = dur
                             rate_s = ""
-                            # media solo se lo step e' durato abbastanza da avere senso
+                            # average only if the step lasted long enough to be meaningful
                             if row.get("count") and dur > 1.0:
                                 rate_s = L["rate_avg"].format(rate=row["count"] / dur,
                                                               unit=_rate_unit(key))
@@ -355,7 +356,7 @@ with tab_run:
                             row = _state.get(stagekey)
                             if row is None:
                                 return
-                            # uno step nuovo inizia -> i precedenti sono conclusi
+                            # a new step starts -> the previous ones are done
                             for k in order[:order.index(stagekey)]:
                                 _finish(k)
                             if row["start"] is None:
@@ -400,10 +401,10 @@ with tab_run:
                                 (L["msg_error"].format(name=video.name, e=e), "err"))
                             continue
 
-                        for k in order:            # chiudi in verde gli step rimasti
+                        for k in order:            # close the remaining steps in green
                             finish(k)
 
-                        # riepilogo durate per tipo di step (somma le bande)
+                        # duration summary per step kind (sums the bands)
                         agg = {}
                         for key, row in state.items():
                             kind = row["label"].split(" · ")[0]
@@ -444,7 +445,7 @@ with tab_run:
                 st.session_state["start_requested"] = False
                 st.rerun()
 
-# ===== ANTEPRIMA =====
+# ===== PREVIEW =====
 with tab_prev:
     st.subheader(L["prev_subheader"])
     if BUSY:
@@ -458,8 +459,8 @@ with tab_prev:
                                 help=L["video_select_help"])
             vid = next(p for p in videos if p.name == name)
 
-            N_PREV = 20            # frame campione da mostrare
-            TRIES_PER_ZONE = 3     # tentativi per zona per trovarne uno col testo
+            N_PREV = 20            # sample frames to show
+            TRIES_PER_ZONE = 3     # attempts per zone to find one with text
 
             if st.button(L["extract_frames_btn"].format(n=N_PREV),
                          help=L["extract_frames_help"].format(n=N_PREV,
@@ -479,10 +480,10 @@ with tab_prev:
                     pbar = st.progress(0.0, text=L["searching_frames"])
 
                     def probe_zone(i: int):
-                        """Ritorna (i, path, band) — band: 'bottom' | 'top' | None."""
+                        """Returns (i, path, band) — band: 'bottom' | 'top' | None."""
                         a, b = float(edges[i]), float(edges[i + 1])
                         fallback = None
-                        # prova centro, poi inizio e fine zona
+                        # try the center, then the start and end of the zone
                         for f in (0.5, 0.2, 0.8)[:TRIES_PER_ZONE if use_vision else 1]:
                             fp = preview_frame(str(vid), a + (b - a) * f)
                             if not fp:
@@ -501,7 +502,7 @@ with tab_prev:
                                 txt, _ = core.ocr_conf(band, langs, "fast", 0.25)
                                 if txt.strip():
                                     return i, str(fp), "bottom"
-                                # niente dialoghi: se attiva, prova la banda cartelli
+                                # no dialogue: if enabled, try the signs band
                                 if top_band:
                                     th = int(h * top_pct / 100)
                                     tw = int(w * top_w_pct / 100)

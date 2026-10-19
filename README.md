@@ -26,9 +26,13 @@ Why Apple Vision instead of an LLM/VLM:
 | --- | --- |
 | ![Main screen](demo/screenshots/app_main_en.png) | ![Preview](demo/screenshots/app_preview_en.png) |
 
-The interactive review report (an editor, not just a report):
+| Batch processing (per-step progress, ETA, live speed) | One-frame OCR test (voting + confidence) |
+| --- | --- |
+| ![Processing](demo/screenshots/app_processing_en.png) | ![OCR test](demo/screenshots/app_testocr_en.png) |
 
-![Review report](demo/screenshots/review_report_en.png)
+| Sub fix (clean an external SRT) | The interactive review report (an editor, not just a report) |
+| --- | --- |
+| ![Sub fix](demo/screenshots/app_subfix_en.png) | ![Review report](demo/screenshots/review_report_en.png) |
 
 ## Demo (Sintel)
 
@@ -143,6 +147,26 @@ python3 -c "import ocr_core as C; \
 `OcrParams(fps=6, skip_hamming=1, multi_variant=False, top_band=False,
 refine_timing=False)`. `process_video(..., ui_lang="en")` controls the review
 report language.
+
+## Credits / Acknowledgements
+
+SubVision stands on the shoulders of these projects (not distributed with
+this repository — they are installed via `pip` from `requirements.txt`, or
+separately for ffmpeg):
+
+- **[ocrmac](https://github.com/straussmaximilian/ocrmac)** — the key
+  enabler: a thin Python wrapper around Apple's Vision / LiveText OCR
+  frameworks, which is what makes native, offline macOS OCR usable from
+  Python.
+- [Streamlit](https://github.com/streamlit/streamlit) — the GUI framework.
+- [Pillow](https://github.com/python-pillow/Pillow) — image handling and the
+  OCR variants.
+- [NumPy](https://github.com/numpy/numpy) — numeric helpers.
+- [ffmpeg](https://ffmpeg.org) — required external dependency (installed
+  separately, e.g. `brew install ffmpeg`), invoked as an external binary for
+  frame extraction.
+- Apple's **Vision** and **LiveText** frameworks — the OCR engines
+  themselves, part of macOS.
 
 ## License
 
