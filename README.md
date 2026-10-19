@@ -24,31 +24,29 @@ Why Apple Vision instead of an LLM/VLM:
 
 | Main screen | Preview with crop bands |
 | --- | --- |
-| ![Main screen](demo/screenshots/app_main_en.png) | ![Preview](demo/screenshots/app_preview_en.png) |
+| ![Main screen](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_main_en.png) | ![Preview](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_preview_en.png) |
 
 | Batch processing (per-step progress, ETA, live speed) | One-frame OCR test (voting + confidence) |
 | --- | --- |
-| ![Processing](demo/screenshots/app_processing_en.png) | ![OCR test](demo/screenshots/app_testocr_en.png) |
+| ![Processing](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_processing_en.png) | ![OCR test](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_testocr_en.png) |
 
 | Sub fix (clean an external SRT) | The interactive review report (an editor, not just a report) |
 | --- | --- |
-| ![Sub fix](demo/screenshots/app_subfix_en.png) | ![Review report](demo/screenshots/review_report_en.png) |
+| ![Sub fix](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_subfix_en.png) | ![Review report](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/review_report_en.png) |
 
 ## Demo (Sintel)
 
 The demo uses a 55-second dialogue clip from
 [Sintel](https://durian.blender.org), the Blender Foundation open movie
 (CC-BY 3.0, **© copyright Blender Foundation | durian.blender.org**), with
-Italian and English subtitles burned in. The two videos (~9 MB each) are
-attached to the [v1.0.0 release](https://github.com/Interstellar0verdrive/SubVision/releases/tag/v1.0.0)
-to keep the repo light; the [`demo/`](demo) folder holds what SubVision
-extracted from them:
+Italian and English subtitles burned in. To keep the repo light, the demo
+files are attached to the [v1.0.0 release](https://github.com/Interstellar0verdrive/SubVision/releases/tag/v1.0.0) (direct download links):
 
 | File | What it is |
 | --- | --- |
-| [`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.mp4) / [`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.mp4) | 55s clips with burned-in subs (IT / EN) — release assets, download links |
-| `sintel_ita_hardsub_demo.srt` / `sintel_eng_hardsub_demo.srt` | the SRT extracted by SubVision |
-| `sintel_ita_hardsub_demo.revisione.html` / `..._eng_...` | the interactive review report of each run |
+| [`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.mp4) / [`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.mp4) | 55s clips with burned-in subs (IT / EN), ~9 MB each |
+| [`sintel_ita_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.srt) / [`sintel_eng_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.srt) | the SRT extracted by SubVision |
+| [`sintel_ita_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.revisione.html) / [`sintel_eng_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.revisione.html) | the interactive review report of each run (download, then open it in a browser) |
 
 **Measured accuracy on the demo** (fast profile: `fps=6`, `skip_hamming=1`,
 no timing refinement, no signs band — ~20s of processing per clip on an

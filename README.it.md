@@ -21,29 +21,32 @@ revisione viene generato nella lingua scelta.
 
 | Schermata principale | Anteprima con le bande |
 | --- | --- |
-| ![Schermata principale](demo/screenshots/app_main_it.png) | ![Anteprima](demo/screenshots/app_preview_en.png) |
+| ![Schermata principale](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_main_it.png) | ![Anteprima](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_preview_en.png) |
 
 | Elabora (avanzamento a step, ETA, velocità) | Test OCR su un frame (voto + confidenza) |
 | --- | --- |
-| ![Elabora](demo/screenshots/app_processing_en.png) | ![Test OCR](demo/screenshots/app_testocr_en.png) |
+| ![Elabora](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_processing_en.png) | ![Test OCR](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_testocr_en.png) |
 
 | Sub fix | Report di revisione interattivo |
 | --- | --- |
-| ![Sub fix](demo/screenshots/app_subfix_en.png) | ![Report di revisione](demo/screenshots/review_report_en.png) |
+| ![Sub fix](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/app_subfix_en.png) | ![Report di revisione](https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/review_report_en.png) |
 
 ## 🧪 Demo (Sintel)
 
 La demo usa un clip di 55 secondi di dialoghi da
 [Sintel](https://durian.blender.org), l'open movie della Blender Foundation
 (CC-BY 3.0, **© copyright Blender Foundation | durian.blender.org**), con i
-sottotitoli impressi in italiano e in inglese. I due video (~9 MB l'uno) sono
-allegati alla [release v1.0.0](https://github.com/Interstellar0verdrive/SubVision/releases/tag/v1.0.0)
-per tenere leggero il repo:
-[`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.mp4) ·
-[`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.mp4).
-La cartella [`demo/`](demo) contiene ciò che SubVision ne ha estratto
-(`.srt` e report `.revisione.html`); per riprovare tu, scarica un clip,
-mettilo in `./videos` e premi *Avvia OCR*.
+sottotitoli impressi in italiano e in inglese. Per tenere leggero il repo, i
+file della demo sono allegati alla [release v1.0.0](https://github.com/Interstellar0verdrive/SubVision/releases/tag/v1.0.0) (link di download
+diretto):
+
+| File | Cos'è |
+| --- | --- |
+| [`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.mp4) / [`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.mp4) | clip di 55s con i sub impressi (IT / EN), ~9 MB l'uno |
+| [`sintel_ita_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.srt) / [`sintel_eng_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.srt) | l'SRT estratto da SubVision |
+| [`sintel_ita_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.revisione.html) / [`sintel_eng_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.revisione.html) | il report di revisione interattivo di ogni run (scaricalo e aprilo nel browser) |
+
+Per riprovare tu: scarica un clip, mettilo in `./videos` e premi *Avvia OCR*.
 
 **Accuratezza misurata sulla demo** (profilo veloce: `fps=6`,
 `skip_hamming=1`, senza raffinamento tempi né banda cartelli — ~20s di
@@ -248,7 +251,6 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 | `ignore.txt` | frasi da ignorare |
 | `correzioni.txt` | sostituzioni automatiche `sbagliato => giusto` |
 | `videos/` | metti qui i video; qui compaiono `.srt` / `.revisione.html` / `.log` |
-| `demo/` | SRT e report estratti dai clip demo Sintel (CC-BY; i video sono nella release) |
 
 ## 🧪 Uso headless (senza GUI)
 

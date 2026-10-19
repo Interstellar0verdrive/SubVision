@@ -19,9 +19,3 @@ videos/
 *.avi
 *.m4v
 *.webm
-
-# Eccezioni: SOLO i file demo con licenza CC (Sintel, © Blender Foundation)
-!demo/sintel_ita_hardsub_demo.srt
-!demo/sintel_eng_hardsub_demo.srt
-!demo/sintel_ita_hardsub_demo.revisione.html
-!demo/sintel_eng_hardsub_demo.revisione.html
