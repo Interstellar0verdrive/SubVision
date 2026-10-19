@@ -33,11 +33,17 @@ revisione viene generato nella lingua scelta.
 
 ## 🧪 Demo (Sintel)
 
-La cartella [`demo/`](demo) contiene un clip di 55 secondi di dialoghi da
+La demo usa un clip di 55 secondi di dialoghi da
 [Sintel](https://durian.blender.org), l'open movie della Blender Foundation
 (CC-BY 3.0, **© copyright Blender Foundation | durian.blender.org**), con i
-sottotitoli impressi in italiano e in inglese, più ciò che SubVision ne ha
-estratto (`.srt` e report `.revisione.html`).
+sottotitoli impressi in italiano e in inglese. I due video (~9 MB l'uno) sono
+allegati alla [release v1.0.0](https://github.com/Interstellar0verdrive/SubVision/releases/tag/v1.0.0)
+per tenere leggero il repo:
+[`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.mp4) ·
+[`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.mp4).
+La cartella [`demo/`](demo) contiene ciò che SubVision ne ha estratto
+(`.srt` e report `.revisione.html`); per riprovare tu, scarica un clip,
+mettilo in `./videos` e premi *Avvia OCR*.
 
 **Accuratezza misurata sulla demo** (profilo veloce: `fps=6`,
 `skip_hamming=1`, senza raffinamento tempi né banda cartelli — ~20s di
@@ -242,7 +248,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 | `ignore.txt` | frasi da ignorare |
 | `correzioni.txt` | sostituzioni automatiche `sbagliato => giusto` |
 | `videos/` | metti qui i video; qui compaiono `.srt` / `.revisione.html` / `.log` |
-| `demo/` | clip demo Sintel (CC-BY) con SRT estratti e report |
+| `demo/` | SRT e report estratti dai clip demo Sintel (CC-BY; i video sono nella release) |
 
 ## 🧪 Uso headless (senza GUI)
 

@@ -36,15 +36,17 @@ Why Apple Vision instead of an LLM/VLM:
 
 ## Demo (Sintel)
 
-The [`demo/`](demo) folder contains a 55-second dialogue clip from
+The demo uses a 55-second dialogue clip from
 [Sintel](https://durian.blender.org), the Blender Foundation open movie
 (CC-BY 3.0, **© copyright Blender Foundation | durian.blender.org**), with
-Italian and English subtitles burned in, plus what SubVision extracted from
-them:
+Italian and English subtitles burned in. The two videos (~9 MB each) are
+attached to the [v1.0.0 release](https://github.com/Interstellar0verdrive/SubVision/releases/tag/v1.0.0)
+to keep the repo light; the [`demo/`](demo) folder holds what SubVision
+extracted from them:
 
 | File | What it is |
 | --- | --- |
-| `sintel_ita_hardsub_demo.mp4` / `sintel_eng_hardsub_demo.mp4` | 55s clips with burned-in subs (IT / EN) |
+| [`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_ita_hardsub_demo.mp4) / [`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/v1.0.0/sintel_eng_hardsub_demo.mp4) | 55s clips with burned-in subs (IT / EN) — release assets, download links |
 | `sintel_ita_hardsub_demo.srt` / `sintel_eng_hardsub_demo.srt` | the SRT extracted by SubVision |
 | `sintel_ita_hardsub_demo.revisione.html` / `..._eng_...` | the interactive review report of each run |
 
@@ -59,7 +61,8 @@ Apple Silicon Mac):
   (the default profile also refines boundaries to the native frame rate,
   ~±20ms).
 
-To reproduce it yourself: put a demo clip in `./videos`, start the app and
+To reproduce it yourself: download a demo clip from the release, put it in
+`./videos`, start the app and
 press *Start OCR* — or run the pipeline headless (see below).
 
 ## Requirements
