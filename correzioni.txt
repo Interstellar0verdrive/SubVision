@@ -1,0 +1,11 @@
+# Correzioni automatiche applicate al testo OCR (case-insensitive).
+# Formato: una regola per riga
+#     sbagliato => giusto
+#
+# Perfette per i typo RICORRENTI che l'OCR non risolverà mai, tipo i nomi
+# propri su font difficili. Una regola sistema tutte le puntate della serie.
+# Esempi (decommentare/adattare):
+# Flamilion => Hamilton
+# Elamilion => Hamilton
+# Blamilion => Hamilton
+# allastudentessa => alla studentessa

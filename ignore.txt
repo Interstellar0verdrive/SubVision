@@ -1,0 +1,6 @@
+# Frasi da ignorare (una per riga). Vengono scartate se compaiono come output OCR.
+# Utile per loghi/watermark ricorrenti dei fansub, cartelli, ecc.
+# Esempi:
+# Traduzione a cura di
+# Sottotitoli:
+# www.esempio-fansub.it

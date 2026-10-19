@@ -1,0 +1,29 @@
+# Ambiente / temporanei
+.venv/
+tmp/
+__pycache__/
+.DS_Store
+.ui_prefs.json
+
+# Video dell'utente e output della pipeline (mai nel repo)
+videos/
+*.srt
+*.log
+*.revisione.html
+*.qc.html
+
+# File multimediali (i video di lavoro restano fuori dal repo)
+*.mkv
+*.mp4
+*.mov
+*.avi
+*.m4v
+*.webm
+
+# Eccezioni: SOLO i file demo con licenza CC (Sintel, © Blender Foundation)
+!demo/sintel_ita_hardsub_demo.mp4
+!demo/sintel_eng_hardsub_demo.mp4
+!demo/sintel_ita_hardsub_demo.srt
+!demo/sintel_eng_hardsub_demo.srt
+!demo/sintel_ita_hardsub_demo.revisione.html
+!demo/sintel_eng_hardsub_demo.revisione.html
