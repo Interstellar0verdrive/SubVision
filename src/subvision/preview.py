@@ -93,7 +93,8 @@ def _duration(ffprobe: str, video: str) -> float:
     try:
         return float(out.stdout.strip())
     except ValueError as e:
-        raise core.EngineError("probe_failed", path=video, error=out.stderr.strip()) from e
+        raise core.EngineError("probe_failed", path=video, tool="ffprobe",
+                               detail=out.stderr.strip()) from e
 
 
 # ---------------------------------------------------------------- frames
@@ -123,9 +124,11 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
     try:
         dur = _duration(ffprobe, video)
     except core.EngineError as e:
-        raise core.EngineError("invalid_duration", path=video, error=str(e.args_.get("error", ""))) from e
+        raise core.EngineError("invalid_duration", path=video, tool="ffprobe",
+                               detail=str(e.args_.get("detail", ""))) from e
     if dur <= 0:
-        raise core.EngineError("invalid_duration", path=video)
+        raise core.EngineError("invalid_duration", path=video, tool="ffprobe",
+                               detail="ffprobe reported no duration")
 
     outdir = preview_dir(video, paths.root)
     shutil.rmtree(outdir, ignore_errors=True)
@@ -245,7 +248,7 @@ def test_frame(frame_path: Path | str, params: OcrParams,
     Raises EngineError("vision_unavailable") without Apple Vision.
     """
     if not core.vision_available():
-        raise core.EngineError("vision_unavailable")
+        raise core.EngineError("vision_unavailable", tool="vision")
     ignore_lines, corrections = lists or ([], [])
     langs = core.resolve_langs(params.lang_hint)
     core.warmup(langs, params.recognition_level)

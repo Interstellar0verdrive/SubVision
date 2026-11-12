@@ -17,6 +17,22 @@ from subvision import core
 from subvision.lists import Lists
 
 
+def _first_text_line(text: str) -> int:
+    """1-based number of the first non-empty line (where the parse gave up)."""
+    for i, ln in enumerate(text.splitlines(), 1):
+        if ln.strip():
+            return i
+    return 1
+
+
+def _first_text_line(text: str) -> int:
+    """1-based number of the first non-empty line (where the parse gave up)."""
+    for i, ln in enumerate(text.splitlines(), 1):
+        if ln.strip():
+            return i
+    return 1
+
+
 def fix_srt(path: Path | str, merge: bool = True, ignore: bool = True,
             flash: bool = True, min_dur: float = 0.2,
             params: Optional[core.OcrParams] = None,
@@ -28,7 +44,8 @@ def fix_srt(path: Path | str, merge: bool = True, ignore: bool = True,
     ignore lines are used only when `ignore` is on, the corrections
     whenever they are given. Raises EngineError("no_valid_segments") when
     nothing is left (no file is written), EngineError("not_found") when
-    the source does not exist.
+    the source does not exist, EngineError("bad_srt", line=...) when the
+    file cannot be read as an SRT (encoding, or no timed block at all).
     """
     src = Path(path)
     if not src.is_file():
@@ -36,7 +53,15 @@ def fix_srt(path: Path | str, merge: bool = True, ignore: bool = True,
     p = params or core.OcrParams()
     ignore_lines, corrections = lists or ([], [])
 
-    segs = core.parse_srt(src)
+    try:
+        segs = core.parse_srt(src)
+    except (UnicodeDecodeError, OSError) as e:
+        raise core.EngineError("bad_srt", path=str(src), detail=str(e), line=1) from e
+    if not segs:
+        text = src.read_text(encoding="utf-8", errors="replace")
+        if text.strip() and "-->" not in text:
+            raise core.EngineError("bad_srt", path=str(src), line=_first_text_line(text),
+                                   detail="no '-->' timing line found")
     ext = list(ignore_lines) if ignore else []
     if ignore:
         segs = [(s, e, t) for s, e, t in segs if not core.looks_like_no_subtitle(t, ext)]

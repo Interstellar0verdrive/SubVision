@@ -10,7 +10,7 @@ other, and reports through the sidecar events of the protocol (plan, table
     batch.step         {idx, step, band, ratio, count, total, unit, elapsed, eta, rate}
     batch.file.done    {idx, segments, dropped, refined, elapsed, times:{"step:band": sec},
                         srt, report, log, empty}
-    batch.file.failed  {idx, error, at_step}
+    batch.file.failed  {idx, error, at_step, code, message, detail?, tool?, path?, line?}
     batch.file.stopped {idx}
     batch.done         {done, failed, stopped, skipped, elapsed}
 - `stop` is a BatchControl: stop("file") moves on to the next video,
@@ -214,7 +214,7 @@ def output_paths(video: Path, qc_report: bool = True,
 def validate_params(params: OcrParams) -> None:
     """Raises EngineError("bad_params", field=..., reason=...) before any work."""
     def bad(field: str, reason: str) -> None:
-        raise EngineError("bad_params", field=field, reason=reason)
+        raise EngineError("bad_params", field=field, detail=f"{field}: {reason}")
 
     if not (0.5 <= float(params.fps) <= 60):
         bad("fps", "must be between 0.5 and 60")
@@ -313,10 +313,10 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
         except Exception as e:      # noqa: BLE001 - any engine error fails this file only
             at_step = tracker.current_step()
             tracker.abort()
-            err = _error_text(e)
-            log.code("log_error", e=err)
+            info = error_info(e, path=str(video))
+            log.code("log_error", e=info["error"])
             counts["failed"] += 1
-            emit("batch.file.failed", {"idx": idx, "error": err, "at_step": at_step})
+            emit("batch.file.failed", {"idx": idx, "at_step": at_step, **info})
             continue
 
         tracker.finish_all()
@@ -340,11 +340,23 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
     return done
 
 
-def _error_text(e: Exception) -> str:
+def error_info(e: Exception, path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    The error fields of an event: `code` (stable, translated by the app),
+    `message` (= code), `error` (one line with the details, for logs), plus
+    `detail`, `tool`, `path`, `line` when known. Unexpected exceptions are
+    `unknown` with the exception text as detail.
+    """
     if isinstance(e, EngineError):
-        extra = ", ".join(f"{k}={v}" for k, v in e.args_.items())
-        return f"{e.code}" + (f" ({extra})" if extra else "")
-    return f"{type(e).__name__}: {e}"
+        info: Dict[str, Any] = {"code": e.code, "message": e.code, "error": e.describe(),
+                                **e.details()}
+    else:
+        detail = f"{type(e).__name__}: {e}"
+        info = {"code": "unknown", "message": "unknown", "error": f"unknown ({detail})",
+                "detail": detail}
+    if path and "path" not in info:
+        info["path"] = path
+    return info
 
 
 class _StepTracker:

@@ -124,12 +124,36 @@ _StepCallback = Callable[[float, int, int], None]
 
 
 class EngineError(RuntimeError):
-    """Engine error with a stable `code` (the message is the code itself)."""
+    """
+    Engine error with a stable `code` (the message is the code itself) and
+    optional details for the app: `detail` (technical text: exception,
+    stderr), `tool` ("ffmpeg" | "ffprobe" | "vision" | "uv" when a tool is
+    involved), `path` (the file concerned), `line` (for parse errors). Any
+    other keyword ends up in `args_` and in the detail text.
+    """
+
+    DETAIL_KEYS = ("detail", "tool", "path", "line")
 
     def __init__(self, code: str, **args: Any) -> None:
         super().__init__(code)
         self.code = code
         self.args_ = args
+
+    def details(self) -> Dict[str, Any]:
+        """{detail, tool, path, line} when present; other args folded into detail."""
+        out = {k: self.args_[k] for k in self.DETAIL_KEYS if self.args_.get(k) is not None}
+        extra = ", ".join(f"{k}={v}" for k, v in self.args_.items() if k not in self.DETAIL_KEYS)
+        if extra:
+            out["detail"] = f"{out['detail']} ({extra})" if out.get("detail") else extra
+        return out
+
+    def describe(self) -> str:
+        """`code` plus the details in one line (logs, CLI)."""
+        d = self.details()
+        parts = [f"{k}={d[k]}" for k in ("tool", "path", "line") if k in d]
+        if d.get("detail"):
+            parts.append(d["detail"])
+        return self.code + (f" ({'; '.join(parts)})" if parts else "")
 
 
 # Flags attached to the segments (SegInfo.flags). Codes only: the review
@@ -313,7 +337,7 @@ def ffprobe_duration(video: str) -> float:
                     "-of", "default=nw=1:nk=1", video]).stdout
         return float(out.strip())
     except (subprocess.CalledProcessError, OSError, ValueError) as e:
-        raise EngineError("probe_failed", path=video, error=str(e)) from e
+        raise EngineError("probe_failed", path=video, tool="ffprobe", detail=str(e)) from e
 
 
 def ffprobe_fps(video: str) -> float:
@@ -337,7 +361,8 @@ def ffprobe_fps(video: str) -> float:
         except (subprocess.CalledProcessError, OSError, ValueError) as e:
             last_err = e
             continue
-    raise EngineError("probe_failed", path=video, error=str(last_err or "no frame rate"))
+    raise EngineError("probe_failed", path=video, tool="ffprobe",
+                      detail=str(last_err or "no frame rate"))
 
 
 def band_crop(p: OcrParams, band: str) -> str:
@@ -1972,7 +1997,7 @@ def process_video(video: str, out_path: str, p: OcrParams,
     stays and the error becomes a LogEvent("report_failed").
     """
     if not vision_available():
-        raise EngineError("vision_unavailable")
+        raise EngineError("vision_unavailable", tool="vision")
     _check_stop(stop)
     langs = resolve_langs(p.lang_hint)
     tmp_root = Path(tmp_root or tempfile.gettempdir())

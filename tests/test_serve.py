@@ -78,7 +78,7 @@ class Sidecar:
                 self.reply_cv.wait(left)
             reply = self.replies.pop(ident)
         if "error" in reply:
-            raise SidecarError(reply["error"]["code"], reply["error"].get("message", ""))
+            raise SidecarError(reply["error"])
         return reply["result"]
 
     def wait_event(self, name: str, timeout: float = 60, since: int = 0) -> tuple[int, dict]:
@@ -105,9 +105,10 @@ class Sidecar:
 
 
 class SidecarError(Exception):
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(f"{code}: {message}")
-        self.code = code
+    def __init__(self, error: dict) -> None:
+        super().__init__(f"{error.get('code')}: {error.get('message', '')}")
+        self.code = error.get("code")
+        self.error = error
 
 
 def _ffmpeg_on(clip_name: str) -> list[str]:
@@ -181,12 +182,16 @@ def test_tools_status_and_lists(sidecar: Sidecar, work: dict):
     with pytest.raises(SidecarError) as exc:
         sidecar.call("lists.import", {"kind": "ignore", "path": str(work["root"] / "missing.txt")})
     assert exc.value.code == "not_found"
+    assert exc.value.error["path"] == str(work["root"] / "missing.txt") and exc.value.error["detail"]
+    assert set(exc.value.error) <= {"code", "message", "detail", "tool", "path", "line"}
 
 
 def test_tools_use(sidecar: Sidecar, work: dict):
     with pytest.raises(SidecarError) as exc:
         sidecar.call("tools.use", {"ffmpeg": str(work["root"] / "not-ffmpeg")})
     assert exc.value.code == "bad_tool"
+    assert exc.value.error["tool"] == "ffmpeg" and exc.value.error["path"] == str(work["root"] / "not-ffmpeg")
+    assert exc.value.error["detail"]
     res = sidecar.call("tools.use", {"ffmpeg": work["ffmpeg"]})
     assert res["ffmpeg"]["path"] == work["ffmpeg"]
     assert sidecar.call("hello")["ffmpeg"]["path"] == work["ffmpeg"]
@@ -202,6 +207,7 @@ def test_videos_probe(sidecar: Sidecar, work: dict):
         assert 50 < v["duration"] < 60 and v["fps"] > 20 and v["width"] > 0 and v["height"] > 0
         assert "error" not in v
     assert vids[2]["error"] == "probe_failed" and vids[2]["path"] == str(bogus)
+    assert vids[2]["code"] == "probe_failed" and vids[2]["tool"] == "ffprobe" and vids[2]["detail"]
 
 
 def test_warmup(sidecar: Sidecar):
@@ -318,6 +324,53 @@ def test_srt_fix_errors(sidecar: Sidecar, work: dict):
     with pytest.raises(SidecarError) as exc:
         sidecar.call("srt.fix", {"path": str(work["root"] / "missing.srt")})
     assert exc.value.code == "not_found"
+    assert exc.value.error["path"] == str(work["root"] / "missing.srt")
+    garbage = work["root"] / "garbage.srt"
+    garbage.write_text("\n\nthis is not an srt\nat all\n", encoding="utf-8")
+    with pytest.raises(SidecarError) as exc:
+        sidecar.call("srt.fix", {"path": str(garbage)})
+    assert exc.value.code == "bad_srt"
+    assert exc.value.error["path"] == str(garbage) and exc.value.error["line"] == 3
+    assert "-->" in exc.value.error["detail"]
+    binary = work["root"] / "binary.srt"
+    binary.write_bytes(b"\xff\xfe\x00garbage")
+    with pytest.raises(SidecarError) as exc:
+        sidecar.call("srt.fix", {"path": str(binary)})
+    assert exc.value.code == "bad_srt" and exc.value.error["line"] == 1
+
+
+def test_batch_failed_file_carries_the_details(sidecar: Sidecar, work: dict):
+    bogus = work["root"] / "broken.mp4"
+    bogus.write_bytes(b"not a video")
+    since = len(sidecar.events)
+    assert sidecar.call("batch.start", {"videos": [str(bogus)], "params": PARAMS}) == {"started": True}
+    _, failed = sidecar.wait_event("batch.file.failed", since=since, timeout=60)
+    assert failed["code"] == "probe_failed" and failed["message"] == "probe_failed"
+    assert failed["tool"] == "ffprobe" and failed["path"] == str(bogus) and failed["detail"]
+    assert failed["at_step"] == "extract:bottom" and failed["error"].startswith("probe_failed")
+    _, done = sidecar.wait_event("batch.done", since=since)
+    assert done["failed"] == 1
+
+
+def test_preview_failed_carries_the_details(sidecar: Sidecar, work: dict):
+    bogus = work["root"] / "broken.mp4"
+    bogus.write_bytes(b"not a video")
+    since = len(sidecar.events)
+    assert sidecar.call("preview.frames", {"video": str(bogus), "params": PARAMS}) == {"started": True}
+    _, failed = sidecar.wait_event("preview.failed", since=since, timeout=60)
+    assert failed["error"] == "invalid_duration" and failed["code"] == "invalid_duration"
+    assert failed["tool"] == "ffprobe" and failed["path"] == str(bogus)
+
+
+def test_tools_install_with_no_keys(sidecar: Sidecar):
+    since = len(sidecar.events)
+    res = sidecar.call("tools.install", {"keys": []})
+    assert res == {"started": True, "keys": []}
+    i, done = sidecar.wait_event("tools.done", since=since, timeout=10)
+    assert done["ok"] is True and set(done["status"]["tools"]) == {"ffmpeg", "ffprobe"}
+    assert not any(e == "tools.progress" for e, _ in sidecar.events[since:i])
+    # and the slot is free again at once
+    assert sidecar.call("tools.install", {"keys": []})["started"] is True
 
 
 def test_shutdown_during_a_batch(work: dict):

@@ -36,9 +36,10 @@ from subvision import __version__
 FFMPEG_VERSION = "9.0.2"
 _FFMPEG_BASE = "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2"
 
-# Progress callback: progress(key, state, bytes, total, error=None) with
-# state in waiting | running | done | failed. The sidecar turns it into the
-# `tools.progress` event; `error` is one of the ToolsError codes below.
+# Progress callback: progress(key, state, bytes, total, error=None, detail=None)
+# with state in waiting | running | done | failed. The sidecar turns it into
+# the `tools.progress` event; `error` is one of the ToolsError codes below,
+# `detail` the technical text that goes with it.
 ProgressCallback = Callable[..., None]
 
 CHUNK = 1 << 16          # download block; the stop event is checked per block
@@ -272,14 +273,15 @@ def install(keys: Optional[Iterable[str]], state_dir: Path | str,
     announced `waiting`, then `running` with the bytes, then `done` or
     `failed` (error = ToolsError code). Stops at the first failure: the
     others stay `waiting`, a new call starts again from there. Returns True
-    when everything is installed. Never raises for the expected failures.
+    when everything is installed (at once, with nothing to do). Never raises
+    for the expected failures.
     """
     todo = [k for k in (list(keys) if keys is not None else missing(state_dir)) if k in TOOLS]
 
     def emit(key: str, state: str, done: int = 0, total: int = 0,
-             error: Optional[str] = None) -> None:
+             error: Optional[str] = None, detail: Optional[str] = None) -> None:
         if progress:
-            progress(key, state, done, total, error)
+            progress(key, state, done, total, error, detail)
 
     for key in todo:
         emit(key, "waiting", 0, TOOLS[key].size)
@@ -297,10 +299,10 @@ def install(keys: Optional[Iterable[str]], state_dir: Path | str,
         try:
             install_one(key, state_dir, step, stop, check_static)
         except ToolsError as exc:
-            emit(key, "failed", 0, 0, exc.code)
+            emit(key, "failed", 0, 0, exc.code, exc.detail or None)
             return False
         except Exception as exc:  # noqa: BLE001 - zip format, disk, ...
-            emit(key, "failed", 0, 0, f"error: {type(exc).__name__}: {exc}")
+            emit(key, "failed", 0, 0, "unknown", f"{type(exc).__name__}: {exc}")
             return False
         emit(key, "done", TOOLS[key].size, TOOLS[key].size)
     return True
