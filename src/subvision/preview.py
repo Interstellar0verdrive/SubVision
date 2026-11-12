@@ -16,10 +16,9 @@ the pipeline does, and returns text, confidence, agreement, alternatives,
 final text (after postprocess, with {\\an8} for the signs band) and the
 time taken, per band.
 
-NOTE (F1.8): `Stopped`, `_check_stop`, `_stop_proc` and `_run_ffmpeg`
-below are a local copy of the cooperative stop of core.py (activity 1.3,
-developed in parallel). After the merge they go away and this module
-imports them from core, together with the configured ffmpeg/ffprobe.
+The cooperative stop (`Stopped`, `_check_stop`, `_run_ffmpeg`) and the
+ffmpeg/ffprobe executables (`core.FFMPEG`/`core.FFPROBE`, set once by the
+sidecar or the CLI through `core.set_tools`) come from core.py.
 """
 
 from __future__ import annotations
@@ -35,7 +34,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PIL import Image
 
-from subvision import core, tools
+from subvision import core
 from subvision.core import OcrParams, crop_band
 from subvision.lists import Lists
 from subvision.paths import state_paths
@@ -48,57 +47,10 @@ OCR_WORKERS = 4
 QUICK_MIN_CONF = 0.25           # confidence floor of the quick "is there text?" OCR
 
 
-# ---------------------------------------------------------------- stop (local copy, see NOTE)
-class Stopped(Exception):
-    """Raised at a stop point when the caller's `stop` event is set."""
-
-
-def _check_stop(stop: Optional[threading.Event]) -> None:
-    if stop is not None and stop.is_set():
-        raise Stopped()
-
-
-def _stop_proc(proc: subprocess.Popen, grace: float = 1.0) -> None:
-    """SIGTERM, wait up to `grace`, then SIGKILL; always reaps the child."""
-    if proc.poll() is not None:
-        return
-    proc.terminate()
-    try:
-        proc.communicate(timeout=grace)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.communicate()
-
-
-def _run_ffmpeg(cmd: List[str], stop: Optional[threading.Event] = None,
-                on_poll: Optional[Callable[[], None]] = None,
-                poll: float = 0.1) -> str:
-    """
-    Runs ffmpeg/ffprobe with Popen, polling every `poll` seconds: when
-    `stop` is set the child is terminated and Stopped is raised. stderr is
-    drained by communicate(timeout=...) so a chatty child never blocks on
-    a full pipe. Returns stderr; raises CalledProcessError on failure.
-    """
-    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                            stderr=subprocess.PIPE, text=True)
-    try:
-        while True:
-            try:
-                _, err = proc.communicate(timeout=poll)
-                break
-            except subprocess.TimeoutExpired:
-                pass
-            if stop is not None and stop.is_set():
-                _stop_proc(proc)
-                raise Stopped()
-            if on_poll:
-                on_poll()
-    except BaseException:
-        _stop_proc(proc)
-        raise
-    if proc.returncode != 0:
-        raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=err)
-    return err or ""
+# re-exported for the callers (and the tests) that catch the stop here
+Stopped = core.Stopped
+_check_stop = core._check_stop
+_run_ffmpeg = core._run_ffmpeg
 
 
 # ---------------------------------------------------------------- folders
@@ -132,13 +84,16 @@ def clean_old(state: Optional[Path | str] = None, max_age: float = PREVIEW_MAX_A
 
 
 def _duration(ffprobe: str, video: str) -> float:
+    """Duration through the given ffprobe (core.ffprobe_duration with a temporary tool)."""
+    if ffprobe == core.FFPROBE:
+        return core.ffprobe_duration(video)
+    out = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration",
+                          "-of", "default=nw=1:nk=1", video], check=False,
+                         capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
     try:
-        out = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration",
-                              "-of", "default=nw=1:nk=1", video],
-                             check=True, capture_output=True, text=True, timeout=60).stdout
-        return float((out or "0").strip())
-    except Exception:
-        return 0.0
+        return float(out.stdout.strip())
+    except ValueError as e:
+        raise core.EngineError("probe_failed", path=video, error=out.stderr.strip()) from e
 
 
 # ---------------------------------------------------------------- frames
@@ -160,11 +115,15 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
     """
     video = str(video)
     paths = state_paths(state).ensure()
-    ffmpeg = ffmpeg or tools.ffmpeg_path(paths.root) or "ffmpeg"
-    ffprobe = ffprobe or tools.ffprobe_path(paths.root) or "ffprobe"
+    # the executables configured by core.set_tools(), unless overridden here
+    ffmpeg = ffmpeg or core.FFMPEG
+    ffprobe = ffprobe or core.FFPROBE
     clean_old(paths.root)
 
-    dur = _duration(ffprobe, video)
+    try:
+        dur = _duration(ffprobe, video)
+    except core.EngineError as e:
+        raise core.EngineError("invalid_duration", path=video, error=str(e.args_.get("error", ""))) from e
     if dur <= 0:
         raise core.EngineError("invalid_duration", path=video)
 
