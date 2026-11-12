@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strumenti · tavole</title>
+<link rel="stylesheet" href="tavole.css"><script src="strings.js"></script><script src="tavole.js"></script></head>
+<body>
+<div class="doc-head"><a href="index.html">← Indice</a><h1>Finestra degli strumenti e motore · T1–T5</h1><span class="sp"></span><span class="ctl"></span></div>
+<p class="doc-intro">Finestra a sé, 600 pt, prima della finestra principale (T1 di AnimeUp). Quattro righe: uv + Python, FFmpeg, FFprobe, preparazione del riconoscimento (spike S5: ~30 s una volta per utente e per versione di macOS, mai per lingua). Inventario §1, D11, D12.</p>
+<main id="boards"></main>
+<script>
+const { t, btn, note, icon, board, spin, bar } = SV;
+const ROWS = [['python', 51], ['ffmpeg', 28], ['ffprobe', 28], ['warmup', 0]];
+function rowH(key, mb, st, o = {}) {
+  const ic = st === 'done' ? `<span class="sicon done">${icon('check', 10)}</span>` : st === 'run' ? spin() : st === 'fail' ? `<span class="sicon fail">${icon('x', 10)}</span>` : `<span class="sicon wait"></span>`;
+  const right = st === 'run' && o.frac != null ? `<span style="width:90px;display:flex">${bar(o.frac)}</span>` : '';
+  return `<div class="trow ${st === 'run' ? 'run' : st === 'fail' ? 'fail' : st === 'wait' ? 'wait' : ''}">${ic}<span class="tn">${t('app.tools.row.' + key)} <span class="sub">· ${t('app.tools.row.' + key + '_sub')}</span></span>
+    ${right}${st === 'fail' ? SV.chip(t('app.chip.stopped'), 'red') : ''}<span class="mb">${mb ? mb + ' MB' : o.secs || ''}</span></div>`;
+}
+function toolsWin(o) {
+  const rows = (o.rows || ROWS.map((r, i) => [r[0], r[1], o.states[i], o.opts && o.opts[i]])).map(r => rowH(r[0], r[1], r[2], r[3] || {})).join('');
+  const status = o.fail ? note('red', o.fail[0], o.fail[1])
+    : `<div style="display:flex;align-items:baseline;gap:6px"><b style="font-size:13px">${o.status[0]}</b><span style="font-size:12px;color:var(--text2)">${o.status[1]}</span></div>`;
+  const foot = o.fail ? `${SV.link(t('app.btn.show_log'), 'red')}<span style="flex:1"></span>${btn(t('app.btn.quit'))}${btn(t('app.btn.retry'), 'primary')}`
+    : `<span class="small" style="flex:1">${o.footNote || t('app.tools.inside')}</span>${btn(t('app.btn.quit'))}`;
+  return `<div class="twin">${SV.lights()}
+    <div style="display:flex;gap:16px;align-items:center"><span class="appicon"></span><div><div style="font-size:17px;font-weight:700">${o.head || t('app.tools.welcome')}</div>
+      <div class="small">${o.intro || (t('app.tools.intro1', { mb: 108 }) + '<br>' + t('app.tools.intro2'))}</div></div></div>
+    ${status}<div class="trows">${rows}</div><div style="display:flex;gap:8px;align-items:center">${foot}</div></div>`;
+}
+board('T1', 'Strumenti · download in corso', 'Prima riga pronta, FFmpeg in corso con la barra a byte, le altre in attesa. Riga di stato con i MB e il tempo che manca.', [600, 400], () =>
+  toolsWin({ states: ['done', 'run', 'wait', 'wait'], opts: [0, { frac: .45 }], status: [t('app.tools.downloading', { i: 2, n: 3 }), t('app.tools.progress', { done: 13, total: 57 }) + ' · ' + t('app.tools.minute_left')] }));
+board('T2', 'Strumenti · preparazione del riconoscimento', 'Righe 1–3 pronte, la quarta in corso con la stima di 30 s; la nota dice che chiudere ora rimanda la preparazione al prossimo avvio (nessun avviso).', [600, 400], () =>
+  toolsWin({ states: ['done', 'done', 'done', 'run'], opts: [0, 0, 0, { frac: .4, secs: '12 s' }], status: [t('app.tools.preparing'), t('app.tools.preparing_time')], footNote: t('app.tools.warmup_note') }));
+board('T3', 'Strumenti · errori', 'Sinistra: download fermato (la connessione è caduta). Destra: il riconoscimento non è partito (Vision mancante al primo avvio). Variante del testo per il checksum: «FFmpeg è arrivato danneggiato, quindi è stato messo da parte.»', [1240, 460], () =>
+  toolsWin({ states: ['done', 'fail', 'wait', 'wait'], fail: [t('app.tools.stopped_title'), t('app.tools.stopped_text', { tool: 'FFmpeg' }) + '<br>' + t('app.tools.stopped_kept')] }) +
+  toolsWin({ states: ['done', 'done', 'done', 'fail'], fail: [t('app.tools.vision_failed'), t('app.tools.vision_failed_text')] }), { row: true });
+board('T4', 'Strumenti · ritorno', 'Sinistra: all’avvio manca FFmpeg (cancellato a mano o checksum non valido): torna solo la sua riga. Destra: dopo un aggiornamento di macOS torna solo la preparazione del riconoscimento.', [1240, 330], () =>
+  toolsWin({ head: t('app.tools.one_missing'), intro: t('app.tools.one_missing_text', { mb: 28 }), rows: [['ffmpeg', 28, 'run', { frac: .7 }]], status: [t('app.tools.downloading', { i: 1, n: 1 }), t('app.tools.progress', { done: 20, total: 28 })] }) +
+  toolsWin({ head: t('app.tools.again_title'), intro: t('app.tools.again_text'), rows: [['warmup', 0, 'run', { frac: .2, secs: '6 s' }]], status: [t('app.tools.preparing'), t('app.tools.preparing_time')], footNote: t('app.tools.warmup_note') }), { row: true });
+board('T5', 'Motore', 'Al posto della pagina (EngineStatusView di AnimeUp): avvio in corso; non partito con l’errore, Riprova e Mostra il log; fermato più volte, solo Mostra il log.', [1360, 840], () => SV.win({
+  side: { tab: 'process', subs: { process: '—', preview: '—', fix: '—' } },
+  page: `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px">${spin('l')}<div>${t('app.engine.starting')}</div><div class="small">${t('app.engine.first')}</div></div>
+    <div style="width:560px">${note('red', t('app.engine.failed'), '<span class="mono" style="font-size:11.5px">uv sync failed: network unreachable (pypi.org)</span>', SV.tint(t('app.btn.retry')) + SV.tint(t('app.btn.show_log')))}</div>
+    <div style="width:560px">${note('red', t('app.engine.failed'), t('app.engine.gave_up'), SV.tint(t('app.btn.show_log')))}</div></div>`,
+}));
+</script>
+</body></html>

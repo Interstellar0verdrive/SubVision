@@ -25,9 +25,8 @@ Ogni tavola esiste in versione **chiara e scura** (D10). I testi sono in inglese
 
 - ⧉ Slot della scheda attività in fondo alla barra laterale (`ActivityCard`), una sola alla volta, in quest'ordine `(DS4)`:
   1. **Lotto in corso**: "Elabora · File 2 di 3 · nome.mkv", seconda riga "Fine verso le 14:20" (solo quando c'è una stima, cioè dal secondo file o dopo la prima tappa), barra con la frazione del lotto, pulsante **Ferma tutto**. Clic sulla scheda: va in Elabora. Niente Pausa (D7).
-  2. **Preparazione del riconoscimento** (solo se capita dopo il primo avvio, per esempio con una lingua OCR nuova **[?24]**): "Preparo il riconoscimento · circa 30 s", spinner, nessun pulsante.
-  3. **Aggiornamento disponibile** (gialla, `UpdateCard`): "È disponibile SubVision v2.0.1", "Novità" e **Scarica…** (apre la release su GitHub).
-  4. Nessuna scheda per la ricerca dei fotogrammi dell'Anteprima: dura 15–40 s, basta lo spinner sulla scheda.
+  2. **Aggiornamento disponibile** (gialla, `UpdateCard`): "È disponibile SubVision v2.0.1", "Novità" e **Scarica…** (apre la release su GitHub).
+  3. Nessuna scheda per la ricerca dei fotogrammi dell'Anteprima (dura 15–40 s, basta lo spinner sulla scheda) né per la preparazione del riconoscimento (dopo lo spike S5 si fa solo nella finestra strumenti, **[?24]** chiuso).
 - ⧉ Piè della barra laterale: "SubVision 2.0.0" (fumetto: "Motore v2.0.0 · Python 3.13.12"), freccia **Controlla aggiornamenti** (spinner mentre chiede), link **GitHub** a destra. `(DS4)`
 - ◻︎ Tra le schede e lo slot attività non c'è altro (niente "Questo Mac"). **[?17]**
 - ⧉ **Finestra stretta** (N1 di AnimeUp): sotto 1240 pt, o con la barra laterale nascosta da Vista, al suo posto una barra in alto di 52 pt: pallini a sinistra, le tre pagine come controllo a segmenti al centro (spinner sulla pagina che lavora, capsula col numero dei video su Elabora), a destra il pulsante dell'inspector (solo su Elabora e Anteprima) e l'ingranaggio. Vista › Mostra barra laterale è disabilitato sotto la soglia. Velo sfumato sotto la barra quando la pagina scorre. `(N1)`
@@ -42,7 +41,7 @@ Ogni tavola esiste in versione **chiara e scura** (D10). I testi sono in inglese
 Finestra a sé, larga 600 pt, prima della finestra principale (come la T1 di AnimeUp). Si chiude da sola e diventa la finestra principale quando tutte e quattro le righe sono pronte. **[D11, D12]**
 
 - ⧉ Intestazione: icona dell'app 64 pt, "Benvenuto in SubVision", "Prima del primo video, SubVision ha bisogno dei suoi strumenti: circa 108 MB, scaricati una volta, ognuno verificato col suo checksum pubblicato."
-- ⧉ Riga di stato sopra l'elenco: "Scarico 2 di 3 · 30 di 57 MB · manca circa un minuto"; durante la quarta riga: "Preparo il riconoscimento · circa 30 secondi, una volta sola".
+- ⧉ Riga di stato sopra l'elenco: "Scarico 2 di 3 · 30 di 57 MB · manca circa un minuto"; durante la quarta riga: "Preparo il riconoscimento · circa 30 secondi, una volta per ogni versione di macOS".
 - ◻︎ Quattro righe (icona di stato, nome e versione, a cosa serve, barra a byte quando c'è, MB a destra):
 
   | # | Riga | A cosa serve | MB | Avanzamento |
@@ -50,7 +49,7 @@ Finestra a sé, larga 600 pt, prima della finestra principale (come la T1 di Ani
   | 1 | **uv + Python 3.13** | motore e riconoscimento (uv, Python, pacchetti) | 51 | spinner fino a `hello` (nessuna barra: uv non dà i byte) |
   | 2 | **FFmpeg 9.0.2** | legge i fotogrammi | 28 | barra a byte da `tools.progress` |
   | 3 | **FFprobe 9.0.2** | durata e framerate | 28 | barra a byte |
-  | 4 | **Preparazione del riconoscimento** | Vision prepara i suoi modelli per la lingua OCR | — | barra a tempo stimato (30 s) o indeterminata, poi la durata vera da `warmup.done` |
+  | 4 | **Preparazione del riconoscimento** | Vision compila i suoi modelli per il Neural Engine (una volta per utente e per versione di macOS) | — | barra a tempo stimato (30 s) o indeterminata, poi la durata vera da `warmup.done` |
 
 - ◻︎ Stati di ogni riga: **in attesa** (cerchio vuoto, testo secondario) · **in corso** (spinner, fondo tenue d'accento, testo pieno) · **pronto** (spunta verde) · **errore** (croce rossa, fondo rosso tenue, chip "fermato").
 - ⧉ Stati della finestra:
@@ -58,6 +57,7 @@ Finestra a sé, larga 600 pt, prima della finestra principale (come la T1 di Ani
   - **preparazione del riconoscimento** `(T2)`: righe 1–3 pronte, riga 4 in corso;
   - **errore** `(T3)`: nota rossa sopra l'elenco: "Lo scaricamento si è fermato. La connessione è caduta mentre si scaricava FFmpeg. Ciò che è già fatto resta: Riprova riparte da lì."; variante checksum: "FFmpeg è arrivato danneggiato, quindi è stato messo da parte."; variante riga 4: "Il riconoscimento di testo non è partito. Il log dice perché." (è il caso "Vision mancante" al primo avvio). Pulsanti: link rosso **Mostra il log**, **Esci**, **Riprova** (primario);
   - **ritorno con uno strumento solo** `(T4)`: se all'avvio manca ffmpeg o ffprobe scaricato (cancellato a mano, checksum non valido), la finestra torna con la sola riga mancante; uv e Python non si mostrano se sono già a posto.
+  - **ritorno dopo un aggiornamento di macOS** `(T4)`: la cache dei modelli di Vision è legata alla build di macOS (spike S5), quindi torna la sola riga 4, "una volta per ogni versione di macOS, circa 30 secondi"; mai per un cambio di lingua OCR. Se si chiude durante la preparazione, nessun avviso: la riga dice "Se chiudi ora, la preparazione ripartirà al prossimo avvio" e la volta dopo si rifà.
 - ✕ "Svuota /tmp", `run.command`, `requirements.txt`, virtualenv nel progetto: il lanciatore del motore se ne occupa da solo.
 
 ## 2. Elabora (E) · la home
@@ -130,7 +130,7 @@ Pannello a destra di Elabora e di Anteprima **[?1]**, largo 300 pt, aperto e chi
 
   | Gruppo | Voce (IT / EN, proposta) | Controllo | Predefinito | Intervallo · passo | `OcrParams` | Oggi |
   |---|---|---|---|---|---|---|
-  | **OCR** | Lingua dei sottotitoli / Subtitle language | menu con le lingue di Vision su questo Mac (`hello.languages`), nomi nella lingua dell'app, codice BCP-47 in grigio **[?19]** | Italiano (`it-IT`) | lingue del Mac | `lang_hint` | campo di testo libero "Lingua (hint)" |
+  | **OCR** | Lingua dei sottotitoli / Subtitle language | menu con le 33 lingue del livello "accurate" di Vision su questo Mac (`hello.languages`, spike S5), nomi nella lingua dell'app, codice BCP-47 in grigio **[?19]** | Italiano (`it-IT`) | lingue del Mac | `lang_hint` | campo di testo libero "Lingua (hint)" |
   | | Fotogrammi al secondo / Frames per second | `SnapSlider` a 5 tacche | 12 | 4 · 6 · 8 · 10 · 12 | `fps` | `select_slider` |
   | | Lettura multipla con voto / Multiple readings with voting | interruttore | acceso | — | `multi_variant` | casella |
   | | Raffina i tempi al fotogramma nativo / Refine timing to native frames | interruttore | acceso | — | `refine_timing` | casella |
@@ -481,7 +481,7 @@ Tavole HTML in `design/tavole/`, ognuna in versione **chiara e scura** con il su
 | **DS1** · Colori e token | token chiaro/scuro copiati da AnimeUp 2.1 (`Color(dark:light:)`), rampe verde/giallo/rosso/accento, colori delle due bande sul fotogramma, contrasti **[?3, ?4]** |
 | **DS2** · Testo, pulsanti, link | scala tipografica, ruoli dei pulsanti (primario, secondario, distruttivo, avviso, semplice) in tre misure, link sottolineati per tono |
 | **DS3** · Componenti | riga del file (pronto, in corso, fatto, senza sottotitoli, fallito, fermato, illeggibile), barra di tappa (attesa, corso, fatta, interrotta), chip, note (blu, gialla, rossa, verde), controlli dell'inspector (cursore con valore, campo con stepper, interruttore, menu lingua, Predefinito, puntino), maniglie e linguette delle bande |
-| **DS4** · Barra laterale | schede con i sottotitoli di tutti gli stati, segni a destra, schede attività (lotto, preparazione del riconoscimento, aggiornamento), piè con versione e GitHub |
+| **DS4** · Barra laterale | schede con i sottotitoli di tutti gli stati, segni a destra, schede attività (lotto, aggiornamento), piè con versione e GitHub |
 | **T1** · Strumenti · download | quattro righe: pronta, in corso con barra, in attesa; riga di stato "Scarico 2 di 3" |
 | **T2** · Strumenti · riconoscimento | righe 1–3 pronte, riga 4 in corso con stima di 30 s |
 | **T3** · Strumenti · errore | download fermato, checksum, riconoscimento non partito; Mostra il log, Esci, Riprova |
@@ -530,4 +530,4 @@ Tavole HTML in `design/tavole/`, ognuna in versione **chiara e scura** con il su
 | **N1** · Finestra stretta | barra in alto con Elabora in corso (spinner, capsula col numero) |
 | **N2** · Stretta con inspector | inspector sovrapposto da destra |
 
-51 tavole × 2 temi. Le future immagini del README corrispondono a: `app_main` → E1, `app_preview` → A3, `app_processing` → E2, `app_testocr` → A4, `app_subfix` → F2, `review_report` → R1.
+51 tavole × 2 temi. Disegnate in 3.2: `design/tavole/index.html` (pagine, ancore e PNG); alcuni titoli si sono precisati disegnando (A5 "Nessun testo e casi della prova", R3 "Errori del report e caricamento", T4 "Ritorno" con l'aggiornamento di macOS). Le future immagini del README corrispondono a: `app_main` → E1, `app_preview` → A3, `app_processing` → E2, `app_testocr` → A4, `app_subfix` → F2, `review_report` → R1.
