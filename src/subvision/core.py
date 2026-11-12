@@ -498,6 +498,28 @@ def vision_available() -> bool:
     return bool(_VISION_OK)
 
 
+_VISION_LANGS: Optional[List[str]] = None
+
+
+def vision_languages() -> List[str]:
+    """
+    BCP-47 codes that Vision can recognize on this Mac (e.g. "it-IT"),
+    cached; [] when Vision is not importable. Used to validate the OCR
+    language before a job starts (an unknown language gives an empty SRT
+    with no error) and by the sidecar's `hello`.
+    """
+    global _VISION_LANGS
+    if _VISION_LANGS is None:
+        try:
+            import Vision
+            req = Vision.VNRecognizeTextRequest.alloc().init()
+            langs, _err = req.supportedRecognitionLanguagesAndReturnError_(None)
+            _VISION_LANGS = [str(code) for code in (langs or [])]
+        except Exception:
+            _VISION_LANGS = []
+    return list(_VISION_LANGS)
+
+
 def warmup(langs: List[str], level: str = "accurate") -> None:
     try:
         from ocrmac import ocrmac
