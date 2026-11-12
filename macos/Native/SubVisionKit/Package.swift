@@ -21,7 +21,7 @@ let package = Package(
         .target(name: "SVDesign"),
         .target(name: "SVLocalization"),
         .target(name: "SVShell", dependencies: ["SVEngine", "SVDesign", "SVLocalization"]),
-        .testTarget(name: "SVEngineTests", dependencies: ["SVEngine"]),
+        .testTarget(name: "SVEngineTests", dependencies: ["SVEngine"], resources: [.copy("Fixtures")]),
         .testTarget(name: "SVDesignTests", dependencies: ["SVDesign"]),
         .testTarget(name: "SVLocalizationTests", dependencies: ["SVLocalization"]),
         .testTarget(name: "SVShellTests", dependencies: ["SVShell"]),
