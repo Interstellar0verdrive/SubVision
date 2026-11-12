@@ -24,6 +24,15 @@ export UV_PYTHON_PREFERENCE=only-managed
 
 `uv lock` (after a dependency change) runs with the same uv and variables.
 
+The launcher `./subvision` does the same for a user: uv 0.11.4 and Python
+go into `$SUBVISION_STATO` (default `~/Library/Application Support/SubVision`),
+`uv sync --frozen` runs only when `.venv/.subvision-lock-sha256` differs
+from the sha256 of `uv.lock`. `SUBVISION_LAUNCHER_CHECK=1` makes it print
+its decision ("environment ready" / "sync needed") and exit, which is what
+`tests/test_cli.py` uses to test it without network. The sidecar and the
+CLI take the ffmpeg of the tests from `SUBVISION_FFMPEG` (set by the test
+helpers from the `ffmpeg_bin` fixture).
+
 The demo clips (`demo/sintel_ita_hardsub_demo.mp4`, `demo/sintel_eng_hardsub_demo.mp4`,
 from the `demo-assets` release) are expected in `demo/` at the repo root; tests
 that need them skip when they are missing. ffmpeg/ffprobe come from `PATH` or

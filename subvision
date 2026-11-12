@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# ==========================================================================
+#  subvision - portable launcher of the SubVision engine
+#
+#  Everything the engine needs (uv, Python, the packages, the caches) lives
+#  in the STATE folder, not next to the code: the code can be read-only (the
+#  app bundle is), and gets replaced whole at every update.
+#
+#  Adapted from the `animeup` launcher of AnimeUp 2.1 (MIT-licensed pieces
+#  by the same author). What differs: uv is only ever the pinned release
+#  (no system uv), the environment is re-synced only when `uv.lock` changes
+#  (marker with its sha256, plan rule 3.7), the state folder is always
+#  outside the code.
+# ==========================================================================
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- the state folder: uv, Python, the environment, the caches, the tools ---
+STATO="${SUBVISION_STATO:-$HOME/Library/Application Support/SubVision}"
+export SUBVISION_STATO="$STATO"
+mkdir -p "$STATO/bin" "$STATO/records"
+export UV_PYTHON_INSTALL_DIR="$STATO/.python"
+export UV_CACHE_DIR="$STATO/.cache/uv"
+export UV_PROJECT_ENVIRONMENT="$STATO/.venv"
+export PYTHONPYCACHEPREFIX="$STATO/.cache/pycache"
+export UV_PYTHON_DOWNLOADS=automatic   # self-repairs on a new machine
+export UV_PYTHON_PREFERENCE=only-managed
+
+# --- language of the messages: the one saved by the app, when there is one ---
+# No Python and no jq: on the first launch the environment does not exist
+# yet. The key `language` of records/settings.json is read with sed; without
+# the file, or with an unknown value, English like the factory app.
+saved_language() {
+  local file="$1/records/settings.json"
+  [[ -r "$file" ]] || return 0
+  sed -n 's/.*"language"[[:space:]]*:[[:space:]]*"\([a-z]*\)".*/\1/p' "$file" | head -n 1
+}
+LANGUAGE_CODE="$(saved_language "$STATO" || true)"
+[[ "$LANGUAGE_CODE" == "it" ]] || LANGUAGE_CODE="en"
+
+# A message in the two languages, on stderr: `say "italiano" "english"`.
+say() {
+  if [[ "$LANGUAGE_CODE" == "it" ]]; then echo "$1" >&2; else echo "$2" >&2; fi
+}
+
+# --- folder downloaded from the Internet: drop the macOS quarantine ---
+# Extracting the zip of a release, macOS marks every file as "downloaded"
+# and Gatekeeper would block the unsigned binaries one by one. The mark is
+# removed from the code folder only: whoever runs this launcher has already
+# chosen to trust it.
+if xattr -p com.apple.quarantine "$ROOT/subvision" >/dev/null 2>&1; then
+  say "Cartella scaricata da Internet: tolgo la quarantena di macOS ai suoi file." \
+      "Folder downloaded from the Internet: removing the macOS quarantine from its files."
+  xattr -dr com.apple.quarantine "$ROOT" 2>/dev/null || true
+fi
+
+# --- uv: the pinned release, verified ---
+UV="$STATO/bin/uv"
+UV_VERSION="0.11.4"
+UV_SHA256="9b9cb6c6f58c3246dbf3351ed4e97c500bc3266f5f237d2fd620b66e1c31dc56"
+UV_URL="https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-aarch64-apple-darwin.tar.gz"
+
+download_uv() {
+  local tmp
+  tmp="$(mktemp -d)"
+  say "Scarico uv $UV_VERSION (gestore dell'ambiente Python, ~20 MB)..." \
+      "Downloading uv $UV_VERSION (the Python environment manager, ~20 MB)..."
+  if curl -fsSL "$UV_URL" -o "$tmp/uv.tar.gz" \
+     && [[ "$(shasum -a 256 "$tmp/uv.tar.gz" | cut -d' ' -f1)" == "$UV_SHA256" ]] \
+     && tar -xzf "$tmp/uv.tar.gz" -C "$tmp"; then
+    cp "$tmp/uv-aarch64-apple-darwin/uv" "$UV" && chmod +x "$UV"
+    xattr -d com.apple.quarantine "$UV" 2>/dev/null || true
+  fi
+  rm -rf "$tmp"
+  [[ -x "$UV" ]]
+}
+
+if [[ ! -x "$UV" ]]; then
+  if [[ "$(uname -m)" != "arm64" ]] || ! download_uv; then
+    if [[ "$LANGUAGE_CODE" == "it" ]]; then
+      cat >&2 <<EOF
+ERRORE: uv $UV_VERSION non è in $STATO/bin e il download non è riuscito.
+
+uv è il gestore che crea l'ambiente Python nella cartella di stato. Serve
+un Mac con Apple Silicon e una connessione a Internet per il primo avvio.
+EOF
+    else
+      cat >&2 <<EOF
+ERROR: uv $UV_VERSION is not in $STATO/bin and the download failed.
+
+uv is the manager that creates the Python environment in the state folder.
+An Apple Silicon Mac and an Internet connection are needed for the first
+launch.
+EOF
+    fi
+    exit 1
+  fi
+fi
+
+# --- the environment: synced only when uv.lock changes (or it is broken) ---
+# The marker holds the sha256 of the uv.lock the environment was made from:
+# after an update of the code the lock differs, and `uv sync --frozen` runs
+# again. Without this check AnimeUp 2.0 kept running an old environment
+# after an update (plan, rule 3.7). The import check guards against a venv
+# that points to a moved or missing Python.
+PY="$STATO/.venv/bin/python"
+MARKER="$STATO/.venv/.subvision-lock-sha256"
+LOCK_SHA="$(shasum -a 256 "$ROOT/uv.lock" | cut -d' ' -f1)"
+CHECK='import subvision,os,sys; sys.exit(0 if os.path.realpath(subvision.__file__).startswith(os.path.realpath(sys.argv[1])+os.sep) else 1)'
+
+environment_ready() {
+  [[ -x "$PY" ]] || return 1
+  [[ -r "$MARKER" && "$(cat "$MARKER")" == "$LOCK_SHA" ]] || return 1
+  "$PY" -I -c "$CHECK" "$ROOT" >/dev/null 2>&1
+}
+
+if environment_ready; then
+  # Test hook: report the decision and leave without running anything.
+  if [[ "${SUBVISION_LAUNCHER_CHECK:-}" == "1" ]]; then
+    echo "launcher: environment ready" >&2
+    exit 0
+  fi
+  # Always the same python path: the Vision cache is tied to the executable
+  # name (spike S5), and the module is invoked instead of the `.venv/bin/subvision`
+  # script, whose shebang has the absolute path of when it was created.
+  exec "$PY" -m subvision.cli "$@"
+fi
+
+if [[ ! -d "$STATO/.venv" ]]; then
+  say "Primo avvio: preparo l'ambiente Python nella cartella di stato (una volta sola)..." \
+      "First launch: setting up the Python environment in the state folder (only once)..."
+else
+  say "Aggiornamento: risincronizzo l'ambiente Python (uv.lock è cambiato)..." \
+      "Update: re-syncing the Python environment (uv.lock changed)..."
+fi
+
+if [[ "${SUBVISION_LAUNCHER_CHECK:-}" == "1" ]]; then
+  echo "launcher: sync needed" >&2
+  exit 0
+fi
+
+# --frozen: the lock is the one of the release and is never touched here.
+if ! "$UV" sync --project "$ROOT" --frozen --no-dev --quiet; then
+  if [[ "$LANGUAGE_CODE" == "it" ]]; then
+    cat >&2 <<EOF
+ERRORE: preparazione dell'ambiente fallita.
+
+Al primo avvio su una macchina nuova serve una connessione per scaricare
+Python e le dipendenze nella cartella di stato. Una volta fatto, funziona
+anche offline.
+EOF
+  else
+    cat >&2 <<EOF
+ERROR: setting up the environment failed.
+
+The first launch on a new machine needs an Internet connection to download
+Python and the dependencies into the state folder. After that, it works
+offline too.
+EOF
+  fi
+  exit 1
+fi
+printf '%s\n' "$LOCK_SHA" > "$MARKER"
+
+exec "$PY" -m subvision.cli "$@"
