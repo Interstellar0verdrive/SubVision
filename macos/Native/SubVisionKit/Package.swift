@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "SVDesign", targets: ["SVDesign"]),
         .library(name: "SVLocalization", targets: ["SVLocalization"]),
         .library(name: "SVShell", targets: ["SVShell"]),
+        .executable(name: "ShellDemo", targets: ["ShellDemo"]),
     ],
     targets: [
         .target(name: "SVEngine"),
@@ -24,7 +25,9 @@ let package = Package(
         .testTarget(name: "SVEngineTests", dependencies: ["SVEngine"], resources: [.copy("Fixtures")]),
         .testTarget(name: "SVDesignTests", dependencies: ["SVDesign"]),
         .testTarget(name: "SVLocalizationTests", dependencies: ["SVLocalization"], resources: [.copy("Fixtures")]),
-        .testTarget(name: "SVShellTests", dependencies: ["SVShell"]),
+        .testTarget(name: "SVShellTests", dependencies: ["SVShell"], resources: [.copy("Fixtures")]),
+        .executableTarget(name: "ShellDemo", dependencies: ["SVShell"], path: "Examples/ShellDemo",
+                          resources: [.copy("fake_engine.py")]),
     ],
     swiftLanguageModes: [.v5]
 )

@@ -126,7 +126,7 @@ public struct PopupMenu<Label: View>: View {
         }
         // Under the control, its left edge aligned, as a popup button opens.
         let y = view.isFlipped ? frame.maxY + 4 : view.bounds.height - frame.maxY - 4
-        withExtendedLifetime(handler) {
+        _ = withExtendedLifetime(handler) {
             menu.popUp(positioning: nil, at: NSPoint(x: frame.minX, y: y), in: view)
         }
     }

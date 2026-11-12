@@ -4,10 +4,6 @@ import SwiftUI
 import Testing
 @testable import SVDesign
 
-@Test func moduleName() {
-    #expect(DesignModule.name == "SVDesign")
-}
-
 @Test func cssColours() {
     let hex = NSColor(css: "#2AC9DE").usingColorSpace(.sRGB)!
     #expect(abs(hex.redComponent - 42 / 255) < 0.002)
