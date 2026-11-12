@@ -96,6 +96,17 @@ def test_band_crop_expressions():
     assert core.band_crop(p, "top") == "crop=iw:ih*22/100:0:0"
 
 
+def test_band_box_matches_crop_geometry():
+    from PIL import Image
+    p = OcrParams(bottom_keep_pct=28, keep_w_pct=96, top_keep_pct=22, top_keep_w_pct=100)
+    # same geometry as band_crop(): 96% of 1920 = 1843 px centred, 28% of 1080 = 302 px
+    assert core.band_box(p, "bottom", 1920, 1080) == (38, 778, 1881, 1080)
+    assert core.band_box(p, "top", 1920, 1080) == (0, 0, 1920, 237)
+    im = Image.new("RGB", (1920, 1080))
+    assert core.crop_band(im, p, "bottom").size == (1843, 302)
+    assert core.crop_band(im, p, "top").size == (1920, 237)
+
+
 # ---------------------------------------------------------------- real run
 def test_process_video_fast_profile(demo_ita_copy: Path, ffmpeg_bin: str, tmp_path: Path):
     if not core.vision_available():

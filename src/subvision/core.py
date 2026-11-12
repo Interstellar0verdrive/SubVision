@@ -40,7 +40,7 @@ import subprocess
 import datetime
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
@@ -74,48 +74,67 @@ def resolve_langs(lang_hint: str) -> List[str]:
     return [lang_hint.strip()]
 
 
-# Progress/log strings emitted by the pipeline (shown by the GUI and written
-# to the per-file .log). Text only, zero logic; "it" must stay byte-identical
-# to the historical strings. The numeric formats are preserved because the
-# GUI parses the leading count with a regex.
-_CORE_I18N = {
-    "it": {
-        "frames_progress": "{cnt}/~{exp} frame",
-        "frames_done": "{n} frame estratti",
-        "analyze_frame": "Analisi frame {i}/{n}",
-        "to_read": "{t}/{n} frame da leggere",
-        "ocr_progress": "{done}/{n} frame",
-        "refine_rows": "{i}/{n} righe",
-        "log_frames": "{n} frame @ {fps}fps",
-        "log_to_ocr": "{t}/{n} frame da OCR-are",
-        "log_ocr_err": "OCR errore su un frame: {e}",
-        "log_refining": "raffinamento confini a {fps:.3f} fps nativi…",
-        "log_moved": "{n} confini spostati",
-        "log_srt": "SRT scritto: {path} ({segments} righe, {ocr} OCR, "
-                   "{refined} confini raffinati, {elapsed:.1f}s)",
-        "log_qc": "Report di revisione: {path}",
-        "vision_err": "Apple Vision non disponibile (pip install ocrmac). "
-                      "Serve macOS 10.15+.",
-    },
-    "en": {
-        "frames_progress": "{cnt}/~{exp} frames",
-        "frames_done": "{n} frames extracted",
-        "analyze_frame": "Analyzing frame {i}/{n}",
-        "to_read": "{t}/{n} frames to read",
-        "ocr_progress": "{done}/{n} frames",
-        "refine_rows": "{i}/{n} lines",
-        "log_frames": "{n} frames @ {fps}fps",
-        "log_to_ocr": "{t}/{n} frames to OCR",
-        "log_ocr_err": "OCR error on one frame: {e}",
-        "log_refining": "refining boundaries at {fps:.3f} native fps…",
-        "log_moved": "{n} boundaries moved",
-        "log_srt": "SRT written: {path} ({segments} lines, {ocr} OCR, "
-                   "{refined} boundaries refined, {elapsed:.1f}s)",
-        "log_qc": "Review report: {path}",
-        "vision_err": "Apple Vision not available (pip install ocrmac). "
-                      "Requires macOS 10.15+.",
-    },
-}
+# ---------------------------------------------------------------- Events
+# The engine never formats text for the user: progress and log callbacks
+# receive codes and numbers, and the caller (sidecar, CLI, app) formats them
+# in its own language. The only localized texts left here are the ones of
+# the review report (_QC_I18N), because the report is generated here.
+STEPS = ("extract", "group", "ocr", "refine")
+BANDS = ("bottom", "top")
+
+
+@dataclass(frozen=True)
+class ProgressEvent:
+    """
+    Progress of one step of one band. `ratio` grows from 0 to 1 within the
+    step; `count`/`total` are the numbers behind it (`unit`: what they count,
+    e.g. "frames" during extract/group/ocr, "targets" for the frames selected
+    for OCR at the end of group, "segments" during refine).
+    """
+    step: str          # one of STEPS
+    band: str          # one of BANDS
+    ratio: float       # 0.0 .. 1.0
+    count: int
+    total: int
+    unit: str
+
+
+@dataclass(frozen=True)
+class LogEvent:
+    """
+    One line of the per-file log, as a code plus its arguments. Codes:
+      frames_extracted  {band, n, fps}
+      ocr_targets       {band, targets, frames}
+      ocr_error         {band, error}
+      refining          {band, fps}
+      boundaries_moved  {band, n}
+      srt_written       {path, segments, ocr, refined, elapsed}
+      report_written    {path}
+    """
+    code: str
+    args: Dict[str, Any] = field(default_factory=dict)
+
+
+ProgressCallback = Callable[[ProgressEvent], None]
+LogCallback = Callable[[LogEvent], None]
+# Low-level step callback used inside the band pipeline: (ratio, count, total).
+_StepCallback = Callable[[float, int, int], None]
+
+
+class EngineError(RuntimeError):
+    """Engine error with a stable `code` (the message is the code itself)."""
+
+    def __init__(self, code: str, **args: Any) -> None:
+        super().__init__(code)
+        self.code = code
+        self.args_ = args
+
+
+# Flags attached to the segments (SegInfo.flags). Codes only: the review
+# report translates them through _QC_I18N["<lang>"]["flags"].
+FLAG_TOO_SHORT = "too_short"
+FLAG_NOISE = "noise"
+FLAG_MERGED_FADE = "merged_fade"
 
 
 # ---------------------------------------------------------------- Parameters
@@ -239,16 +258,40 @@ def band_crop(p: OcrParams, band: str) -> str:
     return f"crop={crop_w}:ih*{vb}/100:{crop_x}:ih-ih*{vb}/100"
 
 
+def band_box(p: OcrParams, band: str, width: int, height: int
+             ) -> Tuple[int, int, int, int]:
+    """
+    Pixel box (left, top, right, bottom) of the requested band on a full
+    frame of the given size: the same geometry as band_crop(), for callers
+    that work on whole frames in PIL (preview, OCR test).
+    """
+    if band == "top":
+        vb = max(1, min(100, int(p.top_keep_pct)))
+        kw = max(1, min(100, int(p.top_keep_w_pct)))
+    else:
+        vb = max(1, min(100, int(p.bottom_keep_pct)))
+        kw = max(1, min(100, int(p.keep_w_pct)))
+    w = width if kw >= 100 else int(width * kw / 100)
+    h = int(height * vb / 100)
+    left = 0 if kw >= 100 else int((width - width * kw / 100) / 2)
+    top = 0 if band == "top" else height - h
+    return left, top, left + w, top + h
+
+
+def crop_band(im: Image.Image, p: OcrParams, band: str) -> Image.Image:
+    """The band of a full frame, cropped in PIL (see band_box)."""
+    return im.crop(band_box(p, band, im.width, im.height))
+
+
 def extract_frames(video: str, outdir: Path, p: OcrParams, band: str,
-                   progress_cb: Optional[Callable[[float, str], None]] = None,
-                   ui_lang: str = "it"
+                   progress_cb: Optional[_StepCallback] = None,
                    ) -> Tuple[List[Path], float]:
     """
     Extracts the frames of the requested band, WITHOUT enhancement filters:
     the raw image reads better (measured); the variants are generated in PIL
     at OCR time, so they can vote.
+    progress_cb(ratio, frames_so_far, frames_expected).
     """
-    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     outdir.mkdir(parents=True, exist_ok=True)
     vf = f"fps={p.fps},{band_crop(p, band)}"
     pattern = str(outdir / "f_%08d.jpg")
@@ -261,14 +304,13 @@ def extract_frames(video: str, outdir: Path, p: OcrParams, band: str,
         time.sleep(0.3)
         cnt = sum(1 for _ in outdir.glob("f_*.jpg"))
         if progress_cb and expected:
-            progress_cb(min(0.99, cnt / expected),
-                        tr["frames_progress"].format(cnt=cnt, exp=expected))
+            progress_cb(min(0.99, cnt / expected), cnt, expected)
     _, err = proc.communicate()
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=err)
     frames = sorted(outdir.glob("f_*.jpg"))
     if progress_cb:
-        progress_cb(1.0, tr["frames_done"].format(n=len(frames)))
+        progress_cb(1.0, len(frames), len(frames))
     return frames, 1.0 / max(p.fps, 0.001)
 
 
@@ -276,7 +318,7 @@ def extract_frames(video: str, outdir: Path, p: OcrParams, band: str,
 def dhash(path: Path, hash_size: int = 16) -> int:
     im = Image.open(path)
     im = ImageOps.grayscale(im).resize((hash_size + 1, hash_size), Image.BILINEAR)
-    px = list(im.getdata())
+    px = list(im.get_flattened_data())
     bits = 0
     pos = 0
     for r in range(hash_size):
@@ -727,15 +769,13 @@ def merge_segments(segs: List[Tuple[float, float, str]], merge_gap: float,
 
 # ---------------------------------------------------------------- pipeline
 def select_ocr_targets(frames: List[Path], skip_hamming: int,
-                       progress_cb: Optional[Callable[[float, str], None]] = None,
-                       ui_lang: str = "it"
+                       progress_cb: Optional[_StepCallback] = None,
                        ) -> List[int]:
     """
     Frames to OCR: frame 0 and every frame that differs from the PREVIOUS
     one (dhash) by more than skip_hamming. The others inherit the text
-    (forward-fill).
+    (forward-fill). progress_cb(ratio, frames_analyzed, frames).
     """
-    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     n = len(frames)
     targets: List[int] = []
     prev = None
@@ -748,7 +788,7 @@ def select_ocr_targets(frames: List[Path], skip_hamming: int,
             targets.append(i)
         prev = h
         if progress_cb and (i % 300 == 0):
-            progress_cb(i / max(n, 1), tr["analyze_frame"].format(i=i, n=n))
+            progress_cb(i / max(n, 1), i, n)
     return targets
 
 
@@ -835,7 +875,7 @@ def merge_seginfos(segs: List[SegInfo], merge_gap: float) -> List[SegInfo]:
                 agree=min(prev.agree, s.agree),
                 nframes=prev.nframes + s.nframes, top=prev.top,
                 alts=sorted(set(prev.alts + s.alts + [other.text]) - {keep.text})[:4],
-                flags=sorted(set(prev.flags + s.flags + ["unito da fade/typo"])),
+                flags=sorted(set(prev.flags + s.flags + [FLAG_MERGED_FADE])),
             )
             out[-1] = merged
         else:
@@ -846,16 +886,14 @@ def merge_seginfos(segs: List[SegInfo], merge_gap: float) -> List[SegInfo]:
 def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
                           native_fps: float, crop_expr: str, langs: List[str],
                           p: OcrParams, tmp_root: Path,
-                          progress_cb: Optional[Callable[[float, str], None]] = None,
-                          ui_lang: str = "it",
+                          progress_cb: Optional[_StepCallback] = None,
                           ) -> int:
     """
     Refines the start/end of every segment at the NATIVE frame rate: extracts
     a ±dt window around the boundary and looks for the first/last frame in
     which the segment text is visible. Precision ~1 native frame (~±20ms).
-    Returns the number of boundaries moved.
+    Returns the number of boundaries moved. progress_cb(ratio, done, segments).
     """
-    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     moved = 0
     ndt = 1.0 / max(native_fps, 1.0)
 
@@ -901,8 +939,7 @@ def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
                 moved += 1
             seg.end = new_end
         if progress_cb:
-            progress_cb((n + 1) / max(1, len(segs)),
-                        tr["refine_rows"].format(i=n + 1, n=len(segs)))
+            progress_cb((n + 1) / max(1, len(segs)), n + 1, len(segs))
 
     # remove small overlaps introduced by the refinement
     segs.sort(key=lambda s: s.start)
@@ -1346,7 +1383,7 @@ updateCounter();
 
 # Review-report strings (text only, zero logic).
 # "html": __T_*__ tokens of the markup; "js": the T object used by the scripts;
-# "flags": translation of the QC notes generated by the pipeline (in Italian);
+# "flags": texts of the segment flag codes (FLAG_*) set by the pipeline;
 # "summary": the recap at the top of the report.
 _QC_I18N = {
     "it": {
@@ -1395,7 +1432,11 @@ _QC_I18N = {
             "addHere": "➕ aggiungi riga qui",
             "addedFlag": "aggiunta a mano",
         },
-        "flags": {},    # the QC notes are generated in Italian already
+        "flags": {
+            FLAG_TOO_SHORT: "scartato: troppo breve",
+            FLAG_NOISE: "scartato: probabile rumore grafico",
+            FLAG_MERGED_FADE: "unito da fade/typo",
+        },
         "summary": (
             "SRT: <b>{srt}</b><br>"
             "Righe: <b>{rows}</b> · da ricontrollare: <b>{warn}</b> · "
@@ -1453,9 +1494,9 @@ _QC_I18N = {
             "addedFlag": "added by hand",
         },
         "flags": {
-            "scartato: troppo breve": "dropped: too short",
-            "scartato: probabile rumore grafico": "dropped: likely graphic noise",
-            "unito da fade/typo": "merged across fade/typo",
+            FLAG_TOO_SHORT: "dropped: too short",
+            FLAG_NOISE: "dropped: likely graphic noise",
+            FLAG_MERGED_FADE: "merged across fade/typo",
         },
         "summary": (
             "SRT: <b>{srt}</b><br>"
@@ -1539,36 +1580,38 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
 # ---------------------------------------------------------------- orchestration
 def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
                   workdir: Path, stats: RunStats,
-                  progress_cb, log_cb,
-                  ui_lang: str = "it") -> Tuple[List[SegInfo], List[SegInfo], List[Tuple[float, float, str]]]:
+                  progress_cb: Optional[ProgressCallback],
+                  log_cb: Optional[LogCallback],
+                  ) -> Tuple[List[SegInfo], List[SegInfo], List[Tuple[float, float, str]]]:
     """
     Processes one band ('bottom' or 'top') and returns (segments, dropped, gaps).
     The review-report thumbnails are captured HERE, before the frames are deleted.
     """
-    def stage(name):
-        # "stage:band" key (e.g. "ocr:bottom") so the GUI can dedicate a
-        # progress row to every step of every band.
-        def cb(ratio, text):
-            if progress_cb:
-                progress_cb(f"{name}:{band}", ratio, text)
+    def emit(step: str, ratio: float, count: int, total: int, unit: str) -> None:
+        if progress_cb:
+            progress_cb(ProgressEvent(step, band, ratio, count, total, unit))
+
+    def stage(name: str, unit: str = "frames") -> _StepCallback:
+        # one (step, band) pair per callback, so the caller can dedicate a
+        # progress row to every step of every band
+        def cb(ratio: float, count: int, total: int) -> None:
+            emit(name, ratio, count, total, unit)
         return cb
 
-    def log(msg):
+    def log(code: str, **args: Any) -> None:
         if log_cb:
-            log_cb(f"[{band}] {msg}")
+            log_cb(LogEvent(code, {"band": band, **args}))
 
-    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     frames, dt = extract_frames(video, workdir / f"frames_{band}", p, band,
-                                stage("extract"), ui_lang=ui_lang)
+                                stage("extract"))
     stats.frames += len(frames)
-    log(tr["log_frames"].format(n=len(frames), fps=p.fps))
+    log("frames_extracted", n=len(frames), fps=p.fps)
     if not frames:
         return [], [], []
 
-    targets = select_ocr_targets(frames, p.skip_hamming, stage("group"),
-                                 ui_lang=ui_lang)
-    stage("group")(1.0, tr["to_read"].format(t=len(targets), n=len(frames)))
-    log(tr["log_to_ocr"].format(t=len(targets), n=len(frames)))
+    targets = select_ocr_targets(frames, p.skip_hamming, stage("group"))
+    emit("group", 1.0, len(targets), len(frames), "targets")
+    log("ocr_targets", targets=len(targets), frames=len(frames))
 
     # ---- multi-variant OCR in parallel
     nvar = len(gen_variants(Image.new("RGB", (2, 2)), p.multi_variant))
@@ -1590,12 +1633,11 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
                 idx, res = fut.result()
                 results[idx] = res
             except Exception as e:
-                log(tr["log_ocr_err"].format(e=e))
+                log("ocr_error", error=str(e))
             done += 1
             stats.ocr_calls += nvar
-            if progress_cb and (done % 10 == 0 or done == len(targets)):
-                progress_cb(f"ocr:{band}", done / len(targets),
-                            tr["ocr_progress"].format(done=done, n=len(targets)))
+            if done % 10 == 0 or done == len(targets):
+                emit("ocr", done / len(targets), done, len(targets), "frames")
 
     # ---- forward-fill + sanitize
     per_text: List[str] = []
@@ -1631,10 +1673,10 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
     kept, dropped = [], []
     for s in segs:
         if (s.end - s.start) < p.min_duration:
-            s.flags.append("scartato: troppo breve")
+            s.flags.append(FLAG_TOO_SHORT)
             dropped.append(s)
         elif is_noise(s):
-            s.flags.append("scartato: probabile rumore grafico")
+            s.flags.append(FLAG_NOISE)
             dropped.append(s)
         else:
             kept.append(s)
@@ -1662,31 +1704,31 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
     # ---- boundary refinement at the native frame rate
     if p.refine_timing and kept:
         native = ffprobe_fps(video)
-        log(tr["log_refining"].format(fps=native))
+        log("refining", fps=native)
         moved = refine_segment_bounds(video, kept, dt, native, band_crop(p, band),
-                                      langs, p, workdir, stage("refine"),
-                                      ui_lang=ui_lang)
+                                      langs, p, workdir, stage("refine", "segments"))
         stats.refined += moved
-        log(tr["log_moved"].format(n=moved))
+        log("boundaries_moved", n=moved)
 
     return kept, dropped, gaps
 
 
 def process_video(video: str, out_path: str, p: OcrParams,
-                  progress_cb: Optional[Callable[[str, float, str], None]] = None,
-                  log_cb: Optional[Callable[[str], None]] = None,
+                  progress_cb: Optional[ProgressCallback] = None,
+                  log_cb: Optional[LogCallback] = None,
                   tmp_root: Optional[Path] = None,
                   ui_lang: str = "it"
                   ) -> Tuple[List[Tuple[float, float, str]], RunStats]:
     """
-    Full pipeline. progress_cb(stage, ratio, text) with stage in
-    {"extract","group","ocr","refine"}. Returns (tuple_segments, stats);
-    stats.qc_path holds the path of the review report (if generated).
-    ui_lang ("it" | "en") is only the language of the review-report texts.
+    Full pipeline. progress_cb(ProgressEvent) with step in STEPS and band in
+    BANDS; log_cb(LogEvent) with the codes listed on LogEvent. Returns
+    (tuple_segments, stats); stats.qc_path holds the path of the review
+    report (if generated). ui_lang ("it" | "en") is only the language of the
+    review-report texts. Raises EngineError("vision_unavailable") when
+    Apple Vision (ocrmac) cannot be imported.
     """
-    tr = _CORE_I18N.get(ui_lang) or _CORE_I18N["it"]
     if not vision_available():
-        raise RuntimeError(tr["vision_err"])
+        raise EngineError("vision_unavailable")
     langs = resolve_langs(p.lang_hint)
     tmp_root = Path(tmp_root or tempfile.gettempdir())
     tmp_root.mkdir(parents=True, exist_ok=True)
@@ -1703,8 +1745,7 @@ def process_video(video: str, out_path: str, p: OcrParams,
         bands = ["bottom"] + (["top"] if p.top_band else [])
         for band in bands:
             kept, dropped, g = _process_band(video, band, p, langs, workdir,
-                                             stats, progress_cb, log_cb,
-                                             ui_lang=ui_lang)
+                                             stats, progress_cb, log_cb)
             all_segs += kept
             all_dropped += dropped
             gaps += g
@@ -1726,10 +1767,10 @@ def process_video(video: str, out_path: str, p: OcrParams,
 
         write_srt(final, out_path)
         if log_cb:
-            log_cb(tr["log_srt"].format(path=out_path, segments=stats.segments,
-                                        ocr=stats.ocr_calls,
-                                        refined=stats.refined,
-                                        elapsed=stats.elapsed))
+            log_cb(LogEvent("srt_written", {
+                "path": str(out_path), "segments": stats.segments,
+                "ocr": stats.ocr_calls, "refined": stats.refined,
+                "elapsed": stats.elapsed}))
 
         if p.qc_report:
             qc = Path(out_path).with_suffix(".revisione.html")
@@ -1738,7 +1779,7 @@ def process_video(video: str, out_path: str, p: OcrParams,
                           all_dropped, gaps, stats, p, ui_lang=ui_lang)
             stats.qc_path = str(qc)
             if log_cb:
-                log_cb(tr["log_qc"].format(path=qc))
+                log_cb(LogEvent("report_written", {"path": str(qc)}))
 
         return final, stats
     finally:
