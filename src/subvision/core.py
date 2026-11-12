@@ -1080,59 +1080,87 @@ _QC_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="__LANG__"><head><meta charset="utf-8">
 <title>__T_TITLE__ — __VIDEO__</title>
 <style>
- :root{color-scheme:dark}
- body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:0;background:#14161a;color:#e8e8e8}
+ /* Two palettes: dark (the 1.0 look) and light, chosen by the system
+    appearance (the app's WKWebView follows the app's theme). The light
+    values borrow from the AnimeUp 2.1 design tokens (Tokens.swift, MIT). */
+ :root{color-scheme:light dark;
+   --bg:#14161a; --fg:#e8e8e8; --line:#333; --line2:#2a2d33; --panel:#1d2026;
+   --topbar:#14161acc; --accent:#2a6df4; --accent-fg:#fff; --accent-line:#7db1ff;
+   --accent-glow:#2a6df499; --sec:#3a3d45; --sec-fg:#fff;
+   --warn-bg:#241f0e; --warn-line:#665c20; --bad-bg:#2b1616; --bad-line:#663333;
+   --added-bg:#12281a; --added-line:#2f6b45; --time:#9ecbff;
+   --field-bg:#1d2026; --field-line:#3a3d45; --muted:#777; --muted2:#888; --muted3:#aaa;
+   --tag-bg:#444; --tag-fg:#ddd; --tag-off-bg:#26282e; --tag-off-fg:#777; --tag-off-line:#555;
+   --chip-bg:#26313f; --chip-line:#3d5470; --chip-fg:#bcd6f5; --chip-hover:#31435a;
+   --hl-bg:#f7d154; --hl-fg:#1a1a1a; --opt:#bbb; --ok:#7fd07f; --link:#9ecbff}
+ @media (prefers-color-scheme: light){
+  :root{
+   --bg:#F6F7F9; --fg:#16181B; --line:#E1E4E8; --line2:#E1E4E8; --panel:#FFFFFF;
+   --topbar:#F6F7F9d9; --accent:#0275B6; --accent-fg:#FFFFFF; --accent-line:#067CC1;
+   --accent-glow:#0275b659; --sec:#DADDE2; --sec-fg:#16181B;
+   --warn-bg:#FFF0C4; --warn-line:#F5B40073; --bad-bg:#FDECEA; --bad-line:#D9402E73;
+   --added-bg:#E6F5EC; --added-line:#12A15059; --time:#206CA1;
+   --field-bg:#FFFFFF; --field-line:#00000040; --muted:#656B73; --muted2:#5C626A; --muted3:#5C626A;
+   --tag-bg:#EEF0F2; --tag-fg:#3A3F46; --tag-off-bg:#F3F4F6; --tag-off-fg:#656B73; --tag-off-line:#00000040;
+   --chip-bg:#2793DB12; --chip-line:#2793DB47; --chip-fg:#206CA1; --chip-hover:#2793DB24;
+   --hl-bg:#FFC21F; --hl-fg:#2A1C00; --opt:#5C626A; --ok:#146C3E; --link:#0275B6}
+ }
+ body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
  .wrap{max-width:1100px;margin:0 auto;padding:18px 22px 80px}
- h1{font-size:20px} h2{font-size:16px;margin-top:36px;border-bottom:1px solid #333;padding-bottom:6px}
- .sum{background:#1d2026;border:1px solid #333;border-radius:10px;padding:12px 16px;line-height:1.7;font-size:14px}
- .topbar{position:sticky;top:0;z-index:10;background:#14161acc;backdrop-filter:blur(8px);
-        border-bottom:1px solid #333;padding:10px 22px;display:flex;gap:12px;align-items:center}
+ h1{font-size:20px} h2{font-size:16px;margin-top:36px;border-bottom:1px solid var(--line);padding-bottom:6px}
+ .sum{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;line-height:1.7;font-size:14px}
+ .topbar{position:sticky;top:0;z-index:10;background:var(--topbar);backdrop-filter:blur(8px);
+        border-bottom:1px solid var(--line);padding:10px 22px;display:flex;gap:12px;align-items:center}
  .topbar b{font-size:15px}
- button{background:#2a6df4;color:#fff;border:0;border-radius:8px;padding:8px 16px;
+ #counter{color:var(--muted3);font-size:13px}
+ button{background:var(--accent);color:var(--accent-fg);border:0;border-radius:8px;padding:8px 16px;
         font-size:14px;cursor:pointer}
  button:hover{filter:brightness(1.15)}
- button.sec{background:#3a3d45} button.mini{padding:2px 10px;font-size:12px;border-radius:6px}
- .row{display:flex;gap:12px;border-bottom:1px solid #2a2d33;padding:10px 4px;align-items:flex-start}
- .row.warn{background:#241f0e} .row.bad{background:#2b1616} .row.excluded{opacity:.45}
- .row.added{background:#12281a}
+ button.sec{background:var(--sec);color:var(--sec-fg)} button.mini{padding:2px 10px;font-size:12px;border-radius:6px}
+ .row{display:flex;gap:12px;border-bottom:1px solid var(--line2);padding:10px 4px;align-items:flex-start}
+ .row.warn{background:var(--warn-bg)} .row.bad{background:var(--bad-bg)} .row.excluded{opacity:.45}
+ .row.added{background:var(--added-bg)}
  .cInc{padding-top:4px}
- .cT{width:120px;flex:none;font-size:12px;color:#9ecbff}
- .cT input{width:112px;background:#1d2026;border:1px solid #3a3d45;border-radius:5px;
-          color:#9ecbff;font-size:12px;padding:3px 5px;margin-bottom:3px;font-family:ui-monospace,monospace}
+ .cT{width:120px;flex:none;font-size:12px;color:var(--time)}
+ .cT input{width:112px;background:var(--field-bg);border:1px solid var(--field-line);border-radius:5px;
+          color:var(--time);font-size:12px;padding:3px 5px;margin-bottom:3px;font-family:ui-monospace,monospace}
  .cImg{flex:none} .cImg img{max-width:400px;border-radius:6px;display:block}
  .cTx{flex:1;min-width:220px}
- textarea{width:100%;box-sizing:border-box;background:#1d2026;border:1px solid #3a3d45;
-         border-radius:6px;color:#e8e8e8;font-size:15px;line-height:1.45;padding:6px 8px;
+ textarea{width:100%;box-sizing:border-box;background:var(--field-bg);border:1px solid var(--field-line);
+         border-radius:6px;color:var(--fg);font-size:15px;line-height:1.45;padding:6px 8px;
          resize:vertical;min-height:38px;font-family:inherit}
- textarea.edited{border-color:#2a6df4}
+ textarea.edited{border-color:var(--accent)}
  .cC{width:78px;flex:none;text-align:right;font-size:13px;white-space:nowrap}
- .dur{color:#777;font-size:11px}
- .tag{display:inline-block;background:#444;border-radius:4px;font-size:11px;
-      padding:1px 7px;margin:4px 4px 0 0;color:#ddd}
- .tag.top{background:#2a6df4;color:#fff;font-weight:700;cursor:pointer;
-          border:1px solid #7db1ff;box-shadow:0 0 8px #2a6df499}
- .tag.top.off{background:#26282e;color:#777;font-weight:400;
-          border:1px dashed #555;box-shadow:none}
- .chip{display:inline-block;background:#26313f;border:1px solid #3d5470;border-radius:6px;
-       font-size:13px;padding:2px 9px;margin:5px 5px 0 0;color:#bcd6f5;cursor:pointer}
- .chip:hover{background:#31435a}
+ .dur{color:var(--muted);font-size:11px}
+ .tag{display:inline-block;background:var(--tag-bg);border-radius:4px;font-size:11px;
+      padding:1px 7px;margin:4px 4px 0 0;color:var(--tag-fg)}
+ .tag.top{background:var(--accent);color:var(--accent-fg);font-weight:700;cursor:pointer;
+          border:1px solid var(--accent-line);box-shadow:0 0 8px var(--accent-glow)}
+ .tag.top.off{background:var(--tag-off-bg);color:var(--tag-off-fg);font-weight:400;
+          border:1px dashed var(--tag-off-line);box-shadow:none}
+ .chip{display:inline-block;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:6px;
+       font-size:13px;padding:2px 9px;margin:5px 5px 0 0;color:var(--chip-fg);cursor:pointer}
+ .chip:hover{background:var(--chip-hover)}
  .chip.orig{border-style:dashed}
- .hl{background:#f7d154;color:#1a1a1a;border-radius:3px;padding:0 3px;font-weight:600}
- label.opt{color:#bbb;font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer}
- .hint{color:#888;font-size:12px;margin-top:4px}
- .n{color:#888;width:26px;flex:none;padding-top:6px;font-size:13px}
- .gap{border:1px dashed #665c20;border-radius:8px;margin:10px 0;padding:10px;display:flex;gap:12px}
+ .hl{background:var(--hl-bg);color:var(--hl-fg);border-radius:3px;padding:0 3px;font-weight:600}
+ label.opt{color:var(--opt);font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer}
+ .hint{color:var(--muted2);font-size:12px;margin-top:4px}
+ .n{color:var(--muted2);width:26px;flex:none;padding-top:6px;font-size:13px}
+ .gap{border:1px dashed var(--warn-line);border-radius:8px;margin:10px 0;padding:10px;display:flex;gap:12px}
  .legend span{margin-right:16px;font-size:13px}
  .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
- .saved{color:#7fd07f;font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s}
- .foot{margin-top:48px;padding-top:12px;border-top:1px solid #2a2d33;color:#777;
+ .dot.warn{background:var(--warn-bg);border:1px solid var(--warn-line)}
+ .dot.bad{background:var(--bad-bg);border:1px solid var(--bad-line)}
+ .dot.added{background:var(--added-bg);border:1px solid var(--added-line)}
+ .saved{color:var(--ok);font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s}
+ .foot{margin-top:48px;padding-top:12px;border-top:1px solid var(--line2);color:var(--muted);
        font-size:12px;text-align:center}
- .foot a{color:#9ecbff;text-decoration:none} .foot a:hover{text-decoration:underline}
+ .foot a{color:var(--link);text-decoration:none} .foot a:hover{text-decoration:underline}
 </style></head><body>
 <div class="topbar">
  <b>🎬 __T_TITLE__ — __VIDEO__</b>
  <span style="flex:1"></span>
- <span id="counter" style="color:#aaa;font-size:13px"></span>
+ <span id="counter"></span>
  <label class="opt" title="__T_MERGE_TIP__">
    <input type="checkbox" id="mergeOnSave" checked> __T_MERGE_LABEL__</label>
  <button class="sec" onclick="resetAll()">__T_RESET__</button>
@@ -1142,11 +1170,11 @@ _QC_TEMPLATE = r"""<!DOCTYPE html>
 <div class="wrap">
 <div class="sum">__SUMMARY__
  <div class="legend" style="margin-top:6px">
-  <span><span class="dot" style="background:#241f0e;border:1px solid #665c20"></span>__T_LEG_WARN__</span>
-  <span><span class="dot" style="background:#2b1616;border:1px solid #663333"></span>__T_LEG_BAD__</span>
-  <span><span class="dot" style="background:#12281a;border:1px solid #2f6b45"></span>__T_LEG_ADDED__</span>
+  <span><span class="dot warn"></span>__T_LEG_WARN__</span>
+  <span><span class="dot bad"></span>__T_LEG_BAD__</span>
+  <span><span class="dot added"></span>__T_LEG_ADDED__</span>
  </div>
- <div class="hint">__T_HINT__</div>
+ <div class="hint" id="hint">__T_HINT__</div>
 </div>
 <h2>__T_ROWS_H__ <button class="mini sec" onclick="addRow(null)">__T_ADDROW__</button></h2>
 <div id="rows"></div>
@@ -1161,9 +1189,33 @@ _QC_TEMPLATE = r"""<!DOCTYPE html>
 const DATA = JSON.parse(document.getElementById('qcdata').textContent);
 const T = __JSTR__;
 const LSKEY = 'voc26_rev_' + DATA.srtName;
+// Bridge to the SubVision app (WKWebView): the app registers the script
+// message handler "subvision" and receives {type:"export", name, srt} and
+// {type:"state", json}. Absent in Safari/Chrome: everything below falls
+// back to the 1.0 behaviour (localStorage, save dialog or download).
+const BRIDGE = (window.webkit && window.webkit.messageHandlers &&
+                window.webkit.messageHandlers.subvision) || null;
+// Initial state: the app injects the saved editor state as
+// window.__subvisionState (from <name>.revisione.json) and it takes
+// precedence over localStorage; after "Reset all" the injected state is
+// ignored once (sessionStorage marker), until the app re-injects the new one.
 let saved = {};
-try { saved = JSON.parse(localStorage.getItem(LSKEY) || '{}'); } catch(e) {}
+let ignoreInjected = false;
+try { ignoreInjected = sessionStorage.getItem(LSKEY + ':reset') === '1';
+      if (ignoreInjected) sessionStorage.removeItem(LSKEY + ':reset'); } catch(e) {}
+if (!ignoreInjected && window.__subvisionState && typeof window.__subvisionState === 'object') {
+  saved = window.__subvisionState;
+} else {
+  try { saved = JSON.parse(localStorage.getItem(LSKEY) || '{}'); } catch(e) {}
+}
+if (BRIDGE) { try { document.getElementById('hint').innerHTML = T.hintApp; } catch(e) {} }
 let addCounter = 0;
+
+function persistState(){
+  const json = JSON.stringify(saved);
+  try { localStorage.setItem(LSKEY, json); } catch(e) {}
+  if (BRIDGE) { try { BRIDGE.postMessage({type:'state', json: json}); } catch(e) {} }
+}
 
 function ts(sec){
   sec = Math.max(0, sec);
@@ -1226,7 +1278,7 @@ function wordDiff(a,b){
 function state(id){ return saved[id] || {}; }
 function setState(id, patch){
   saved[id] = Object.assign({}, saved[id]||{}, patch);
-  localStorage.setItem(LSKEY, JSON.stringify(saved));
+  persistState();
   const n = document.getElementById('savedNote');
   n.style.opacity = 1; setTimeout(()=>n.style.opacity=0, 900);
   updateCounter();
@@ -1426,8 +1478,20 @@ async function exportSrt(){
   const fname = DATA.srtName.replace(/\.srt$/i,'') + '-revisionato-' + stamp() + '.srt';
   const mi = window._lastMergeInfo || 0;
   const mergeNote = mi > 0 ? ' · ' + mi + ' ' + T.mergedDupes : '';
-  // Chrome/Edge: dialogo "Salva" che RICORDA la cartella (id) -> dalla seconda
-  // volta propone direttamente la cartella dei video. Safari: fallback Download.
+  // 1) SubVision app (WKWebView): the app writes the file next to the original.
+  //    With WKScriptMessageHandlerWithReply postMessage returns a promise
+  //    ({ok, path, bytes}); with the plain handler it returns undefined.
+  if (BRIDGE) {
+    try {
+      const r = await Promise.resolve(BRIDGE.postMessage({type:'export', name: fname, srt: out}));
+      flash(T.srtSaved + ' (' + ((r && r.path) || fname) + ')' + mergeNote);
+    } catch(e) {
+      flash(T.srtError + ' ' + e);   // no fallback: WKWebView has no useful dialog
+    }
+    return;
+  }
+  // 2) Chrome/Edge: "Save" dialog that REMEMBERS the folder (id): from the
+  //    second time on it proposes the videos folder. 3) Safari: download.
   if(window.showSaveFilePicker){
     try{
       const h = await showSaveFilePicker({
@@ -1439,8 +1503,8 @@ async function exportSrt(){
       flash(T.srtSaved + ' (' + fname + ')' + mergeNote);
       return;
     }catch(e){
-      if(e && e.name === 'AbortError') return;   // annullato dall'utente
-      // altri errori (es. API bloccata su file://) -> fallback download
+      if(e && e.name === 'AbortError') return;   // cancelled by the user
+      // other errors (e.g. API blocked on file://) -> download fallback
     }
   }
   const blob = new Blob([out], {type:'text/plain;charset=utf-8'});
@@ -1454,7 +1518,9 @@ async function exportSrt(){
 
 function resetAll(){
   if(!confirm(T.confirmReset)) return;
-  localStorage.removeItem(LSKEY); location.reload();
+  saved = {}; persistState();
+  try { localStorage.removeItem(LSKEY); sessionStorage.setItem(LSKEY + ':reset', '1'); } catch(e) {}
+  location.reload();
 }
 
 // ---- render
@@ -1482,7 +1548,7 @@ if(DATA.gaps.length){
   });
 } else gapsEl.innerHTML = '<div class="hint">'+T.noneGaps+'</div>';
 
-// ripristina righe aggiunte in sessioni precedenti
+// restore the lines added in previous sessions
 for(const [id, s] of Object.entries(saved)){
   if(s.added && !DATA.rows.find(r=>r.id===id) && !DATA.extraRows.find(r=>r.id===id)){
     const r = {id:id, n:'+', start:s.start||0, end:s.end||2, text:s.text||'', alts:[],
@@ -1541,6 +1607,10 @@ _QC_I18N = {
             "srtDesc": "Sottotitoli SubRip",
             "srtSaved": "SRT salvato ✓",
             "srtDownloaded": "SRT scaricato in Download",
+            "srtError": "Errore nel salvataggio:",
+            "hintApp": "Modifica il testo nelle caselle, clicca una <b>lettura alternativa</b> per usarla,\n"
+                       " spunta/de-spunta le righe da includere. Le modifiche vengono salvate accanto al report.<br>\n"
+                       " <b>💾 Salva SRT revisionato</b> crea <code>nome-revisionato-data.srt</code> accanto al video.",
             "confirmReset": "Annullare tutte le modifiche fatte in questo report?",
             "noneDropped": "Nessuna.", "noneGaps": "Nessuno.",
             "gapNoSub": "s senza sub",
@@ -1602,6 +1672,10 @@ _QC_I18N = {
             "srtDesc": "SubRip subtitles",
             "srtSaved": "SRT saved ✓",
             "srtDownloaded": "SRT downloaded to Downloads",
+            "srtError": "Could not save:",
+            "hintApp": "Edit the text in the boxes, click an <b>alternative reading</b> to use it,\n"
+                       " check/uncheck the lines to include. Changes are saved next to the report.<br>\n"
+                       " <b>💾 Save reviewed SRT</b> creates <code>name-revisionato-date.srt</code> next to the video.",
             "confirmReset": "Undo all the changes made in this report?",
             "noneDropped": "None.", "noneGaps": "None.",
             "gapNoSub": "s without subs",
@@ -1639,6 +1713,9 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
     - editable times; {\\an8} tag toggleable per line;
     - "Save reviewed SRT" generates the final SRT; changes stay saved in
       the browser (localStorage) across sessions.
+    Inside the SubVision app (WKWebView with the "subvision" message
+    handler) the SRT and the editor state go to the app through the bridge
+    and the saved state comes back injected as window.__subvisionState.
     ui_lang ("it" | "en") picks the language of the report texts.
     """
     import json

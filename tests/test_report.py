@@ -7,6 +7,7 @@ the same ones used to diff the reports before and after activity 1.2
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from subvision import core
@@ -68,6 +69,49 @@ def test_report_en_texts(tmp_path: Path):
         assert text in html, text
     for code in ("too_short", "noise", "merged_fade"):
         assert f'"{code}"' not in html, code
+
+
+def test_report_app_bridge_and_state(tmp_path: Path):
+    """The report talks to the app (WKWebView) and falls back as in 1.0."""
+    html = _fixed_report(tmp_path, "it")
+    js = html.split("<script>", 1)[1]
+    # bridge detection, export through it, state on every change
+    assert "window.webkit.messageHandlers.subvision" in js
+    assert "BRIDGE.postMessage({type:'export', name: fname, srt: out})" in js
+    assert "BRIDGE.postMessage({type:'state', json: json})" in js
+    assert "await Promise.resolve(BRIDGE.postMessage(" in js    # reply or no-reply handler
+    # fallbacks, in order: bridge, showSaveFilePicker, <a download>
+    assert js.index("if (BRIDGE)") < js.index("window.showSaveFilePicker") < js.index("a.download = fname")
+    # injected initial state has precedence over localStorage
+    assert "window.__subvisionState" in js
+    assert js.index("window.__subvisionState && typeof") < js.index("localStorage.getItem(LSKEY)")
+    # in-app hint swapped at load, strings present in both languages
+    assert "document.getElementById('hint').innerHTML = T.hintApp" in js
+    assert '<div class="hint" id="hint">' in html
+    for lang, err, hint in (("it", "Errore nel salvataggio:", "accanto al video"),
+                            ("en", "Could not save:", "next to the video")):
+        h = _fixed_report(tmp_path, lang)
+        assert f'"srtError": "{err}"' in h
+        assert '"hintApp": "' in h and hint in h
+        assert "Chrome/Edge" in h          # the browser hint is unchanged
+
+
+def test_report_light_and_dark_palettes(tmp_path: Path):
+    html = _fixed_report(tmp_path, "it")
+    css = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    assert "color-scheme:light dark" in css
+    assert "@media (prefers-color-scheme: light)" in css
+    dark, light = css.split("@media (prefers-color-scheme: light)")
+    # every variable of the dark palette has a light value
+    names = set(re.findall(r"--([a-z0-9-]+):", dark.split("}")[0]))
+    assert names and names == set(re.findall(r"--([a-z0-9-]+):", light.split("}")[0]))
+    # the dark palette is the 1.0 one; the light one is readable
+    assert "--bg:#14161a" in dark and "--fg:#e8e8e8" in dark
+    assert "--bg:#F6F7F9" in light and "--fg:#16181B" in light
+    # no hard-coded colour left in the markup (legend dots use classes)
+    body = html.split("</style>", 1)[1].split("<script", 1)[0]
+    assert 'style="background:#' not in body
+    assert '<span class="dot warn"></span>' in body
 
 
 def test_qc_i18n_languages_are_aligned():
