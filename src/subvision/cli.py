@@ -219,8 +219,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
         batch.run_batch(videos, p, {"ignore": ignore, "corrections": corrections}, lang,
                         emit, control, tmp_root=state.tmp, ui_lang=lang)
     except core.EngineError as e:
-        extra = ", ".join(f"{k}={v}" for k, v in e.args_.items())
-        print(f"error: {e.code}" + (f" ({extra})" if extra else ""), file=sys.stderr)
+        print(f"error: {e.describe()}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:
         control.stop("all")
@@ -237,7 +236,7 @@ def cmd_fix(args: argparse.Namespace) -> int:
         out, count = fix.fix_srt(args.srt, merge=args.merge, ignore=args.ignore,
                                  flash=args.flash, min_dur=args.min_dur, params=p, lists=pair)
     except core.EngineError as e:
-        print(f"error: {e.code}", file=sys.stderr)
+        print(f"error: {e.describe()}", file=sys.stderr)
         return 2
     print(f"{count} lines -> {out.name}", file=sys.stderr)
     print(out)
@@ -262,7 +261,7 @@ def cmd_preview(args: argparse.Namespace) -> int:
         frames = preview.find_frames(args.video, p, n=args.n, tries=args.tries, emit=emit,
                                      stop=threading.Event(), state=state.root)
     except core.EngineError as e:
-        print(f"\nerror: {e.code}", file=sys.stderr)
+        print(f"\nerror: {e.describe()}", file=sys.stderr)
         return 2
     print(file=sys.stderr)
     for f in frames:

@@ -59,11 +59,27 @@ FFMPEG_ENV = "SUBVISION_FFMPEG"
 
 
 class MethodError(Exception):
-    """An error for the caller, with a stable code."""
+    """
+    An error for the caller: a stable `code` (the app translates it) and
+    `message`, plus the optional details `detail` (technical text), `tool`
+    (ffmpeg | ffprobe | vision | uv), `path` and `line`, shown by the app in
+    the detail of the alert.
+    """
 
-    def __init__(self, code: str, message: str = "") -> None:
+    def __init__(self, code: str, message: str = "", detail: Optional[str] = None,
+                 tool: Optional[str] = None, path: Optional[str] = None,
+                 line: Optional[int] = None) -> None:
         super().__init__(message or code)
         self.code = code
+        self.detail, self.tool, self.path, self.line = detail, tool, path, line
+
+    def payload(self) -> Dict[str, Any]:
+        out: Dict[str, Any] = {"code": self.code, "message": str(self)}
+        for k in ("detail", "tool", "path", "line"):
+            v = getattr(self, k)
+            if v is not None:
+                out[k] = v
+        return out
 
 
 # ---------------------------------------------------------------------------
@@ -161,8 +177,12 @@ def _strings(params: dict, key: str) -> List[str]:
 
 
 def _engine_error(e: EngineError) -> MethodError:
-    extra = ", ".join(f"{k}={v}" for k, v in e.args_.items())
-    return MethodError(e.code, f"{e.code}" + (f" ({extra})" if extra else ""))
+    return MethodError(e.code, e.code, **e.details())
+
+
+def _unknown_error(e: Exception) -> Dict[str, Any]:
+    """The fields of an unexpected exception (code `unknown`)."""
+    return {"code": "unknown", "message": "unknown", "detail": f"{type(e).__name__}: {e}"}
 
 
 # ---------------------------------------------------------------------------
@@ -200,11 +220,24 @@ def _tools_install(params: dict) -> dict:
         return {"started": False, "reason": "already_running"}
     todo = [k for k in (keys if keys is not None else tools.missing(_paths().root))
             if k in tools.TOOLS]
+    if not todo:
+        # nothing to download (the tools window asks anyway, e.g. when only
+        # the warmup is left): answer at once, tools.done right away
+        _tools_lock.release()
+        _configure_tools(_custom_ffmpeg)
+        _emit("tools.done", {"ok": True, "status": _tools_status({})})
+        return {"started": True, "keys": []}
 
-    def progress(key: str, state: str, done: int, total: int, error: Optional[str] = None) -> None:
+    def progress(key: str, state: str, done: int, total: int,
+                 error: Optional[str] = None, detail: Optional[str] = None) -> None:
         data = {"key": key, "state": state, "bytes": done, "total": total}
         if error:
             data["error"] = error
+            data["code"] = error
+            data["tool"] = key
+            data["path"] = str(tools.bin_dir(_paths().root) / key)
+            if detail:
+                data["detail"] = detail
         _emit("tools.progress", data)
 
     def work() -> None:
@@ -229,7 +262,8 @@ def _tools_use(params: dict) -> dict:
     if custom is not None and not isinstance(custom, str):
         raise MethodError("bad_params", "ffmpeg must be a path or null")
     if custom and not tools.tool_version(custom):
-        raise MethodError("bad_tool", f"{custom} does not answer -version")
+        raise MethodError("bad_tool", "bad_tool", tool="ffmpeg", path=custom,
+                          detail="the file does not answer -version")
     _custom_ffmpeg = custom or None
     return {"ffmpeg": _configure_tools(_custom_ffmpeg), "custom": _custom_ffmpeg}
 
@@ -274,7 +308,7 @@ def _lists_import(params: dict) -> dict:
     try:
         lists.import_file(kind, path, _paths().root)
     except FileNotFoundError as e:
-        raise MethodError("not_found", str(e)) from e
+        raise MethodError("not_found", "not_found", path=path, detail=str(e)) from e
     return lists.status(_paths().root)
 
 
@@ -306,7 +340,11 @@ def _probe(path: str) -> Dict[str, Any]:
         return {"path": path, "duration": round(duration, 3), "fps": round(fps, 3),
                 "width": int(stream.get("width") or 0), "height": int(stream.get("height") or 0)}
     except (OSError, subprocess.SubprocessError, ValueError, KeyError) as e:
-        return {"path": path, "error": "probe_failed", "message": str(e)}
+        detail = str(e)
+        if isinstance(e, subprocess.CalledProcessError) and e.stderr:
+            detail = e.stderr.strip() or detail
+        return {"path": path, "error": "probe_failed", "code": "probe_failed",
+                "message": "probe_failed", "tool": "ffprobe", "detail": detail}
 
 
 def _videos_probe(params: dict) -> dict:
@@ -366,7 +404,7 @@ def _batch_start(params: dict) -> dict:
             traceback.print_exc(file=sys.stderr)
             _emit("batch.done", {"done": 0, "failed": 0, "stopped": 0,
                                  "skipped": len(videos), "elapsed": 0.0,
-                                 "error": f"{type(e).__name__}: {e}"})
+                                 "error": f"{type(e).__name__}: {e}", **_unknown_error(e)})
 
     if not _start_job("batch", control, work):
         return {"started": False, "reason": "busy"}
@@ -401,10 +439,10 @@ def _preview_frames(params: dict) -> dict:
         except Stopped:
             _emit("preview.stopped", {})
         except EngineError as e:
-            _emit("preview.failed", {"error": e.code, "message": str(_engine_error(e))})
+            _emit("preview.failed", {"error": e.code, **_engine_error(e).payload()})
         except Exception as e:  # noqa: BLE001
             traceback.print_exc(file=sys.stderr)
-            _emit("preview.failed", {"error": "internal", "message": f"{type(e).__name__}: {e}"})
+            _emit("preview.failed", {"error": "unknown", **_unknown_error(e)})
 
     if not _start_job("preview", stop, work):
         return {"started": False, "reason": "busy"}
@@ -422,7 +460,8 @@ def _preview_stop(_params: dict) -> dict:
 def _preview_test(params: dict) -> dict:
     frame = params.get("frame")
     if not isinstance(frame, str) or not Path(frame).is_file():
-        raise MethodError("not_found", "frame must be the path of an existing image")
+        raise MethodError("not_found", "not_found", path=str(frame),
+                          detail="frame must be the path of an existing image")
     p = _params_from(params.get("params"))
     try:
         return preview.test_frame(frame, p, lists=_lists_for(params))
@@ -504,11 +543,12 @@ def handle(request: object) -> Optional[dict]:
     try:
         return {"id": ident, "result": fn(params)}
     except MethodError as e:
-        return {"id": ident, "error": {"code": e.code, "message": str(e)}}
+        return {"id": ident, "error": e.payload()}
+    except EngineError as e:
+        return {"id": ident, "error": _engine_error(e).payload()}
     except Exception as e:  # noqa: BLE001 - the engine must not die
         traceback.print_exc(file=sys.stderr)
-        return {"id": ident, "error": {"code": "internal",
-                                       "message": f"{type(e).__name__}: {e}"}}
+        return {"id": ident, "error": _unknown_error(e)}
 
 
 def _clean_orphans() -> None:

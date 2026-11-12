@@ -138,8 +138,11 @@ class Events:
     def __init__(self) -> None:
         self.items: list[tuple] = []
 
-    def __call__(self, key, state, done, total, error=None) -> None:
+    def __call__(self, key, state, done, total, error=None, detail=None) -> None:
         self.items.append((key, state, done, total, error))
+        self.details = getattr(self, "details", {})
+        if detail:
+            self.details[key] = detail
 
     def states(self, key: str) -> list[str]:
         return [s for k, s, *_ in self.items if k == key]
@@ -220,7 +223,7 @@ def test_stop_midway_keeps_part(fake_tools, tmp_path: Path) -> None:
     stop = threading.Event()
     ev = Events()
 
-    def progress(key, state, done, total, error=None):
+    def progress(key, state, done, total, error=None, detail=None):
         ev(key, state, done, total, error)
         if state == "running" and done > 0:
             stop.set()

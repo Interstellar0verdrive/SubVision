@@ -242,6 +242,11 @@ def test_failed_file_does_not_stop_the_batch(demo_ita: Path, ffmpeg_bin: str, tm
     assert len(failed) == 1 and failed[0]["idx"] == 0
     assert failed[0]["error"].startswith("probe_failed")
     assert failed[0]["at_step"] == "extract:bottom"
+    # error details for the app: code (translated), tool, path, detail
+    assert failed[0]["code"] == "probe_failed" and failed[0]["message"] == "probe_failed"
+    assert failed[0]["tool"] == "ffprobe" and failed[0]["path"] == str(bogus)
+    assert failed[0]["detail"]
+    assert "line" not in failed[0]
     assert [d["idx"] for d in rec.of("batch.file.done")] == [1]
     assert done["failed"] == 1 and done["done"] == 1 and done["stopped"] == 0
     assert "ERROR: probe_failed" in bogus.with_suffix(".log").read_text(encoding="utf-8")
