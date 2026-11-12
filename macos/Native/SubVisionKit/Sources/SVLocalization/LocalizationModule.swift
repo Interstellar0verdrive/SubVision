@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Placeholder: the localiser lands here (activity 2.4).
+// Kept for the SVShell placeholder, which lists the modules by name.
 
 /// Identity of the module, until the real types arrive.
 public enum LocalizationModule {

@@ -23,7 +23,7 @@ let package = Package(
         .target(name: "SVShell", dependencies: ["SVEngine", "SVDesign", "SVLocalization"]),
         .testTarget(name: "SVEngineTests", dependencies: ["SVEngine"], resources: [.copy("Fixtures")]),
         .testTarget(name: "SVDesignTests", dependencies: ["SVDesign"]),
-        .testTarget(name: "SVLocalizationTests", dependencies: ["SVLocalization"]),
+        .testTarget(name: "SVLocalizationTests", dependencies: ["SVLocalization"], resources: [.copy("Fixtures")]),
         .testTarget(name: "SVShellTests", dependencies: ["SVShell"]),
     ],
     swiftLanguageModes: [.v5]

@@ -1,0 +1,7 @@
+{
+  "x.hello": "Ciao {name}",
+  "x.files.uno": "un file",
+  "x.files.altri": "{n} file",
+  "x.braces": "{{letterale}} {a}",
+  "x.only_it": "Solo italiano"
+}
