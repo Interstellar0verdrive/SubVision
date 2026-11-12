@@ -1,0 +1,31 @@
+# Engine tests
+
+The engine is developed in a self-contained environment: uv 0.11.4 (the
+version the launcher pins) and the CPython 3.13.12 it downloads, under
+`~/Library/Application Support/SubVision-dev`. No system Python, no Homebrew uv.
+
+```sh
+DEV="$HOME/Library/Application Support/SubVision-dev"
+mkdir -p "$DEV/bin"
+curl -sSL -o /tmp/uv.tar.gz \
+  https://github.com/astral-sh/uv/releases/download/0.11.4/uv-aarch64-apple-darwin.tar.gz
+echo "9b9cb6c6f58c3246dbf3351ed4e97c500bc3266f5f237d2fd620b66e1c31dc56  /tmp/uv.tar.gz" | shasum -a 256 -c -
+tar xzf /tmp/uv.tar.gz -C /tmp && cp /tmp/uv-aarch64-apple-darwin/uv "$DEV/bin/uv"
+
+export UV_PYTHON_INSTALL_DIR="$DEV/.python"
+export UV_CACHE_DIR="$DEV/.cache/uv"
+export UV_PROJECT_ENVIRONMENT="$DEV/.venv"
+export UV_PYTHON_DOWNLOADS=automatic
+export UV_PYTHON_PREFERENCE=only-managed
+
+"$DEV/bin/uv" sync --frozen          # engine + dev group (pytest)
+"$DEV/bin/uv" run pytest             # or: "$DEV/.venv/bin/python" -m pytest
+```
+
+`uv lock` (after a dependency change) runs with the same uv and variables.
+
+The demo clips (`demo/sintel_ita_hardsub_demo.mp4`, `demo/sintel_eng_hardsub_demo.mp4`,
+from the `demo-assets` release) are expected in `demo/` at the repo root; tests
+that need them skip when they are missing. ffmpeg/ffprobe come from `PATH` or
+`/opt/homebrew/bin`. The full run on the ita clip takes ~10 s from the second
+time; the very first Vision call on a Mac can take ~30 s.

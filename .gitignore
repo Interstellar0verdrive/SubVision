@@ -1,18 +1,35 @@
-# Ambiente / temporanei
-.venv/
-tmp/
-__pycache__/
+# --- macOS ---
 .DS_Store
-.ui_prefs.json
 
-# Video dell'utente e output della pipeline (mai nel repo)
-videos/
+# --- self-contained runtime (created on first launch / by the dev setup) ---
+.venv/
+.python/
+.cache/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# --- local working material ---
+tmp/
+demo/
+
+# --- app build output (tools/build_native.sh) ---
+dist/
+build/
+
+# --- native app build output (xcodebuild / swift build) ---
+macos/Native/SubVisionKit/.build/
+.swiftpm/
+xcuserdata/
+
+# --- synthetic test samples ---
+tests/.fixtures/
+
+# --- pipeline output and user videos (never in the repo) ---
 *.srt
 *.log
 *.revisione.html
 *.qc.html
-
-# File multimediali (i video di lavoro restano fuori dal repo)
 *.mkv
 *.mp4
 *.mov

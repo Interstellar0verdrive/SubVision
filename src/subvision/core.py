@@ -44,7 +44,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
-__version__ = "1.0.0"
+from subvision import __version__  # single source of truth: subvision/__init__.py
+
 REPO_URL = "https://github.com/Interstellar0verdrive/SubVision"
 
 # ocrmac is imported lazily inside the OCR functions so the module loads
