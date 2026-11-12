@@ -11,9 +11,9 @@
   const K = window.EK = {};
   K.openBtn = () => btn(t('app.process.open'), 'secondary', { icon: 'folder' });
   K.inspBtn = on => `<span class="iconbtn ${on ? 'on' : ''}" title="⌥⌘I" style="margin-left:4px">${icon('inspector', 16)}</span>`;
-  K.reportBtn = () => btn(t('app.row.open_report'), 'secondary', { size: 'sm', icon: 'doc' });
+  K.reportBtn = () => btn(t('app.process.row.open_report'), 'secondary', { size: 'sm', icon: 'doc' });
   K.more = () => `<span class="iconbtn" style="width:22px;height:22px">${icon('dots', 14)}</span>`;
-  K.list = (rows, head) => `<div class="list">${head ? `<div class="lhead"><span></span><span class="label">${t('app.list.name')}</span><span class="label r">${t('app.list.duration')}</span><span class="label r">${t('app.list.fps')}</span><span class="label r col-res">${t('app.list.size')}</span><span></span></div>` : ''}${rows.join('')}</div>`;
+  K.list = (rows, head) => `<div class="list">${head ? `<div class="lhead"><span></span><span class="label">${t('app.process.list.name')}</span><span class="label r">${t('app.process.list.duration')}</span><span class="label r">${t('app.process.list.fps')}</span><span class="label r col-res">${t('app.process.list.size')}</span><span></span></div>` : ''}${rows.join('')}</div>`;
   const SIC = { done: ['done', 'check'], warn: ['warn', 'warn'], fail: ['fail', 'x'], bad: ['fail', 'x'], stop: ['stop', 'stop'], ready: ['wait', ''], wait: ['wait', ''] };
   /** One file row. r: st, name, dir, dur, fps, res, result, rcls, chips, acts, detail, dim */
   K.row = function (r) {
@@ -28,44 +28,44 @@
   K.bottom = (html, noAuto) => `<div class="bottombar" style="${noAuto ? 'margin-top:0' : ''}">${html}</div>`;
   /** Step bars of one band. Specs: ['done',step,total,time,rate?] ['run',step,frac,done,total,el,eta,rate] ['wait',step,est?] ['fail',step] ['skip',step] */
   K.steps = function (band, specs, o = {}) {
-    const name = band === 'dlg' ? t('app.band.dialogue') : t('app.band.signs');
+    const name = band === 'dlg' ? t('app.steps.band.dialogue') : t('app.steps.band.signs');
     const sw = band === 'dlg' ? 'var(--bandDialogue)' : 'var(--bandSigns)';
     const lines = specs.map(sp => {
       const [st, step] = sp;
       const isRef = step === 'refine';
-      const unit = t(isRef ? 'app.unit.lines' : 'app.unit.frames'), unitS = t(isRef ? 'app.unit.lines_s' : 'app.unit.fps');
-      const label = step === 'ocr' ? t('app.step.ocr', { n: o.n || 3 }) : t('app.step.' + step);
+      const unit = t(isRef ? 'app.steps.unit.lines' : 'app.steps.unit.frames'), unitS = t(isRef ? 'app.steps.unit.lines_s' : 'app.steps.unit.fps');
+      const label = step === 'ocr' ? t('app.steps.ocr', { n: o.n || 3 }) : t('app.steps.' + step);
       let iconH, barH, numH;
       if (st === 'done') {
         iconH = `<span style="color:var(--greenText)">${icon('check', 12)}</span>`; barH = S.bar(1, 'green');
-        numH = sp[4] ? t('app.step.done', { total: th(sp[2]), unit, t: sp[3], rate: dec(sp[4]), unit_s: unitS }) : t('app.step.done_short', { total: th(sp[2]), unit, t: sp[3] });
+        numH = sp[4] ? t('app.steps.done', { total: th(sp[2]), unit, t: sp[3], rate: dec(sp[4]), unit_s: unitS }) : t('app.steps.done_short', { total: th(sp[2]), unit, t: sp[3] });
       } else if (st === 'run') {
         iconH = S.spin('s'); barH = S.bar(sp[2]);
-        numH = t('app.step.running', { done: th(sp[3]), total: th(sp[4]), unit, el: sp[5], eta: sp[6], rate: dec(sp[7]), unit_s: unitS });
+        numH = t('app.steps.running', { done: th(sp[3]), total: th(sp[4]), unit, el: sp[5], eta: sp[6], rate: dec(sp[7]), unit_s: unitS });
       } else if (st === 'wait') {
         iconH = `<span class="dot" style="background:transparent;border:1px solid var(--glassLine);width:9px;height:9px"></span>`; barH = S.bar(0);
-        numH = sp[2] ? t('app.step.waiting_est', { t: sp[2] }) : t('app.step.waiting');
+        numH = sp[2] ? t('app.steps.waiting_est', { t: sp[2] }) : t('app.steps.waiting');
       } else if (st === 'fail') {
-        iconH = `<span style="color:var(--redText)">${icon('x', 12)}</span>`; barH = S.bar(0.35, 'red'); numH = t('app.step.aborted');
+        iconH = `<span style="color:var(--redText)">${icon('x', 12)}</span>`; barH = S.bar(0.35, 'red'); numH = t('app.steps.aborted');
       } else {
-        iconH = `<span class="dot" style="background:transparent;border:1px dashed var(--glassLine);width:9px;height:9px"></span>`; barH = S.bar(0, 'gray'); numH = t('app.step.not_run');
+        iconH = `<span class="dot" style="background:transparent;border:1px dashed var(--glassLine);width:9px;height:9px"></span>`; barH = S.bar(0, 'gray'); numH = t('app.steps.not_run');
       }
       return `<div class="srow ${st}"><span style="display:grid;place-items:center">${iconH}</span><span class="sl">${label}</span>${barH}<span class="sn">${numH}</span></div>`;
     }).join('');
     return `<div class="bandgrp"><div class="label" style="display:flex;gap:6px;align-items:center;margin:4px 0 2px"><span class="sw" style="background:${sw}"></span>${name}</div>${lines}</div>`;
   };
   K.doneDetail = () => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:6px">
-      <div><div class="label" style="margin-bottom:4px">${t('app.row.times')}</div><div class="kv">
-        <span class="k">${t('app.step.extract')}</span><span class="v">2:14 · 2:01</span>
-        <span class="k">${t('app.step.group')}</span><span class="v">0:12 · 0:11</span>
-        <span class="k">${t('app.step.ocr', { n: 3 })}</span><span class="v">1:03:40 · 14:02</span>
-        <span class="k">${t('app.step.refine')}</span><span class="v">7:48 · 0:52</span></div>
-        <div class="small t3" style="margin-top:4px">${t('app.band.dialogue')} · ${t('app.band.signs')}</div></div>
-      <div><div class="label" style="margin-bottom:4px">${t('app.row.files')}</div><div class="kv">
+      <div><div class="label" style="margin-bottom:4px">${t('app.process.row.times')}</div><div class="kv">
+        <span class="k">${t('app.steps.extract')}</span><span class="v">2:14 · 2:01</span>
+        <span class="k">${t('app.steps.group')}</span><span class="v">0:12 · 0:11</span>
+        <span class="k">${t('app.steps.ocr', { n: 3 })}</span><span class="v">1:03:40 · 14:02</span>
+        <span class="k">${t('app.steps.refine')}</span><span class="v">7:48 · 0:52</span></div>
+        <div class="small t3" style="margin-top:4px">${t('app.steps.band.dialogue')} · ${t('app.steps.band.signs')}</div></div>
+      <div><div class="label" style="margin-bottom:4px">${t('app.process.row.files')}</div><div class="kv">
         <span class="k">SRT</span><span class="v">Show S01E04 [1080p].srt</span>
         <span class="k">${S.lang === 'en' ? 'Report' : 'Report'}</span><span class="v">Show S01E04 [1080p].revisione.html</span>
         <span class="k">Log</span><span class="v">Show S01E04 [1080p].log</span></div>
-        <div style="display:flex;gap:14px;margin-top:8px">${S.link(t('app.btn.show_in_finder'))}${S.link(t('app.row.open_srt'))}${S.link(t('app.row.open_log'))}</div></div></div>`;
+        <div style="display:flex;gap:14px;margin-top:8px">${S.link(t('app.common.show_in_finder'))}${S.link(t('app.process.row.open_srt'))}${S.link(t('app.process.row.open_log'))}</div></div></div>`;
 
   // ---------- inspector (D5)
   const P = [
@@ -94,8 +94,8 @@
       { k: 'gap', ctl: 'stepper', v: () => '6 s' },
       { k: 'skip', ctl: 'snap', f: 0, ticks: [0, .25, .5, .75, 1], v: () => '0' },
       { k: 'workers', ctl: 'stepper', v: () => '4' },
-      { k: 'ignore', ctl: 'toggle', on: true, count: () => t('app.insp.phrases', { n: 12 }) },
-      { k: 'corr', ctl: 'toggle', on: true, count: () => t('app.insp.corrections', { n: 4 }) },
+      { k: 'ignore', ctl: 'toggle', on: true, count: () => t('app.inspector.phrases', { n: 12 }) },
+      { k: 'corr', ctl: 'toggle', on: true, count: () => t('app.inspector.corrections', { n: 4 }) },
     ] },
   ];
   /** o: locked, closed: [groups], changed: {key: [value, frac]}, langMissing, listMissing, compact, popover, menu */
@@ -105,9 +105,9 @@
     const groups = P.map(G => {
       const isClosed = closed.includes(G.g);
       const changedHere = G.items.some(it => ch[it.k]) || (G.g === 'sig' && o.signsOff);
-      const right = `<span class="def ${changedHere && !o.locked ? '' : 'off'}">${t('app.btn.defaults')}</span>`;
+      const right = `<span class="def ${changedHere && !o.locked ? '' : 'off'}">${t('app.common.defaults')}</span>`;
       const sigToggle = G.toggle ? `<span style="margin-left:6px">${S.toggle(!o.signsOff, o.locked)}</span>` : '';
-      const head = `<div class="grp-h"><span class="chev">${icon(isClosed ? 'chevR' : 'chevD', 11)}</span>${t('app.insp.g.' + G.g)}${sigToggle}<span class="sp"></span>${right}</div>`;
+      const head = `<div class="grp-h"><span class="chev">${icon(isClosed ? 'chevR' : 'chevD', 11)}</span>${t('app.inspector.g.' + G.g)}${sigToggle}<span class="sp"></span>${right}</div>`;
       if (isClosed) return `<div class="grp">${head}</div>`;
       const items = G.items.map(it => {
         const c = ch[it.k];
@@ -118,25 +118,25 @@
         let ctl = '';
         if (it.ctl === 'toggle') {
           const on = c ? c[2] : it.on;
-          return `<div class="prm ${dis ? 'dis' : ''}"><div class="pl">${t('app.insp.' + it.k)}<span class="q">?</span><span class="sp"></span>${it.count ? `<span class="small ${o.listMissing && it.k === 'ignore' ? '' : 't3'}" style="${o.listMissing && it.k === 'ignore' ? 'color:var(--yellowText)' : ''}">${o.listMissing && it.k === 'ignore' ? t('app.insp.file_missing') : it.count()}</span>` : ''}${c ? '<span class="pv chg"></span>' : ''}${S.toggle(on, dis)}</div></div>`;
+          return `<div class="prm ${dis ? 'dis' : ''}"><div class="pl">${t('app.inspector.' + it.k)}<span class="q">?</span><span class="sp"></span>${it.count ? `<span class="small ${o.listMissing && it.k === 'ignore' ? '' : 't3'}" style="${o.listMissing && it.k === 'ignore' ? 'color:var(--yellowText)' : ''}">${o.listMissing && it.k === 'ignore' ? t('app.inspector.file_missing') : it.count()}</span>` : ''}${c ? '<span class="pv chg"></span>' : ''}${S.toggle(on, dis)}</div></div>`;
         }
         if (it.ctl === 'popup') {
           const warn = o.langMissing;
           ctl = `${S.popup(`${vtxt} <span class="t3 num" style="font-size:11px">${it.code}</span>`, 268, dis)}`;
-          return `<div class="prm ${dis ? 'dis' : ''}"><div class="pl">${t('app.insp.' + it.k)}<span class="q">?</span></div><div class="pc" style="${warn ? 'outline:1px solid var(--yellowLine);border-radius:7px' : ''}">${ctl}</div></div>`;
+          return `<div class="prm ${dis ? 'dis' : ''}"><div class="pl">${t('app.inspector.' + it.k)}<span class="q">?</span></div><div class="pc" style="${warn ? 'outline:1px solid var(--yellowLine);border-radius:7px' : ''}">${ctl}</div></div>`;
         }
         if (it.ctl === 'slider' || it.ctl === 'snap') ctl = S.slider(f, { ticks: it.ticks });
-        if (it.ctl === 'stepper') return `<div class="prm ${dis ? 'dis' : ''}"><div class="pl">${t('app.insp.' + it.k)}<span class="q">?</span><span class="sp"></span>${c ? '<span class="pv chg"></span>' : ''}${S.stepper(vtxt, 64)}</div></div>`;
-        return `<div class="prm ${dis ? 'dis' : ''}"><div class="pl">${t('app.insp.' + it.k)}<span class="q">?</span><span class="sp"></span>${it.ctl === 'stepper' ? '' : val}</div><div class="pc">${ctl}</div></div>`;
+        if (it.ctl === 'stepper') return `<div class="prm ${dis ? 'dis' : ''}"><div class="pl">${t('app.inspector.' + it.k)}<span class="q">?</span><span class="sp"></span>${c ? '<span class="pv chg"></span>' : ''}${S.stepper(vtxt, 64)}</div></div>`;
+        return `<div class="prm ${dis ? 'dis' : ''}"><div class="pl">${t('app.inspector.' + it.k)}<span class="q">?</span><span class="sp"></span>${it.ctl === 'stepper' ? '' : val}</div><div class="pc">${ctl}</div></div>`;
       }).join('');
       return `<div class="grp">${head}${items}</div>`;
     }).join('');
     const notes = [
-      o.locked ? S.note('accent', '', t('app.insp.locked')) : '',
-      o.langMissing ? S.note('yellow', '', t('app.insp.lang_missing', { lang: S.lang === 'en' ? 'Italian' : 'Italiano' })) : '',
+      o.locked ? S.note('accent', '', t('app.inspector.locked')) : '',
+      o.langMissing ? S.note('yellow', '', t('app.inspector.lang_missing', { lang: S.lang === 'en' ? 'Italian' : 'Italiano' })) : '',
     ].filter(Boolean).join('<div style="height:8px"></div>');
-    return `<div class="insp-h"><div class="t">${t('app.insp.title')}<span class="sp"></span><span class="iconbtn" style="width:22px;height:22px">${icon('dots', 14)}</span><span class="iconbtn" style="width:22px;height:22px">${icon('x', 12)}</span></div>
-      <div class="s">${t('app.insp.subtitle')}</div></div>
+    return `<div class="insp-h"><div class="t">${t('app.inspector.title')}<span class="sp"></span><span class="iconbtn" style="width:22px;height:22px">${icon('dots', 14)}</span><span class="iconbtn" style="width:22px;height:22px">${icon('x', 12)}</span></div>
+      <div class="s">${t('app.inspector.subtitle')}</div></div>
       <div class="insp-b">${notes ? `<div style="margin:10px 0 4px">${notes}</div>` : ''}${groups}</div>${o.extra || ''}`;
   };
 })();

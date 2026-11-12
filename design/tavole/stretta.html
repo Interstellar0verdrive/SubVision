@@ -11,16 +11,16 @@
 const { t, btn, chip, icon, board, win, pageHead } = SV;
 const K = EK;
 const rows = () => K.list([
-  K.row({ st: 'done', name: 'Show S01E04 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:40', fps: '23.976', res: '', result: t('app.row.done', { lines: 312, dropped: 9, refined: 588, t: '1 h 31 min' }), acts: K.reportBtn() }),
+  K.row({ st: 'done', name: 'Show S01E04 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:40', fps: '23.976', res: '', result: SV.tj(t('app.process.row.lines', { n: 312 }), t('app.process.row.dropped', { n: 9 }), t('app.process.row.refined', { n: 588 }), '1 h 31 min'), acts: K.reportBtn() }),
   K.row({ st: 'run', name: 'Show S01E05 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:42', fps: '23.976', res: '',
-    result: `<span style="color:var(--primaryText);font-weight:500">${t('app.row.file_of', { i: 2, n: 3 })}</span> · ${t('app.row.elapsed', { t: '41:20' })}`, acts: btn(t('app.btn.stop'), 'secondary', { size: 'sm', icon: 'stop' }),
+    result: `<span style="color:var(--primaryText);font-weight:500">${t('app.process.row.file_of', { i: 2, n: 3 })}</span> · ${t('app.process.row.elapsed', { t: '41:20' })}`, acts: btn(t('app.common.stop'), 'secondary', { size: 'sm', icon: 'stop' }),
     detail: K.steps('dlg', [['done', 'extract', 17040, '2:14'], ['done', 'group', 17040, '0:12'], ['run', 'ocr', 0.62, 10565, 17040, '38:54', '23:40', '4.5'], ['wait', 'refine', '6 min']]) }),
-  K.row({ st: 'wait', name: 'sintel_ita_hardsub_demo.mp4', dir: '~/Downloads', dur: '0:55', fps: '24', res: '', result: t('app.row.waiting_est', { t: '3 min' }), rcls: 'ok' }),
+  K.row({ st: 'wait', name: 'sintel_ita_hardsub_demo.mp4', dir: '~/Downloads', dur: '0:55', fps: '24', res: '', result: t('app.process.row.waiting_est', { t: '3 min' }), rcls: 'ok' }),
 ], true);
 board('N1', 'Finestra stretta, lotto in corso', 'Pallini, le tre pagine a segmenti (spinner su Elabora che lavora, capsula col numero dei video), a destra inspector e ingranaggio. La colonna Dimensioni sparisce; la scheda attività non c’è: il lotto si segue dalla barra in basso.', [760, 780], () => win({
   w: 760, h: 780, topbar: { tab: 'process', busy: ['process'], count: 3, inspector: true }, pageCls: 'narrowcols',
   page: pageHead(t('app.process.title'), '', K.openBtn()) + rows() +
-    K.bottom(`<span class="sum">${t('app.bar.running', { i: 2, n: 3, time: '14:20' })}</span><span class="sp"></span>${btn(t('app.btn.stop_all'), 'destructive', { icon: 'stop', kbd: '⌘.' })}`),
+    K.bottom(`<span class="sum">${t('app.process.bar.running', { i: 2, n: 3, time: '14:20' })}</span><span class="sp"></span>${btn(t('app.common.stop_all'), 'destructive', { icon: 'stop', kbd: '⌘.' })}`),
 }));
 board('N2', 'Finestra stretta con inspector sovrapposto', 'Sotto 1000 pt di finestra l’inspector si apre sopra la pagina, da destra, con ombra; si chiude con Esc, con un clic fuori o con ⌥⌘I.', [760, 780], () => win({
   w: 760, h: 780, topbar: { tab: 'process', count: 3, inspector: true, inspectorOn: true }, pageCls: 'narrowcols', inspOver: true,
@@ -28,7 +28,7 @@ board('N2', 'Finestra stretta con inspector sovrapposto', 'Sotto 1000 pt di fine
       K.row({ st: 'ready', name: 'Show S01E04 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:40', fps: '23.976', res: '' }),
       K.row({ st: 'ready', name: 'Show S01E05 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:42', fps: '23.976', res: '' }),
       K.row({ st: 'ready', name: 'sintel_ita_hardsub_demo.mp4', dir: '~/Downloads', dur: '0:55', fps: '24', res: '' })], true) +
-    K.bottom(`<span class="sum">${t('app.bar.ready', { n: 3, t: '48 min' })}</span><span class="sp"></span>${btn(t('app.bar.start'), 'primary', { icon: 'play', kbd: '⌘↩' })}`),
+    K.bottom(`<span class="sum">${t('app.process.bar.ready', { n: 3, t: '48 min' })}</span><span class="sp"></span>${btn(t('app.process.bar.start'), 'primary', { icon: 'play', kbd: '⌘↩' })}`),
   insp: INSPECTOR({ closed: ['seg', 'adv'] }),
 }));
 </script>

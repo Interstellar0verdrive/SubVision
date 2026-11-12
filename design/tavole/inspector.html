@@ -12,21 +12,21 @@ const { t, btn, chip, note, icon, board, win, pageHead } = SV;
 const K = EK;
 
 board('I1', 'Inspector aperto, predefiniti', 'Su Elabora con i video pronti: la pagina si stringe (la colonna Dimensioni sparisce), i gruppi aperti con i valori di fabbrica. Il pannello scorre.', [1360, 840], () => win({
-  side: { tab: 'process', subs: { process: t('app.side.videos', { n: 3 }), preview: 'Show S01E04 [1080p].mkv', fix: t('app.side.no_srt') } },
+  side: { tab: 'process', subs: { process: t('app.sidebar.videos', { n: 3 }), preview: 'Show S01E04 [1080p].mkv', fix: t('app.sidebar.no_srt') } },
   page: pageHead(t('app.process.title'), '', K.openBtn() + K.inspBtn(true)) +
     K.list([
       K.row({ st: 'ready', name: 'Show S01E04 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:40', fps: '23.976', res: '1920×1080' }),
-      K.row({ st: 'ready', name: 'Show S01E05 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:42', fps: '23.976', res: '1920×1080', chips: chip(t('app.row.srt_exists')) }),
+      K.row({ st: 'ready', name: 'Show S01E05 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:42', fps: '23.976', res: '1920×1080', chips: chip(t('app.process.row.srt_exists')) }),
       K.row({ st: 'ready', name: 'sintel_ita_hardsub_demo.mp4', dir: '~/Downloads', dur: '0:55', fps: '24', res: '1280×544' }),
     ], true) +
-    K.bottom(`<span class="sum">${t('app.bar.ready', { n: 3, t: '48 min' })}</span><span class="sp"></span>${btn(t('app.bar.start'), 'primary', { icon: 'play', kbd: '⌘↩' })}`),
+    K.bottom(`<span class="sum">${t('app.process.bar.ready', { n: 3, t: '48 min' })}</span><span class="sp"></span>${btn(t('app.process.bar.start'), 'primary', { icon: 'play', kbd: '⌘↩' })}`),
   insp: INSPECTOR({}),
 }));
 
 function langMenu() {
   const L = VISION_LANGS.slice(9, 23);
   return `<div class="menu" style="position:absolute;left:16px;top:118px;width:268px;z-index:4">
-    <div class="mi dis" style="font-size:11px">${t('app.insp.menu_title')}</div><div class="sep"></div>
+    <div class="mi dis" style="font-size:11px">${t('app.inspector.menu_title')}</div><div class="sep"></div>
     ${L.map(l => `<div class="mi ${l[0] === 'it-IT' ? 'hl' : ''}"><span class="ck">${l[0] === 'it-IT' ? '✓' : ''}</span>${SV.lang === 'en' ? l[1] : l[2]}<span class="cd">${l[0]}</span></div>`).join('')}
     <div class="mi dis" style="justify-content:center">⋯ 33</div></div>`;
 }
@@ -34,7 +34,7 @@ board('I2', 'Inspector: gruppi chiusi, valori cambiati, menu e fumetto', 'Sinist
   K.panel(INSPECTOR({ closed: ['ocr', 'dlg', 'sig'], changed: { merge: [SV.dec('1.0') + ' s'], skip: ['1', .25] } }), 760) +
   K.panel(INSPECTOR({ closed: ['dlg', 'sig', 'seg', 'adv'] }), 760, { visible: true, over: langMenu() }) +
   K.panel(INSPECTOR({ closed: ['sig', 'seg', 'adv'] }), 760, { visible: true, over: `<div class="pop" style="position:absolute;left:-150px;top:208px;width:290px;z-index:4">
-     <b style="color:var(--text)">${t('app.insp.fps')}</b><br>${t('app.insp.help.fps')}<div style="margin-top:6px;color:var(--text3)">${t('app.insp.popover_default')}</div></div>` }),
+     <b style="color:var(--text)">${t('app.inspector.fps')}</b><br>${t('app.inspector.help.fps')}<div style="margin-top:6px;color:var(--text3)">${t('app.inspector.default_range', { value: '12', range: '4–12' })}</div></div>` }),
   { row: true });
 
 board('I3', 'Inspector bloccato e note', 'Sinistra: durante il lotto (nota blu, tutto spento). Centro: la lingua salvata non è tra quelle di questo Mac (nota gialla, menu evidenziato). Destra: ignore.txt mancante, banda cartelli spenta e report spento (le voci che dipendono si attenuano).', [1020, 760], () =>

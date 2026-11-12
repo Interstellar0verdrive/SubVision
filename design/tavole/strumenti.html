@@ -12,15 +12,15 @@ const ROWS = [['python', 51], ['ffmpeg', 28], ['ffprobe', 28], ['warmup', 0]];
 function rowH(key, mb, st, o = {}) {
   const ic = st === 'done' ? `<span class="sicon done">${icon('check', 10)}</span>` : st === 'run' ? spin() : st === 'fail' ? `<span class="sicon fail">${icon('x', 10)}</span>` : `<span class="sicon wait"></span>`;
   const right = st === 'run' && o.frac != null ? `<span style="width:90px;display:flex">${bar(o.frac)}</span>` : '';
-  return `<div class="trow ${st === 'run' ? 'run' : st === 'fail' ? 'fail' : st === 'wait' ? 'wait' : ''}">${ic}<span class="tn">${t('app.tools.row.' + key)} <span class="sub">· ${t('app.tools.row.' + key + '_sub')}</span></span>
-    ${right}${st === 'fail' ? SV.chip(t('app.chip.stopped'), 'red') : ''}<span class="mb">${mb ? mb + ' MB' : o.secs || ''}</span></div>`;
+  return `<div class="trow ${st === 'run' ? 'run' : st === 'fail' ? 'fail' : st === 'wait' ? 'wait' : ''}">${ic}<span class="tn">${t('app.tools.row.' + key, { version: { python: '3.13', ffmpeg: '9.0.2', ffprobe: '9.0.2' }[key] })} <span class="sub">· ${t('app.tools.row.' + key + '_sub')}</span></span>
+    ${right}${st === 'fail' ? SV.chip(t('app.common.stopped_chip'), 'red') : ''}<span class="mb">${mb ? mb + ' MB' : o.secs || ''}</span></div>`;
 }
 function toolsWin(o) {
   const rows = (o.rows || ROWS.map((r, i) => [r[0], r[1], o.states[i], o.opts && o.opts[i]])).map(r => rowH(r[0], r[1], r[2], r[3] || {})).join('');
   const status = o.fail ? note('red', o.fail[0], o.fail[1])
     : `<div style="display:flex;align-items:baseline;gap:6px"><b style="font-size:13px">${o.status[0]}</b><span style="font-size:12px;color:var(--text2)">${o.status[1]}</span></div>`;
-  const foot = o.fail ? `${SV.link(t('app.btn.show_log'), 'red')}<span style="flex:1"></span>${btn(t('app.btn.quit'))}${btn(t('app.btn.retry'), 'primary')}`
-    : `<span class="small" style="flex:1">${o.footNote || t('app.tools.inside')}</span>${btn(t('app.btn.quit'))}`;
+  const foot = o.fail ? `${SV.link(t('app.common.show_log'), 'red')}<span style="flex:1"></span>${btn(t('app.common.quit'))}${btn(t('app.common.retry'), 'primary')}`
+    : `<span class="small" style="flex:1">${o.footNote || t('app.tools.inside')}</span>${btn(t('app.common.quit'))}`;
   return `<div class="twin">${SV.lights()}
     <div style="display:flex;gap:16px;align-items:center"><span class="appicon"></span><div><div style="font-size:17px;font-weight:700">${o.head || t('app.tools.welcome')}</div>
       <div class="small">${o.intro || (t('app.tools.intro1', { mb: 108 }) + '<br>' + t('app.tools.intro2'))}</div></div></div>
@@ -39,9 +39,9 @@ board('T4', 'Strumenti · ritorno', 'Sinistra: all’avvio manca FFmpeg (cancell
 board('T5', 'Motore', 'Al posto della pagina (EngineStatusView di AnimeUp): avvio in corso; non partito con l’errore, Riprova e Mostra il log; fermato più volte, solo Mostra il log.', [1360, 840], () => SV.win({
   side: { tab: 'process', subs: { process: '—', preview: '—', fix: '—' } },
   page: `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px">
-    <div style="display:flex;flex-direction:column;align-items:center;gap:12px">${spin('l')}<div>${t('app.engine.starting')}</div><div class="small">${t('app.engine.first')}</div></div>
-    <div style="width:560px">${note('red', t('app.engine.failed'), '<span class="mono" style="font-size:11.5px">uv sync failed: network unreachable (pypi.org)</span>', SV.tint(t('app.btn.retry')) + SV.tint(t('app.btn.show_log')))}</div>
-    <div style="width:560px">${note('red', t('app.engine.failed'), t('app.engine.gave_up'), SV.tint(t('app.btn.show_log')))}</div></div>`,
+    <div style="display:flex;flex-direction:column;align-items:center;gap:12px">${spin('l')}<div>${t('app.tools.engine.starting')}</div><div class="small">${t('app.tools.engine.first')}</div></div>
+    <div style="width:560px">${note('red', t('app.tools.engine.failed'), '<span class="mono" style="font-size:11.5px">uv sync failed: network unreachable (pypi.org)</span>', SV.tint(t('app.common.retry')) + SV.tint(t('app.common.show_log')))}</div>
+    <div style="width:560px">${note('red', t('app.tools.engine.failed'), t('app.tools.engine.gave_up'), SV.tint(t('app.common.show_log')))}</div></div>`,
 }));
 </script>
 </body></html>

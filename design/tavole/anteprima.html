@@ -38,7 +38,7 @@ const head = (o = {}) => pageHead(t('app.preview.title'), o.intro ? t('app.previ
   vidPopup(o.dis) + (o.searching ? '' : btn(o.again ? t('app.preview.find_again') : t('app.preview.find'), o.again ? 'secondary' : 'primary', { icon: 'search', dis: o.dis })) + K.inspBtn(o.insp));
 const badge = kind => kind === 'sig' ? SV.chip(t('app.preview.badge_sig')) .replace('chip ', 'chip accent ')
   : kind === 'none' ? SV.chip(t('app.preview.badge_none')) : SV.chip(t('app.preview.badge_dlg'), 'green');
-const side = (sub, o = {}) => ({ tab: 'preview', subs: { process: t('app.side.videos', { n: 3 }), preview: sub, fix: t('app.side.no_srt'), ...(o.subs || {}) }, trail: o.trail, card: o.card });
+const side = (sub, o = {}) => ({ tab: 'preview', subs: { process: t('app.sidebar.videos', { n: 3 }), preview: sub, fix: t('app.sidebar.no_srt'), ...(o.subs || {}) }, trail: o.trail, card: o.card });
 function viewer(W, o = {}) {
   return `<div style="display:flex;align-items:center;gap:14px;justify-content:center">
       <span class="navbtn">${icon('chevL', 14)}</span>${frame({ w: W, dlg: o.dlg || [28, 96], sig: o.sig === null ? null : o.sig || [22, 100], handles: o.handles !== false, drag: o.drag, img: o.img, dim: o.dim })}<span class="navbtn">${icon('chevR', 14)}</span></div>
@@ -49,11 +49,11 @@ function viewer(W, o = {}) {
 }
 
 board('A0', 'Anteprima vuota', 'Nessun video in Elabora: cosa fa la pagina e area di trascinamento (i video entrano nell’elenco di Elabora).', [1360, 840], () => win({
-  side: { tab: 'preview', subs: { process: t('app.side.no_videos'), preview: t('app.side.no_videos'), fix: t('app.side.no_srt') } },
+  side: { tab: 'preview', subs: { process: t('app.sidebar.no_videos'), preview: t('app.sidebar.no_videos'), fix: t('app.sidebar.no_srt') } },
   page: pageHead(t('app.preview.title'), t('app.preview.intro')) + `
     <div class="steps" style="margin-top:6px">${[1, 2, 3].map(n => `<div class="step"><div class="n">${n}</div><h4>${t('app.preview.empty_' + n)}</h4><p>${t('app.preview.empty_' + n + '_text')}</p></div>`).join('')}</div>
     <div class="drop" style="flex:1;margin-top:18px"><span style="color:var(--text3)">${icon('preview', 40)}</span><div class="big">${t('app.preview.empty_title')}</div>
-      <div>${t('app.empty.drop')} · ${t('app.empty.or_open')} ${btn(t('app.process.open'), 'primary', { kbd: '⌘O' })}</div><div class="small">${t('app.preview.empty_drop_text')}</div></div>`,
+      <div>${t('app.process.empty.drop')} · ${t('app.process.empty.or_open')} ${btn(t('app.process.open'), 'primary', { kbd: '⌘O' })}</div><div class="small">${t('app.preview.empty_drop_text')}</div></div>`,
 }));
 
 board('A1', 'Anteprima pronta', 'Video scelto dal menu (i video di Elabora), Trova 20 fotogrammi con il fumetto, riquadro vuoto.', [1360, 840], () => win({
@@ -65,15 +65,15 @@ board('A1', 'Anteprima pronta', 'Video scelto dal menu (i video di Elabora), Tro
 }));
 
 board('A2', 'Ricerca in corso', 'Barra della ricerca (zone e fotogrammi con testo), Ferma. Il menu Video è spento finché cerca. Spinner sulla scheda.', [1360, 840], () => win({
-  side: side(t('app.side.prev_search', { i: 12, n: 20 }), { trail: { preview: 'busy' } }),
+  side: side(t('app.sidebar.prev_search', { i: 12, n: 20 }), { trail: { preview: 'busy' } }),
   page: head({ intro: true, searching: true, dis: true }) + `<div style="flex:1;display:flex;align-items:center;justify-content:center">
       <div style="width:460px;display:flex;flex-direction:column;gap:10px;align-items:stretch">
-        <div style="display:flex;align-items:center;gap:8px">${spin()}<b style="font-size:13px">${t('app.preview.searching', { i: 12, n: 20, k: 9 })}</b><span class="sp" style="flex:1"></span>${btn(t('app.btn.stop'), 'secondary', { size: 'sm', icon: 'stop' })}</div>
+        <div style="display:flex;align-items:center;gap:8px">${spin()}<b style="font-size:13px">${t('app.preview.searching', { i: 12, n: 20, k: 9 })}</b><span class="sp" style="flex:1"></span>${btn(t('app.common.stop'), 'secondary', { size: 'sm', icon: 'stop' })}</div>
         <div style="display:flex">${bar(0.6, '', true)}</div><div class="small">${t('app.preview.find_help')}</div></div></div>`,
 }));
 
 board('A3', 'Fotogramma con bande e maniglie', 'Inspector aperto: si trascina il bordo alto della banda dialoghi (etichetta con i valori) e l’altezza cambia anche nell’inspector (puntino). Frecce, badge, miniature con il puntino del testo.', [1360, 840], () => win({
-  side: side(t('app.side.prev_found', { n: 20, k: 15 })),
+  side: side(t('app.sidebar.prev_found', { n: 20, k: 15 })),
   page: head({ again: true, insp: true }) + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center">${viewer(640, { dlg: [31, 96], drag: 'dlg', small: true })}</div>
     <div style="display:flex;justify-content:center;margin-top:16px">${btn(t('app.preview.test'), 'primary', { icon: 'search', kbd: '⌘T' })}</div>`,
   insp: INSPECTOR({ closed: ['seg', 'adv'], changed: { bottom: ['31 %', (31 - 5) / 75] } }),
@@ -94,7 +94,7 @@ function panel(kind, o = {}) {
     <div class="textbox mono">${o.final}</div>${o.stale ? `<div class="small" style="color:var(--yellowText);margin-top:6px">${icon('warn', 11)} ${t('app.preview.stale')}</div>` : ''}</div>`;
 }
 board('A4', 'Prova OCR con i due pannelli', 'Sinistra: banda dialoghi con testo votato, confidenza e accordo, alternative e testo finale (con il fumetto). Destra: banda cartelli senza testo. Il pannello mentre legge e quello superato da parametri cambiati sono in A5.', [1360, 840], () => win({
-  side: side(t('app.side.prev_found', { n: 20, k: 15 })),
+  side: side(t('app.sidebar.prev_found', { n: 20, k: 15 })),
   page: head({ again: true }) + `<div style="display:flex;align-items:center;gap:14px;justify-content:center"><span class="navbtn">${icon('chevL', 14)}</span>${frame({ w: 560, dlg: [28, 96], sig: [22, 100], handles: true })}<span class="navbtn">${icon('chevR', 14)}</span>
       <div style="display:flex;flex-direction:column;gap:8px;margin-left:12px"><span class="num" style="font-size:12px;color:var(--text2)">${t('app.preview.frame_of', { i: 8, n: 20, ts: '00:00:20' })}</span><span>${badge('dlg')}</span>${btn(t('app.preview.test'), 'secondary', { icon: 'search', kbd: '⌘T' })}</div></div>
     <div style="display:flex;gap:16px;margin-top:18px">
@@ -104,7 +104,7 @@ board('A4', 'Prova OCR con i due pannelli', 'Sinistra: banda dialoghi con testo 
 }));
 
 board('A5', 'Nessun testo e casi della prova', 'Nessuna delle 20 zone ha testo (nota gialla, i fotogrammi si vedono comunque); a destra la durata non valida e il fotogramma non disponibile. Sotto: un pannello mentre legge, uno superato da parametri cambiati.', [1360, 840], () => win({
-  side: side(t('app.side.prev_found', { n: 20, k: 0 })),
+  side: side(t('app.sidebar.prev_found', { n: 20, k: 0 })),
   page: head({ again: true }) + note('yellow', '', t('app.preview.none_found'), SV.tint(t('app.process.show_inspector'))) + `<div style="height:18px"></div>
     <div style="display:flex;gap:24px;align-items:flex-start;justify-content:center">
       <div><div style="display:flex;align-items:center;gap:14px"><span class="navbtn">${icon('chevL', 14)}</span>${frame({ w: 560, dlg: [5, 70], sig: null, handles: true, img: 'frame-ita-2.jpg' })}<span class="navbtn">${icon('chevR', 14)}</span></div>
@@ -115,8 +115,8 @@ board('A5', 'Nessun testo e casi della prova', 'Nessuna delle 20 zone ha testo (
 }));
 
 board('A6', 'Anteprima durante il lotto', 'Sola lettura: nota blu, i fotogrammi trovati si sfogliano, maniglie e prova OCR spente.', [1360, 840], () => win({
-  side: side(t('app.side.prev_readonly'), { subs: { process: t('app.side.videos_running', { n: 3 }) }, trail: { process: 'busy' },
-    card: SV.activity(t('app.side.batch'), t('app.side.batch_line', { i: 2, n: 3, name: 'Show S01E05 [1080p].mkv' }), 0.47, btn(t('app.btn.stop_all'), 'secondary', { size: 'sm', icon: 'stop', full: true })) }),
+  side: side(t('app.sidebar.prev_readonly'), { subs: { process: SV.tj(t('app.sidebar.videos', { n: 3 }), t('app.sidebar.running')) }, trail: { process: 'busy' },
+    card: SV.activity(t('app.sidebar.batch'), t('app.sidebar.batch_line', { i: 2, n: 3, name: 'Show S01E05 [1080p].mkv' }), 0.47, btn(t('app.common.stop_all'), 'secondary', { size: 'sm', icon: 'stop', full: true })) }),
   page: head({ again: true, dis: true }) + note('accent', '', t('app.preview.readonly')) + `<div style="flex:1;display:flex;flex-direction:column;justify-content:center">${viewer(820, { handles: false })}</div>
     <div style="display:flex;justify-content:center;margin-top:12px">${btn(t('app.preview.test'), 'primary', { icon: 'search', kbd: '⌘T', dis: true })}</div>`,
 }));

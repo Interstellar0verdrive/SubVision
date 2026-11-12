@@ -92,3 +92,26 @@ L'elenco completo, con titolo e anteprima di ogni tavola, è in `index.html`.
 - Codici: DS design system, T strumenti, E Elabora, I inspector, A Anteprima, F Sub fix, R report, ST Impostazioni, O avvisi e menu, N finestra stretta. Elenco completo in fondo all'inventario (51 tavole).
 - Ogni tavola in chiaro e scuro; una lingua per PNG, entrambe nella pagina HTML.
 - Componenti e misure di AnimeUp 2.1 copiati in `SubVisionKit` citando la provenienza; nessun legame con AnimeUp.
+
+## Cataloghi (3.3)
+
+`macos/Native/SubVision/Resources/locales/en/app.json` e `it/app.json`: **528 chiavi** per lingua, di cui 32 plurali (64 chiavi `.uno` / `.altri`), JSON piatto ordinato per chiave. Aree: alerts 36, common 24, errors 17, fix 25, inspector 63, menu 45, notify 11, preview 46, process 94, report 10, settings 59, sidebar 32, steps 26, tools 40. Controllo: `python3 -I design/tavole/check_locales.py` (stesse chiavi, stessi segnaposto, coppie di plurali complete, solo `{nome}`, chiavi ordinate e nelle aree note); `design/tavole/build_strings.py` rigenera `strings.js` delle tavole dai cataloghi, che da ora sono la fonte. Glossario e regole di stile in `design/glossario.md`.
+
+Cosa è cambiato rispetto ai testi delle tavole di 3.2:
+- chiavi rinominate nelle aree del `Localizer` (`app.side.*` → `app.sidebar.*`, `app.set.*` → `app.settings.*`, `app.insp.*` → `app.inspector.*`, `app.row.*` / `app.bar.*` / `app.fin.*` → `app.process.*`, `app.step.*` / `app.band.*` → `app.steps.*`, ecc.);
+- i conteggi sono plurali `.uno` / `.altri` e i conteggi composti sono spezzati in pezzi uniti da `app.common.list_separator` (per esempio "3 video · 1 fallito", "1 fatto · 1 senza sottotitoli · 1 fallito", l'esito della riga);
+- i valori d'esempio sono diventati segnaposto (versioni di FFmpeg, Python e SubVision, MB, numero di lingue, nome del file importato, spazio sul disco);
+- tolte le scorciatoie dai testi (`(⌘O)`, `(⌥⌘I)`, "Esci con ⌘Q", "Impostazioni (⌘,)");
+- tolte le chiavi della scheda attività "Preparo il riconoscimento" (S5);
+- aggiunte: le 19 spiegazioni (?) dell'inspector e "Predefinito: … · Intervallo …", le etichette di accessibilità dei pulsanti con sola icona (Impostazioni, inspector, Altre azioni, chiudi la nota, fotogramma precedente/successivo, maniglie delle bande), gli stati delle righe e degli strumenti, i titoli dei pannelli Apri, le spiegazioni delle tappe, i tre flag delle righe (too_short, noise, merged_fade), i 15 codici d'errore del motore più `bad_srt` e `unknown`, versione e GitHub del piè della barra laterale.
+
+Le tavole sono state rigenerate (15 PNG cambiati: E0, E1, E7, O4, O8, O10, ST3, T2) e nessuna mostra chiavi mancanti o segnaposto vuoti, in nessuna delle due lingue.
+
+### Dubbi nuovi (cataloghi)
+
+32. **Testi con il 20 fisso.** "Trova 20 fotogrammi", "In nessuna delle 20 zone…", "Divide il video in 20 zone…" hanno il numero nel testo, perché è una costante del design (D6). Se in F5.2 diventa un parametro, passano a `{n}`.
+33. **"1 in corso".** `app.sidebar.running` non è un plurale: il motore elabora un file alla volta.
+34. **Menu di sistema.** Ripeti, Taglia, Copia, Incolla, Zoom e le voci di sistema del menu del Dock non stanno nei cataloghi (li localizza macOS); stanno invece le voci nostre (Annulla Togli, Seleziona tutto nell'elenco, Contrai, SubVision ⌘0). Da verificare in F4 che il menu Modifica di SwiftUI non le duplichi.
+35. **Nomi delle lingue.** Il menu OCR prende i nomi da `Locale` nella lingua dell'app (nessuna chiave); "English" e "Italiano" del selettore restano ognuno nella sua lingua, come in AnimeUp.
+36. **Errori del motore.** Le chiavi `app.errors.<codice>` usano `{detail}`, `{tool}`, `{path}`, `{line}`: in F1.8 il motore deve mandare questi campi nell'errore (oltre a `code`), altrimenti l'app mostra solo il testo senza dettagli.
+

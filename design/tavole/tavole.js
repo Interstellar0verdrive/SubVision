@@ -31,12 +31,19 @@
   S.esc = esc;
   /** t(key, vars): the string in the current language; {x} filled from vars. Unknown keys show in red. */
   S.t = function (key, vars) {
-    const e = (window.STR || {})[key];
+    const STR = window.STR || {};
+    let e = STR[key];
+    // plurals: <key>.uno / <key>.altri, chosen by vars.n (the Localizer's scheme)
+    if (!e && STR[key + '.uno']) e = STR[key + ((vars && Number(vars.n) === 1) ? '.uno' : '.altri')];
     if (!e) return `<span class="missing">${esc(key)}</span>`;
     let s = e[S.lang === 'en' ? 0 : 1];
+    s = s.replace(/\{\{/g, '\u0001').replace(/\}\}/g, '\u0002');
     if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m));
-    return s;
+    if (/\{\w+\}/.test(s)) return `<span class="missing">${esc(key)}: ${esc(s)}</span>`;
+    return s.replace(/\u0001/g, '{').replace(/\u0002/g, '}');
   };
+  /** Joins parts with the catalog's separator (" · "). */
+  S.tj = (...parts) => parts.join(S.t('app.common.list_separator'));
   const t = S.t;
 
   // ---------- icons (SF Symbol stand-ins)
@@ -119,9 +126,9 @@
 
   // ---------- frame
   const TABS = [
-    { id: 'process', ic: 'process', key: 'app.tab.process', k: '⌘1' },
-    { id: 'preview', ic: 'preview', key: 'app.tab.preview', k: '⌘2' },
-    { id: 'fix', ic: 'fix', key: 'app.tab.fix', k: '⌘3' },
+    { id: 'process', ic: 'process', key: 'app.sidebar.tab.process', k: '⌘1' },
+    { id: 'preview', ic: 'preview', key: 'app.sidebar.tab.preview', k: '⌘2' },
+    { id: 'fix', ic: 'fix', key: 'app.sidebar.tab.fix', k: '⌘3' },
   ];
   S.TABS = TABS;
   /** The glass sidebar: o.tab, o.subs {process,preview,fix}, o.trail {id: 'busy'|'done'}, o.card (html), o.update */
@@ -132,7 +139,7 @@
       const trail = tr === 'busy' ? S.spin() : tr === 'done' ? `<span class="tr">${icon('check', 12)}</span>` : '';
       return `<div class="tab ${o.tab === x.id ? 'sel' : ''}"><span class="tile">${icon(x.ic, 15)}</span><div style="min-width:0"><div class="t1">${t(x.key)}</div><div class="t2">${subs[x.id] || ''}</div></div>${trail ? `<span style="margin-left:auto;display:flex">${trail}</span>` : ''}</div>`;
     }).join('');
-    const foot = `<div class="foot"><span class="num">SubVision 2.0.0</span>${o.checking ? S.spin('s') : icon('refresh', 11)}<span class="sp"></span>${icon('github', 13)}<span>GitHub</span></div>`;
+    const foot = `<div class="foot"><span class="num">${t('app.sidebar.version', { version: '2.0.0' })}</span>${o.checking ? S.spin('s') : icon('refresh', 11)}<span class="sp"></span>${icon('github', 13)}<span>${t('app.sidebar.github_short')}</span></div>`;
     return `<div class="side"><div class="toprow">${S.lights(o.inactive)}<span class="iconbtn">${icon('gear', 15)}</span></div><div style="display:flex;flex-direction:column;gap:2px">${tabs}</div><div class="grow"></div>${o.card || ''}${foot}</div>`;
   };
   /** ActivityCard (DS4): kind with spinner or symbol, a line, a bar, buttons. */
@@ -143,8 +150,8 @@
       ${buttons ? `<div style="display:flex;gap:6px;margin-top:4px">${buttons}</div>` : ''}</div>`;
   S.updateCard = v =>
     `<div style="background:var(--yellowBg);border:1px solid var(--yellowLine);border-radius:10px;padding:10px 12px;color:var(--yellowText);display:flex;flex-direction:column;gap:6px">
-      <div style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:600">${icon('arrowcircle', 12)}${t('app.side.update', { version: v })}</div>
-      <div style="display:flex;align-items:baseline">${S.link(t('app.side.whats_new'), 'yellow')}<span style="flex:1"></span>${S.btn(t('app.btn.download'), 'notice', { size: 'sm' })}</div></div>`;
+      <div style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:600">${icon('arrowcircle', 12)}${t('app.sidebar.update', { version: v })}</div>
+      <div style="display:flex;align-items:baseline">${S.link(t('app.sidebar.whats_new'), 'yellow')}<span style="flex:1"></span>${S.btn(t('app.common.download'), 'notice', { size: 'sm' })}</div></div>`;
   /** Top bar of the narrow window (board N1 of AnimeUp). */
   S.topbar = function (o = {}) {
     const segs = TABS.map(x => {

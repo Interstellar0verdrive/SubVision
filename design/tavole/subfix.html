@@ -9,13 +9,13 @@
 <script src="kit.js"></script>
 <script>
 const { t, btn, note, icon, board, win, pageHead, toggle } = SV;
-const side = (sub, o = {}) => ({ tab: 'fix', subs: { process: t('app.side.videos', { n: 3 }), preview: 'Show S01E04 [1080p].mkv', fix: sub }, ...o });
+const side = (sub, o = {}) => ({ tab: 'fix', subs: { process: t('app.sidebar.videos', { n: 3 }), preview: 'Show S01E04 [1080p].mkv', fix: sub }, ...o });
 const head = () => pageHead(t('app.fix.title'), t('app.fix.intro'), btn(t('app.fix.open'), 'secondary', { icon: 'doc', kbd: '⇧⌘O' }));
 function fileCard() {
   return `<div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 18px">
     <span style="color:var(--text2)">${icon('doc', 28)}</span>
     <div style="flex:1;min-width:0"><div class="fname" style="font-size:13px">Show S01E03 (old).srt</div><div class="fdir">~/Movies/Show/Season 1</div>
-      <div class="fres">${t('app.fix.file_meta', { n: 642, t: '23:40' })}</div></div>${btn(t('app.btn.change'), 'secondary', { size: 'sm' })}</div>`;
+      <div class="fres">${t('app.fix.file_meta', { n: 642, t: '23:40' })}</div></div>${btn(t('app.common.change'), 'secondary', { size: 'sm' })}</div>`;
 }
 function options(o = {}) {
   const row = (k, on, dis) => `<div class="srowk ${dis ? 'dis' : ''}"><div class="lt"><div class="a">${t('app.fix.' + k)}</div><div class="d">${t('app.fix.' + k + '_desc')}</div></div>${toggle(on)}</div>`;
@@ -27,23 +27,23 @@ function options(o = {}) {
 const runBar = (dis, spinning) => `<div class="bottombar"><span class="sp"></span>${spinning ? SV.spin() : ''}${btn(t('app.fix.run'), 'primary', { icon: 'play', kbd: '⌘↩', dis })}</div>`;
 
 board('F0', 'Sub fix vuota', 'Area di trascinamento e a cosa serve (SRT esterni, vecchi SRT, nuove correzioni).', [1360, 840], () => win({
-  side: side(t('app.side.no_srt')),
+  side: side(t('app.sidebar.no_srt')),
   page: head() + `<div class="drop" style="flex:1"><span style="color:var(--text3)">${icon('fix', 40)}</span><div class="big">${t('app.fix.drop')}</div>
-    <div>${t('app.empty.or_open')} ${btn(t('app.fix.open'), 'primary', { kbd: '⇧⌘O' })}</div><div class="small" style="max-width:560px">${t('app.fix.why')}</div></div>`,
+    <div>${t('app.process.empty.or_open')} ${btn(t('app.fix.open'), 'primary', { kbd: '⇧⌘O' })}</div><div class="small" style="max-width:560px">${t('app.fix.why')}</div></div>`,
 }));
 board('F1', 'Sub fix pronta', 'File scelto, le quattro opzioni (Durata minima spenta se i flash restano), nota sui parametri condivisi con Elabora, Esegui.', [1360, 840], () => win({
   side: side('Show S01E03 (old).srt'),
   page: head() + `<div style="max-width:720px">${fileCard()}${options()}</div>` + runBar(false),
 }));
 board('F2', 'Sub fix fatto', 'Nota verde con il nome del file creato, Mostra nel Finder e Apri. Durante l’esecuzione (meno di un secondo) solo lo spinner accanto al pulsante.', [1360, 840], () => win({
-  side: side(t('app.side.fix_done', { n: 618 }), { trail: { fix: 'done' } }),
-  page: head() + `<div style="max-width:720px">${note('green', t('app.fix.created', { name: 'Show S01E03 (old)-fixed-20261112_221400.srt', n: 618 }), t('app.fix.created_text'), SV.tint(t('app.btn.show_in_finder')).replace('class="tint"', 'class="tint" style="color:var(--greenText);border-color:var(--greenLine);background:var(--greenTint)"') + SV.tint(t('app.btn.open')).replace('class="tint"', 'class="tint" style="color:var(--greenText);border-color:var(--greenLine);background:var(--greenTint)"'))}
+  side: side(t('app.sidebar.fix_done', { n: 618 }), { trail: { fix: 'done' } }),
+  page: head() + `<div style="max-width:720px">${note('green', t('app.fix.created', { name: 'Show S01E03 (old)-fixed-20261112_221400.srt', n: 618 }), t('app.fix.created_text'), SV.tint(t('app.common.show_in_finder')).replace('class="tint"', 'class="tint" style="color:var(--greenText);border-color:var(--greenLine);background:var(--greenTint)"') + SV.tint(t('app.common.open')).replace('class="tint"', 'class="tint" style="color:var(--greenText);border-color:var(--greenLine);background:var(--greenTint)"'))}
     <div style="height:14px"></div>${fileCard()}${options({ flash: false })}</div>` + runBar(false),
 }));
 board('F3', 'Sub fix errore', 'Nessun segmento valido (errore del motore), SRT illeggibile, file trascinato che non è .srt.', [1360, 840], () => win({
-  side: side(t('app.side.fix_none')),
+  side: side(t('app.sidebar.fix_none')),
   page: head() + `<div style="max-width:720px;display:flex;flex-direction:column;gap:10px">${note('red', t('app.fix.no_valid'), t('app.fix.no_valid_text'))}
-    ${note('red', '', t('app.fix.unreadable', { why: SV.lang === 'en' ? 'line 214 has no timestamps' : 'la riga 214 non ha i tempi' }))}${note('yellow', '', t('app.fix.only_srt'))}
+    ${note('red', '', t('app.fix.unreadable', { why: t('app.errors.bad_srt', { line: 214 }) }))}${note('yellow', '', t('app.fix.only_srt'))}
     <div style="height:4px"></div>${fileCard()}${options()}</div>` + runBar(false),
 }));
 </script>
