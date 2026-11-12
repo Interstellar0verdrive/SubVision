@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SubVision 2.0 · tavole</title>
+<link rel="stylesheet" href="tavole.css"><script src="strings.js"></script><script src="tavole.js"></script>
+<style>
+.idx { max-width: 1180px; padding: 8px 32px 60px; }
+.idx h2 { font-size: 16px; margin: 28px 0 8px; display: flex; gap: 10px; align-items: baseline; }
+.idx h2 a { color: var(--text); text-decoration: none; } .idx h2 span { font-size: 12px; font-weight: 400; color: var(--text2); }
+.idx table { width: 100%; border-collapse: collapse; font-size: 12.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.idx td, .idx th { padding: 7px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.idx th { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; }
+.idx td.c { font-weight: 700; width: 56px; } .idx td.p { width: 210px; white-space: nowrap; }
+.idx a { color: var(--primaryText); } .idx .d { color: var(--text2); }
+.idx img { width: 96px; height: 60px; object-fit: cover; object-position: top left; border-radius: 6px; border: 1px solid var(--line); display: block; }
+body { background: var(--bg); }
+</style></head>
+<body>
+<div class="doc-head"><h1>SubVision 2.0 · tavole (F3, attività 3.2)</h1><span class="sp"></span><span class="ctl"></span></div>
+<div class="idx">
+<p class="d" style="max-width:860px">51 tavole in 10 pagine, ognuna in chiaro e in scuro, testi in inglese e in italiano (selettori in alto, anche qui). I PNG sono in <code>png/&lt;codice&gt;-light.png</code> e <code>-dark.png</code>, in italiano; <code>LANGS="it en" ./screenshot.sh</code> rifà anche quelli in inglese in <code>png/en/</code>. Parametri: <code>?theme=light|dark</code>, <code>?lang=en|it</code>, <code>?board=E2</code>. Inventario: <code>../inventario-app-nativa.md</code>; dubbi: <code>../note-design.md</code>.</p>
+<div id="list"></div>
+</div>
+<script>
+const PAGES = [
+  ['ds', 'Design system', [['DS1', 'Colori e token'], ['DS2', 'Testo, pulsanti, link'], ['DS3', 'Componenti'], ['DS4', 'Barra laterale']]],
+  ['strumenti', 'Finestra degli strumenti e motore', [['T1', 'Download in corso'], ['T2', 'Preparazione del riconoscimento'], ['T3', 'Errori'], ['T4', 'Ritorno (uno strumento, aggiornamento di macOS)'], ['T5', 'Motore']]],
+  ['elabora', 'Elabora', [['E0', 'Vuota'], ['E1', 'Con video, pronto'], ['E2', 'In corso'], ['E3', 'Finita, con esiti'], ['E4', 'File fallito'], ['E5', 'File fermato e lotto fermato'], ['E6', 'Foglio di fine lotto'], ['E7', 'Banner e note']]],
+  ['inspector', 'Inspector dei parametri', [['I1', 'Aperto, predefiniti'], ['I2', 'Gruppi chiusi, valori cambiati, menu della lingua, fumetto'], ['I3', 'Bloccato e note']]],
+  ['anteprima', 'Anteprima', [['A0', 'Vuota'], ['A1', 'Pronta'], ['A2', 'Ricerca'], ['A3', 'Fotogramma con bande e maniglie'], ['A4', 'Prova OCR'], ['A5', 'Nessun testo e casi della prova'], ['A6', 'Durante il lotto']]],
+  ['subfix', 'Sub fix', [['F0', 'Vuota'], ['F1', 'Pronta'], ['F2', 'Fatto'], ['F3', 'Errore']]],
+  ['report', 'Finestra del report', [['R1', 'Report aperto'], ['R2', 'SRT revisionato salvato'], ['R3', 'Errori e caricamento']]],
+  ['impostazioni', 'Impostazioni', [['ST1', 'Generali'], ['ST2', 'Strumenti'], ['ST3', 'Elenchi'], ['ST4', 'Aggiornamenti'], ['ST5', 'Bloccate durante il lotto']]],
+  ['avvisi', 'Avvisi, menu, notifiche', [['O1', 'Ferma questo file'], ['O2', 'Ferma tutto'], ['O3', 'Esci con lotto in corso'], ['O4', 'Chiudi la finestra'], ['O5', 'FFmpeg mancante'], ['O6', 'Vision mancante'], ['O7', 'Lingua non supportata'], ['O8', 'Avvisi minori'], ['O9', 'Barra dei menu'], ['O10', 'Notifiche e Dock']]],
+  ['stretta', 'Finestra stretta', [['N1', 'Barra in alto, lotto in corso'], ['N2', 'Inspector sovrapposto']]],
+];
+function draw() {
+  const theme = document.documentElement.dataset.theme;
+  document.getElementById('list').innerHTML = PAGES.map(([p, title, boards]) => `<h2><a href="${p}.html">${title}</a><span>${p}.html · ${boards.length}</span></h2>
+    <table><tr><th>Codice</th><th>Tavola</th><th>PNG</th><th>Anteprima</th></tr>${boards.map(([c, n]) => `<tr><td class="c"><a href="${p}.html#${c}">${c}</a></td><td>${n}</td>
+      <td class="p"><a href="png/${c}-light.png">${c}-light.png</a> · <a href="png/${c}-dark.png">${c}-dark.png</a></td><td><a href="png/${c}-${theme}.png"><img src="png/${c}-${theme}.png" alt="${c}" loading="lazy"></a></td></tr>`).join('')}</table>`).join('');
+}
+window.addEventListener('DOMContentLoaded', () => { draw(); new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); });
+</script>
+</body></html>

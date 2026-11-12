@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Design system · tavole</title>
+<link rel="stylesheet" href="tavole.css"><script src="strings.js"></script><script src="tavole.js"></script>
+<style>
+.sw-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.swc { border-radius: 10px; overflow: hidden; border: 1px solid var(--glassLine); background: var(--surface); }
+.swc .c { height: 54px; } .swc .n { padding: 6px 8px; font-size: 11px; } .swc .n b { display: block; font-size: 11.5px; }
+.swc .v { font: 10.5px ui-monospace, monospace; color: var(--text2); }
+.dsbox { background: var(--bg); border: 1px solid var(--glassLine); border-radius: 14px; padding: 22px; }
+.dsbox h4 { margin: 0 0 12px; font-size: 13px; } .dsbox + .dsbox { margin-top: 18px; }
+.trow2 { display: flex; align-items: baseline; gap: 18px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.trow2 .m { width: 190px; flex: none; font: 11px ui-monospace, monospace; color: var(--text3); }
+</style></head>
+<body>
+<div class="doc-head"><a href="index.html">← Indice</a><h1>Design system · DS1–DS4</h1><span class="sp"></span><span class="ctl"></span></div>
+<p class="doc-intro">Token, testo, pulsanti e componenti copiati da AnimeUp 2.1 (<code>AnimeUpKit/DesignSystem</code>) in <code>SubVisionKit</code>, MIT, senza legami. Il tema chiaro è quello disegnato di AnimeUp 2.1 (approvato il 12/11), non un'inversione. Ogni tavola cambia con il selettore Chiaro/Scuro in alto.</p>
+<main id="boards"></main>
+<script src="kit.js"></script>
+<script>
+const { t, btn, chip, note, icon, board, spin, bar, toggle } = SV;
+const L = (it, en) => SV.lang === 'en' ? en : it;
+const TOK = [
+  ['bg', '#101113', '#F6F7F9'], ['surface', '#16181B', '#FFFFFF'], ['raised', '#1C1F23', '#EEF0F2'], ['sheet', '#22252A', '#F3F4F6'], ['alert', '#26292E', '#F6F7F9'], ['line', '#26292E', '#E1E4E8'],
+  ['text', '#E8EAED', '#16181B'], ['text2', '#9BA1A9', '#5C626A'], ['text3', '#80868E', '#656B73'], ['textCode', '#C6CBD2', '#3A3F46'], ['primary', '#2AC9DE', '#0275B6'], ['primaryText', '#2AC9DE', '#206CA1'],
+  ['green', '#3DD68C', '#12A150'], ['greenText', '#7FE3AC', '#146C3E'], ['yellow', '#F2B84B', '#F5B400'], ['yellowText', '#F5CB78', '#7F5300'], ['red', '#CD3725', '#CD3725'], ['redText', '#F59B9B', '#B42323'],
+];
+board('DS1', 'Colori e token', 'I token principali con i valori scuro / chiaro; i colori delle due bande sul fotogramma (fissi: stanno sul video); l’accento di AnimeUp e un’alternativa per SubVision (dubbio ?3).', [1300, 760], () => `
+  <div class="dsbox"><h4>${L('Token (nome · scuro · chiaro)', 'Tokens (name · dark · light)')}</h4><div class="sw-grid">
+    ${TOK.map(([n, d, l]) => `<div class="swc"><div class="c" style="background:var(--${n})"></div><div class="n"><b>${n}</b><span class="v">${d} · ${l}</span></div></div>`).join('')}</div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px">
+    <div class="dsbox"><h4>${L('Bande sul fotogramma', 'Bands on the frame')}</h4>
+      <div style="display:flex;gap:16px;align-items:center"><div class="frame" style="width:300px;height:128px"><img src="img/frame-ita.jpg" alt="">
+        <div class="band sig" style="left:0;top:0;width:300px;height:28px"><span class="tagb">${t('app.preview.band_sig')}</span></div>
+        <div class="band dlg" style="left:6px;top:92px;width:288px;height:36px"><span class="tagb">${t('app.preview.band_dlg')}</span></div></div>
+      <div class="small">${L('Dialoghi', 'Dialogue')} <span class="num">#3DD68C</span> · ${L('Cartelli', 'Signs')} <span class="num">#4DA3FF</span><br>${L('Uguali nei due temi: stanno sopra il video, non sulla finestra. Bordo 2 pt, velo al 10 %, linguetta col nome, maniglie bianche.', 'The same in both themes: they sit on the video, not on the window. 2 pt edge, 10 % veil, name tab, white handles.')}</div></div></div>
+    <div class="dsbox"><h4>${L('Accento', 'Accent')}</h4><div style="display:flex;gap:18px;align-items:flex-start">
+      <div style="flex:1"><div class="label" style="margin-bottom:6px">${L('A · di AnimeUp (raccomandato)', 'A · AnimeUp’s (recommended)')}</div>${btn(t('app.process.bar.start'), 'primary', { icon: 'play' })} ${chip('12 fps', 'accent')}<div class="small" style="margin-top:6px">#2AC9DE / #0275B6 · ${L('contrasti già misurati', 'contrasts already measured')}</div></div>
+      <div style="flex:1"><div class="label" style="margin-bottom:6px">${L('B · proprio di SubVision', 'B · SubVision’s own')}</div><span class="btn" style="background:${SV.lang && document.documentElement.dataset.theme === 'light' ? '#5B47D6' : '#9D8CFF'};color:${document.documentElement.dataset.theme === 'light' ? '#fff' : '#160F3A'};font-weight:600">${icon('play', 11)}${t('app.process.bar.start')}</span>
+        <div class="small" style="margin-top:6px">#9D8CFF / #5B47D6 · ${L('da misurare (bianco su #5B47D6 ≈ 6,4 : 1)', 'to measure (white on #5B47D6 ≈ 6.4 : 1)')}</div></div></div></div></div>`);
+board('DS2', 'Testo, pulsanti, link', 'La scala tipografica (SF Pro e SF Mono, punti interi), i ruoli dei pulsanti in tre misure, i link sottolineati per tono.', [1300, 700], () => `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+  <div class="dsbox"><h4>${L('Testo', 'Text')}</h4>
+    ${[['24 bold · page title', '<span style="font-size:24px;font-weight:700;letter-spacing:-.01em">' + t('app.process.title') + '</span>'], ['15 semibold · section', '<span style="font-size:15px;font-weight:600">' + t('app.inspector.title') + '</span>'], ['13 · body', t('app.process.intro')],
+       ['12.5 medium · file name', '<span style="font-size:12.5px;font-weight:500">Show S01E04 [1080p].mkv</span>'], ['12 · small', '<span class="small">' + t('app.process.bar.outputs') + '</span>'],
+       ['11 semibold · label', '<span class="label">' + t('app.steps.band.dialogue') + '</span>'], ['12 mono · numbers', '<span class="num">23:40 · ' + SV.dec('23.976') + '</span>'], ['11 mono · small numbers', '<span class="num" style="font-size:11px;color:var(--text2)">17.040 / 34.080 · ETA 23:40</span>']]
+      .map(([m, s]) => `<div class="trow2"><span class="m">${m}</span><span>${s}</span></div>`).join('')}</div>
+  <div class="dsbox"><h4>${L('Pulsanti', 'Buttons')}</h4>
+    ${['lg', '', 'sm'].map(sz => `<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">${btn(t('app.process.bar.start'), 'primary', { size: sz, icon: 'play' })}${btn(t('app.process.open'), 'secondary', { size: sz })}${btn(t('app.common.stop_all'), 'destructive', { size: sz })}${btn(t('app.common.stop'), 'destructiveSolid', { size: sz })}${btn(t('app.common.download'), 'notice', { size: sz })}${btn(t('app.common.cancel'), 'plain', { size: sz })}</div>`).join('')}
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">${btn(t('app.process.bar.start'), 'primary', { dis: true })}${btn(t('app.process.open'), 'secondary', { dis: true })}<span class="small">${L('spento: 40 %', 'disabled: 40 %')}</span></div>
+    <div class="small" style="margin-bottom:12px">${L('Primario (uno per schermata) · secondario vetro · distruttivo contorno · distruttivo pieno (avvisi rossi) · avviso (nella nota gialla) · semplice', 'Primary (one per screen) · glass secondary · outlined destructive · solid destructive (red alerts) · notice (in the yellow note) · plain')}</div>
+    <h4>Link</h4><div style="display:flex;gap:18px">${SV.link(t('app.common.show_in_finder'))}${SV.link(t('app.common.show_log'), 'red')}${SV.link(t('app.sidebar.whats_new'), 'yellow')}${SV.link(t('app.settings.release_notes'), 'gray', 'ext')}</div></div></div>`);
+board('DS3', 'Componenti', 'Righe del file in tutti gli stati, barre di tappa, chip, note, controlli dell’inspector, maniglie delle bande.', [1300, 900], () => `
+  <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:18px">
+  <div class="dsbox"><h4>${L('Righe del file', 'File rows')}</h4>${EK.list([
+      EK.row({ st: 'ready', name: 'ready.mkv', dir: '~/Movies', dur: '23:40', fps: '23.976', res: '1920×1080', result: t('app.process.row.ready'), rcls: 'ok' }),
+      EK.row({ st: 'run', name: 'running.mkv', dir: '~/Movies', dur: '23:40', fps: '23.976', res: '1920×1080', result: t('app.process.row.file_of', { i: 2, n: 3 }) }),
+      EK.row({ st: 'done', name: 'done.mkv', dir: '~/Movies', dur: '23:40', fps: '23.976', res: '1920×1080', result: t('app.process.finished.lines', { n: 312 }) }),
+      EK.row({ st: 'warn', name: 'no-subs.mkv', dir: '~/Movies', dur: '23:40', fps: '23.976', res: '1920×1080', result: t('app.process.finished.no_subs'), rcls: 'warn' }),
+      EK.row({ st: 'fail', name: 'failed.mkv', dir: '~/Movies', dur: '23:40', fps: '23.976', res: '1920×1080', result: t('app.process.finished.failed_at', { step: 'OCR ×3' }), rcls: 'fail' }),
+      EK.row({ st: 'stop', name: 'stopped.mkv', dir: '~/Movies', dur: '23:40', fps: '23.976', res: '1920×1080', result: t('app.common.stopped_chip'), rcls: 'ok' }),
+      EK.row({ st: 'bad', name: 'unreadable.mkv', dir: '~/Movies', dur: '—', fps: '—', res: '—', result: t('app.process.row.unreadable'), rcls: 'fail', dim: true })], false)}
+    <h4 style="margin-top:16px">${L('Barre di tappa', 'Step bars')}</h4>${EK.steps('dlg', [['done', 'extract', 17040, '2:14', '127'], ['run', 'ocr', .62, 10565, 17040, '38:54', '23:40', '4.5'], ['wait', 'refine', '6 min'], ['fail', 'group'], ['skip', 'refine']])}</div>
+  <div><div class="dsbox"><h4>${L('Chip e note', 'Chips and notes')}</h4><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${chip(t('app.process.row.srt_exists'))}${chip(t('app.preview.badge_dlg'), 'green')}${chip(t('app.preview.badge_sig'), 'accent')}${chip(t('app.common.stopped_chip'), 'red')}${chip(t('app.inspector.file_missing'), 'yellow')}</div>
+      <div style="display:flex;flex-direction:column;gap:8px">${note('accent', '', t('app.inspector.locked'))}${note('green', '', t('app.fix.created', { name: 'x-fixed.srt', n: 618 }))}${note('yellow', '', t('app.process.note.skipped', { n: 2 }))}${note('red', t('app.fix.no_valid'), '', SV.tint(t('app.common.show_log')))}</div></div>
+    <div class="dsbox"><h4>${L('Controlli', 'Controls')}</h4><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;align-items:center">
+      ${SV.popup('Italiano <span class="num t3" style="font-size:11px">it-IT</span>', 200)}<span>${toggle(true)} ${toggle(false)} ${toggle(true, true)}</span>
+      ${SV.slider(.31)}<span>${SV.stepper(SV.dec('0.20') + ' s', 64)}</span>
+      ${SV.slider(1, { ticks: [0, .25, .5, .75, 1] })}${SV.capseg([t('app.settings.theme.system'), t('app.settings.theme.light'), t('app.settings.theme.dark')], 0)}
+      <span><span class="pv chg" style="font:12px ui-monospace,monospace">31 %</span> <span class="small">${L('cambiato', 'changed')}</span></span><span class="def" style="font-size:11.5px;color:var(--primaryText)">${t('app.common.defaults')}</span></div></div>
+    <div class="dsbox"><h4>${L('Maniglie', 'Handles')}</h4><div style="display:flex;gap:18px;align-items:center"><div class="frame" style="width:260px;height:110px"><img src="img/frame-ita.jpg" alt="">
+      <div class="band dlg drag" style="left:5px;top:70px;width:250px;height:40px"><span class="tagb">${t('app.preview.band_dlg')}</span><span class="hdl" style="left:114px;top:-5px"></span><span class="hdl v" style="left:-5px;top:9px"></span><span class="hdl v" style="right:-5px;top:9px"></span></div></div>
+      <div class="small">${L('Bordo superiore: altezza. Lati: larghezza, simmetrica. Arrotondate all’1 %. Cursore di ridimensionamento.', 'Top edge: height. Sides: width, symmetric. Rounded to 1 %. Resize cursor.')}</div></div></div></div></div>`);
+board('DS4', 'Barra laterale', 'Le schede con i sottotitoli di stato e i segni a destra (spinner, spunta); le schede attività (lotto, aggiornamento); il piè con versione, Controlla aggiornamenti (spinner mentre chiede) e GitHub. Nessuna scheda per il riconoscimento: dopo S5 si prepara solo nella finestra strumenti.', [1300, 820], () => {
+  const sb = (o) => `<div style="position:relative;width:252px;height:820px;flex:none">${SV.sidebar(o).replace('class="side"', 'class="side" style="position:absolute;inset:0"')}</div>`;
+  return `<div style="display:flex;gap:28px">
+    ${sb({ tab: 'process', subs: { process: t('app.sidebar.no_videos'), preview: t('app.sidebar.no_videos'), fix: t('app.sidebar.no_srt') } })}
+    ${sb({ tab: 'process', trail: { process: 'busy' }, subs: { process: SV.tj(t('app.sidebar.videos', { n: 3 }), t('app.sidebar.running')), preview: t('app.sidebar.prev_readonly'), fix: 'Show S01E03 (old).srt' },
+      card: SV.activity(t('app.sidebar.batch'), t('app.sidebar.batch_line', { i: 2, n: 3, name: 'Show S01E05 [1080p].mkv' }) + '<br>' + t('app.sidebar.batch_ends', { time: '14:20' }), .47, btn(t('app.common.stop_all'), 'secondary', { size: 'sm', icon: 'stop', full: true })) })}
+    ${sb({ tab: 'preview', trail: { preview: 'busy', fix: 'done' }, subs: { process: SV.tj(t('app.sidebar.videos', { n: 3 }), t('app.sidebar.failed', { n: 1 })), preview: t('app.sidebar.prev_search', { i: 12, n: 20 }), fix: t('app.sidebar.fix_done', { n: 618 }) } })}
+    ${sb({ tab: 'fix', checking: true, subs: { process: SV.tj(t('app.sidebar.videos', { n: 3 }), t('app.sidebar.done', { n: 3 })), preview: t('app.sidebar.prev_found', { n: 20, k: 15 }), fix: t('app.sidebar.fix_none') }, card: SV.updateCard('2.0.1') })}</div>`;
+});
+</script>
+</body></html>
