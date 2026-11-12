@@ -91,6 +91,25 @@ public enum DebugSnapshot {
         }
     }
 
+    /// The real window once per scheme (light and dark from `schemes(_:)`):
+    /// the app's appearance is switched, the window redrawn and captured,
+    /// then the appearance put back. One scheme keeps `path` as it is.
+    @discardableResult
+    public static func capture(_ config: AppShellConfig, schemes: [ColorScheme], _ path: String,
+                               settle: Duration = .milliseconds(400)) async -> [String] {
+        let saved = NSApp.appearance
+        defer { NSApp.appearance = saved }
+        var written: [String] = []
+        for scheme in schemes {
+            NSApp.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+            WindowSizer.main(config)?.displayIfNeeded()
+            try? await Task.sleep(for: settle)
+            let p = schemes.count > 1 ? self.path(path, scheme) : path
+            if capture(config, p) { written.append(p) }
+        }
+        return written
+    }
+
     private static func write(_ image: NSImage?, to path: String) -> Bool {
         guard let image, let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
               let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { return false }

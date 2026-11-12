@@ -39,9 +39,9 @@ struct ShellSandbox {
 }
 
 let demoTools = [
-    ToolRow(key: "ffmpeg", name: "FFmpeg", version: "7.1", megabytes: 38),
-    ToolRow(key: "python", name: "Python", version: "3.13", megabytes: 42, kind: .runtime),
-    ToolRow(key: "warmup", name: "Preparing recognition", kind: .task),
+    ToolRow(key: "python", name: "uv + Python", version: "3.13", detail: "engine and recognition", megabytes: 42, kind: .runtime),
+    ToolRow(key: "ffmpeg", name: "FFmpeg", version: "9.0.2", detail: "reads the frames", megabytes: 38),
+    ToolRow(key: "warmup", name: "Preparing text recognition", detail: "Vision's models for this Mac", kind: .task),
 ]
 
 let demoConfig = AppShellConfig(
@@ -74,28 +74,29 @@ func until(_ seconds: Double, _ condition: @MainActor () -> Bool) async -> Bool 
         // No .venv yet: the window opens straight away, the runtime spinning.
         state.prepareIfFirstLaunch(stateFolder: box.state)
         #expect(state.showsWindow && state.runtimePending)
-        #expect(state.rows.map(\.id) == ["ffmpeg", "python", "warmup"])
-        #expect(state.rows[1].state == .running)
+        #expect(state.rows.map(\.id) == ["python", "ffmpeg", "warmup"])
+        #expect(state.rows[0].state == .running)
         // The events reach the state through one consumer, in order.
         let listener = Task { @MainActor in
             for await event in engine.events { state.apply(event) }
         }
         try await engine.start()
-        _ = try await engine.call("hello", timeout: .seconds(10), as: EngineHello.self)
-        let status = try await engine.call("tools.status", timeout: .seconds(10), as: ToolsStatusReply.self)
+        _ = try await engine.hello(timeout: .seconds(10))
+        let status = try await engine.toolsStatus()
         #expect(status.missingKeys == ["ffmpeg"])
         state.decide(status)
         #expect(state.phase == .installing)
-        #expect(state.rows.map(\.id) == ["ffmpeg", "python", "warmup"])
-        #expect(state.rows[1].state == .done)
+        #expect(state.rows.map(\.id) == ["python", "ffmpeg", "warmup"])
+        #expect(state.rows[0].state == .done)
         // ffmpeg downloads: running with a growing bar, then done.
-        #expect(await until(10) { state.rows[0].state == .running && state.rows[0].bytes > 0 })
-        #expect(state.rows[0].total == 38_000_000)
+        #expect(await until(10) { state.rows[1].state == .running && state.rows[1].bytes > 0 })
+        #expect(state.rows[1].total == 38_000_000)
         #expect(state.totals.count == 2 && state.totals.total == 80_000_000)
-        #expect(await until(10) { state.rows[0].state == .done })
-        // Then the warm-up task, then everything is done and the window goes.
+        #expect(await until(10) { state.rows[1].state == .done })
+        // Then the warm-up (`warmup`, `warmup.done`), then the window goes.
         #expect(await until(10) { state.rows[2].state == .running || state.rows[2].state == .done })
         #expect(await until(10) { finished })
+        #expect(state.rows[2].seconds == 31)
         #expect(state.phase == .notNeeded)
         #expect(!state.showsWindow)
         listener.cancel()
@@ -112,13 +113,13 @@ func until(_ seconds: Double, _ condition: @MainActor () -> Bool) async -> Bool 
             for await event in engine.events { state.apply(event) }
         }
         try await engine.start()
-        _ = try await engine.call("hello", timeout: .seconds(10), as: EngineHello.self)
-        // A later launch with a tool gone missing: only that row, no runtime row.
-        state.decide(ToolsStatusReply(tools: [.init(key: "ffmpeg", verified: false)]))
-        #expect(state.rows.map(\.id) == ["ffmpeg", "warmup"])
+        _ = try await engine.hello(timeout: .seconds(10))
+        // A later launch with a tool gone missing: only that row (T4).
+        state.decide(ToolsStatusReply(tools: [.init(key: "ffmpeg", present: false)]))
+        #expect(state.rows.map(\.id) == ["ffmpeg"])
         #expect(await until(10) { state.failure != nil })
         #expect(state.failure?.key == "ffmpeg")
-        #expect(state.failure?.error.contains("checksum") == true)
+        #expect(state.failure?.error == "checksum")
         #expect(state.rows[0].state == .failed && state.showsWindow)
         state.retry()
         #expect(state.phase == .installing && state.rows[0].state == .waiting)
@@ -135,8 +136,37 @@ func until(_ seconds: Double, _ condition: @MainActor () -> Bool) async -> Bool 
         defer { try? FileManager.default.removeItem(at: marker) }
         state.prepareIfFirstLaunch(stateFolder: marker)
         #expect(state.phase == .unknown && !state.showsWindow)
-        state.decide(ToolsStatusReply(tools: [.init(key: "ffmpeg", verified: true, version: "7.1")]))
+        state.decide(ToolsStatusReply(tools: [.init(key: "ffmpeg", present: true, version: "9.0.2")]))
         #expect(state.phase == .notNeeded && state.rows.isEmpty)
+    }
+
+    @MainActor
+    @Test func afterAMacOSUpdateOnlyTheWarmupRuns() async throws {
+        let box = try ShellSandbox.make()
+        defer { box.cleanUp() }
+        let engine = EngineClient(configuration: box.configuration(["FAKE_TOOLS_VERIFIED": "1"]))
+        let state = ToolsSetupState(tools: demoTools, engine: engine)
+        state.warmupLanguages = ["en-US"]
+        var finished = false
+        state.onFinished = { finished = true }
+        let listener = Task { @MainActor in
+            for await event in engine.events { state.apply(event) }
+        }
+        try await engine.start()
+        _ = try await engine.hello(timeout: .seconds(10))
+        let status = try await engine.toolsStatus()
+        #expect(status.allPresent && status.active?.version == "9.0.2")
+        state.decide(status, runTasks: true)
+        #expect(state.rows.map(\.id) == ["warmup"] && state.rows[0].state == .running)
+        #expect(state.runningTask?.id == "warmup")
+        #expect(await until(10) { finished })
+        #expect(state.rows[0].seconds == 31 && !state.showsWindow)
+        // A task that cannot run (no Vision) is reported by the app as failed.
+        state.decide(status, runTasks: true)
+        state.progress(ToolProgress(key: "warmup", state: .failed, error: "vision"))
+        #expect(state.failure?.key == "warmup" && state.showsWindow)
+        listener.cancel()
+        await engine.stop()
     }
 }
 
@@ -185,6 +215,18 @@ func until(_ seconds: Double, _ condition: @MainActor () -> Bool) async -> Bool 
     @Test func fillsFields() {
         #expect(ShellTexts.fill("Version {version} of {app}", ["version": "2.0", "app": "X"]) == "Version 2.0 of X")
         #expect(ShellTexts.fill("plain", [:]) == "plain")
+    }
+
+    @Test func comeFromTheCatalogue() {
+        let l = Localizer(catalogs: ["en": ["app.common.retry": "Try Again", "app.tools.minutes_left.altri": "about {n} minutes left"],
+                                     "it": ["app.common.retry": "Riprova", "app.tools.minutes_left.altri": "mancano circa {n} minuti"]],
+                          languages: ["en", "it"], language: "it")
+        let texts = ShellTexts(l)
+        #expect(texts.retry == "Riprova" && texts.toolsMinutesLeft == "mancano circa {n} minuti")
+        // Not in this catalogue: the English text, but no second line in the update alerts.
+        #expect(texts.showLog == ShellTexts.english.showLog && texts.upToDateText.isEmpty)
+        let keys = ShellTexts.catalogue.map(\.1)
+        #expect(Set(keys).count == keys.count && keys.allSatisfy { $0.hasPrefix("app.") })
     }
 
     @Test func configReadsPrefixedEnvironment() {

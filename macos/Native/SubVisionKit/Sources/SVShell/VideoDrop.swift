@@ -44,10 +44,13 @@ public enum VideoScan {
 }
 
 extension View {
-    /// Takes dropped files and folders and hands over the videos found in them.
-    /// `isTargeted` follows the drag, for a highlight.
+    /// Takes dropped files and folders and hands over the videos found in them
+    /// (`extensions: ["srt"], recursive: false` for Sub fix). `isTargeted`
+    /// follows the drag, for a highlight; `onEmpty` gets the dropped items
+    /// when none matched (a folder without videos: alert O8a).
     public func videoDrop(extensions: Set<String> = VideoScan.defaultExtensions, recursive: Bool = true,
-                          isTargeted: Binding<Bool>? = nil, action: @escaping ([URL]) -> Void) -> some View {
+                          isTargeted: Binding<Bool>? = nil, onEmpty: (([URL]) -> Void)? = nil,
+                          action: @escaping ([URL]) -> Void) -> some View {
         onDrop(of: [.fileURL], isTargeted: isTargeted) { providers in
             Task { @MainActor in
                 var urls: [URL] = []
@@ -60,7 +63,7 @@ extension View {
                     }
                 }
                 let videos = VideoScan.videos(in: urls, extensions: extensions, recursive: recursive)
-                if !videos.isEmpty { action(videos) }
+                if !videos.isEmpty { action(videos) } else if !urls.isEmpty { onEmpty?(urls) }
             }
             return true
         }

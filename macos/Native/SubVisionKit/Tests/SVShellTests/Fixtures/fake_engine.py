@@ -4,12 +4,14 @@ SVShell tests and the ShellDemo app. Same copy in Examples/ShellDemo/.
 
 Speaks the JSON-lines protocol: `{"id", "method", "params"}` in,
 `{"id", "result"}` or `{"id", "error"}` out, `{"event", "data"}` pushed.
-Methods: hello, tools.status, tools.install, echo, shutdown, quit.
+Methods: hello, tools.status, tools.install, warmup, echo, shutdown, quit;
+the shapes are those of src/subvision/serve.py and tools.py.
 
 `tools.status` says ffmpeg is missing until `tools.install` has run; the
-install emits `tools.progress` for every key asked (bytes growing in a few
-steps, then done), then `warmup` (a task of unknown length), then `tools.done`.
-`FAKE_TOOLS_FAIL=<key>` makes that key fail once, with a checksum error, so
+install emits `tools.progress` for every key asked (waiting, bytes growing
+in a few steps, then done), then `tools.done`. `warmup` answers at once and
+sends `warmup.done` a moment later.
+`FAKE_TOOLS_FAIL=<key>` makes that key fail once, with the `checksum` code, so
 Try Again can be tested. `FAKE_TOOLS_STEP` is the seconds between steps (0.05).
 """
 
@@ -35,9 +37,9 @@ def write(obj):
 
 
 def status():
-    return {"tools": [
-        {"key": "ffmpeg", "name": "FFmpeg", "verified": STATE["verified"], "version": "7.1" if STATE["verified"] else None},
-    ], "all_verified": STATE["verified"]}
+    ok = STATE["verified"]
+    return {"tools": {"ffmpeg": {"present": ok, "path": "/fake/bin/ffmpeg", "version": "9.0.2" if ok else None}},
+            "active": {"path": "/fake/bin/ffmpeg", "version": "9.0.2"} if ok else None, "custom": None}
 
 
 def install(keys):
@@ -45,14 +47,16 @@ def install(keys):
     fail = os.environ.get("FAKE_TOOLS_FAIL")
     ok = True
     for key in keys:
+        write({"event": "tools.progress", "data": {"key": key, "state": "waiting", "bytes": 0, "total": 0}})
+    for key in keys:
         total = 38_000_000 if key == "ffmpeg" else 10_000_000
         write({"event": "tools.progress", "data": {"key": key, "state": "running", "bytes": 0, "total": total}})
         for i in range(1, 5):
             time.sleep(step)
             if fail == key and key not in STATE["failed_once"] and i == 2:
                 STATE["failed_once"].add(key)
-                write({"event": "tools.progress", "data": {"key": key, "state": "failed", "bytes": total // 4,
-                                                           "total": total, "error": "checksum mismatch (fake)"}})
+                write({"event": "tools.progress", "data": {"key": key, "state": "failed", "bytes": 0,
+                                                           "total": 0, "error": "checksum"}})
                 ok = False
                 break
             write({"event": "tools.progress", "data": {"key": key, "state": "running", "bytes": total * i // 4, "total": total}})
@@ -60,10 +64,12 @@ def install(keys):
             write({"event": "tools.progress", "data": {"key": key, "state": "done", "bytes": total, "total": total}})
     if ok:
         STATE["verified"] = True
-        write({"event": "tools.progress", "data": {"key": "warmup", "state": "running"}})
-        time.sleep(step * 2)
-        write({"event": "tools.progress", "data": {"key": "warmup", "state": "done"}})
     write({"event": "tools.done", "data": {"ok": ok, "status": status()}})
+
+
+def warmup(languages):
+    time.sleep(float(os.environ.get("FAKE_TOOLS_STEP", "0.05")) * 2)
+    write({"event": "warmup.done", "data": {"seconds": 31.0, "languages": languages}})
 
 
 def main():
@@ -89,7 +95,7 @@ def main():
             write({"id": rid, "result": {
                 "engine": "fake", "version": "0.0.1", "protocol": 1, "pid": os.getpid(),
                 "python": sys.version.split()[0], "vision": True, "livetext": False,
-                "ffmpeg": {"path": "/fake/ffmpeg", "version": "7.1"} if STATE["verified"] else None,
+                "ffmpeg": {"path": "/fake/bin/ffmpeg", "version": "9.0.2"} if STATE["verified"] else None,
                 "languages": ["it-IT", "en-US"],
                 "state_folder": os.environ.get("SUBVISION_STATO", "")}})
         elif method == "tools.status":
@@ -100,6 +106,10 @@ def main():
                 keys = ["ffmpeg"]
             write({"id": rid, "result": {"started": True, "keys": keys}})
             threading.Thread(target=install, args=(keys,), daemon=True).start()
+        elif method == "warmup":
+            languages = params.get("languages") or ["it-IT"]
+            write({"id": rid, "result": {"started": True, "languages": languages[:1]}})
+            threading.Thread(target=warmup, args=(languages[:1],), daemon=True).start()
         elif method == "echo":
             write({"id": rid, "result": params})
         elif method == "quit":

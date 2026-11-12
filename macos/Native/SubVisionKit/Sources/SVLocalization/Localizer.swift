@@ -112,6 +112,22 @@ public final class Localizer: @unchecked Sendable {
         return t(key + (n == 1 ? pluralSuffixes.one : pluralSuffixes.other), all)
     }
 
+    /// The locale of the active language: the engine sends plain numbers and
+    /// the rows show them as the boards do ("1.840 / 17.000 · 7,3 fps" in Italian).
+    public var locale: Locale { Locale(identifier: language) }
+
+    /// `value` with `decimals` digits and the language's separators.
+    public func number(_ value: Double, decimals: Int = 0) -> String {
+        value.formatted(.number.precision(.fractionLength(decimals)).locale(locale))
+    }
+
+    /// Elapsed time and ETA as the rows show them: `4:12`, `1:02:03`.
+    public static func clock(_ seconds: Double) -> String {
+        let total = max(0, Int(seconds.rounded()))
+        let h = total / 3600, m = total / 60 % 60, s = total % 60
+        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+    }
+
     /// The key exists in the fallback language.
     public func has(_ key: String) -> Bool { catalogs[fallback]?[key] != nil }
 

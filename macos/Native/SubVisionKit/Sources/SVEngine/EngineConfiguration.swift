@@ -45,11 +45,13 @@ public struct EngineConfiguration: Sendable, Equatable {
         }
 
         /// SubVision 2.0: `subvision serve`, `SUBVISION_*`, state in
-        /// `SubVision` (`SubVision-dev` in Debug), log in `records/engine.log`.
+        /// `SubVision` (`SubVision-dev` in Debug), log in `records/engine.log`;
+        /// `SUBVISION_FFMPEG` (an ffmpeg of one's own, read by the engine at
+        /// startup) passes through from the Debug scheme.
         public static let subvision = Spec(
             launcherName: "subvision", environmentPrefix: "SUBVISION_", bundleFolderName: "SubVision",
             releaseStateFolderName: "SubVision", debugStateFolderName: "SubVision-dev",
-            passThroughSuffixes: ["LANG"])
+            passThroughSuffixes: ["FFMPEG"])
 
         public var codeKey: String { environmentPrefix + "CODE" }
         public var stateKey: String { environmentPrefix + "STATO" }

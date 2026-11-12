@@ -34,7 +34,7 @@ public struct AppLog: @unchecked Sendable {
     }
 
     /// The log the shell's own pieces write to; the app replaces it at launch.
-    public nonisolated(unsafe) static var shared = AppLog(subsystem: "io.github.subvision.shell")
+    public nonisolated(unsafe) static var shared = AppLog(subsystem: "io.github.interstellar0verdrive.subvision")
 }
 
 /// Opens a log file in Console.

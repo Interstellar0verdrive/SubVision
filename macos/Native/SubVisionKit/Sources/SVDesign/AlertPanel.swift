@@ -42,15 +42,46 @@ public struct AlertIconSource: Sendable {
         Image(systemName: symbolNames[name] ?? fallbackSymbol)
     }
 
-    /// The symbol in place of a missing icon, by icon name.
+    /// The symbol in place of a missing icon, by icon name (`AlertIconName`).
     public static let symbolNames: [String: String] = [
-        "stop-file": "stop.circle", "stop-all": "stop.circle", "discard": "trash",
-        "disk-missing": "externaldrive.badge.questionmark", "folder-readonly": "lock",
-        "folder-move": "folder", "folder-empty": "folder", "folder-inside": "folder",
-        "folder-busy": "folder.badge.gearshape", "error": "exclamationmark.triangle",
-        "quit": "power", "update": "arrow.down.circle", "window-close": "xmark.circle", "info": "info.circle",
+        AlertIconName.stopFile: "stop.circle", AlertIconName.stopAll: "stop.circle",
+        AlertIconName.quit: "power", AlertIconName.windowClose: "xmark.circle",
+        AlertIconName.folderEmpty: "folder", AlertIconName.error: "exclamationmark.triangle",
+        AlertIconName.info: "info.circle", AlertIconName.update: "arrow.down.circle",
+        AlertIconName.toolMissing: "wrench.and.screwdriver", AlertIconName.vision: "text.viewfinder",
+        AlertIconName.language: "globe",
     ]
     public static let fallbackSymbol = "exclamationmark.circle"
+}
+
+/// The icons of SubVision's alerts (design inventory, §8): the names of the
+/// template images `AlertIcons/<name>` in the app's asset catalog.
+public enum AlertIconName {
+    /// O1 Stop this file.
+    public static let stopFile = "stop-file"
+    /// O2 Stop all.
+    public static let stopAll = "stop-all"
+    /// O3 Quit with a batch running.
+    public static let quit = "quit"
+    /// O4 Close the window with a batch running.
+    public static let windowClose = "window-close"
+    /// O8a A folder with no videos.
+    public static let folderEmpty = "folder-empty"
+    /// The revised SRT could not be saved (R3), and other errors.
+    public static let error = "error"
+    /// O8b, O8c.
+    public static let info = "info"
+    /// O8d, in its three tones.
+    public static let update = "update"
+    /// O5a, O5b: ffmpeg gone or not answering.
+    public static let toolMissing = "tool-missing"
+    /// O6: Vision does not load.
+    public static let vision = "vision"
+    /// O7: the OCR language is not one of this Mac's.
+    public static let language = "language"
+
+    public static let all = [stopFile, stopAll, quit, windowClose, folderEmpty, error, info, update,
+                             toolMissing, vision, language]
 }
 
 /// `Bundle` is not `Sendable`; it is immutable for our use.

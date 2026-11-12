@@ -21,35 +21,46 @@ public struct ToolRow: Sendable, Equatable, Identifiable {
     /// The engine's key (`ffmpeg`), also the key of its `tools.progress` events.
     public var key: String
     public var name: String
+    /// Shown after the name ("FFmpeg 9.0.2"); empty when the name has it already.
     public var version: String
+    /// What it is for, after the name in secondary text ("reads the frames").
+    public var detail: String
     public var megabytes: Int64
     public var kind: Kind
 
     public var id: String { key }
 
-    public init(key: String, name: String, version: String = "", megabytes: Int64 = 0, kind: Kind = .download) {
+    public init(key: String, name: String, version: String = "", detail: String = "", megabytes: Int64 = 0,
+                kind: Kind = .download) {
         self.key = key
         self.name = name
         self.version = version
+        self.detail = detail
         self.megabytes = megabytes
         self.kind = kind
     }
 }
 
 /// The engine methods and events the tools window speaks: these defaults are
-/// the protocol of `serve.py`.
+/// the protocol of `serve.py`. The `.task` rows run through `warmup` and end
+/// with `warmup.done`.
 public struct ToolsMethods: Sendable, Equatable {
     public var status: String
     public var install: String
     public var progressEvent: String
     public var doneEvent: String
+    public var warmup: String
+    public var warmupDoneEvent: String
 
-    public init(status: String = "tools.status", install: String = "tools.install",
-                progressEvent: String = "tools.progress", doneEvent: String = "tools.done") {
+    public init(status: String = EngineMethod.toolsStatus, install: String = EngineMethod.toolsInstall,
+                progressEvent: String = "tools.progress", doneEvent: String = "tools.done",
+                warmup: String = EngineMethod.warmup, warmupDoneEvent: String = "warmup.done") {
         self.status = status
         self.install = install
         self.progressEvent = progressEvent
         self.doneEvent = doneEvent
+        self.warmup = warmup
+        self.warmupDoneEvent = warmupDoneEvent
     }
 
     public static let standard = ToolsMethods()
@@ -59,17 +70,15 @@ public struct ToolsMethods: Sendable, Equatable {
 /// draws with AppKit, outside any SwiftUI appearance.
 public struct DockColors: Sendable {
     public var running: NSColor
-    public var paused: NSColor
     public var track: NSColor
 
-    public init(running: NSColor, paused: NSColor, track: NSColor = NSColor.black.withAlphaComponent(0.55)) {
+    public init(running: NSColor, track: NSColor = NSColor.black.withAlphaComponent(0.55)) {
         self.running = running
-        self.paused = paused
         self.track = track
     }
 
-    /// The accent and the yellow of the dark tokens: the Dock is drawn once, not per appearance.
-    public static let standard = DockColors(running: NSColor(css: "#2AC9DE"), paused: NSColor(css: "#F2B84B"))
+    /// The accent of the dark tokens: the Dock is drawn once, not per appearance.
+    public static let standard = DockColors(running: NSColor(css: "#2AC9DE"))
 }
 
 /// What the shell needs to know about the app.
@@ -85,6 +94,7 @@ public struct AppShellConfig: Sendable {
     public var releasePageURL: URL
     public var guideURL: URL?
     public var issuesURL: URL?
+    /// The main window's first size: `chrome.window` unless given.
     public var windowSize: CGSize
     public var toolsWindowSize: CGSize
     public var toolsWindowMinSize: CGSize
@@ -101,7 +111,7 @@ public struct AppShellConfig: Sendable {
 
     public init(appName: String, bundleIdentifier: String, mainWindowID: String = "main",
                 repositoryURL: URL, releaseAPIURL: URL, releasePageURL: URL, guideURL: URL? = nil, issuesURL: URL? = nil,
-                windowSize: CGSize = CGSize(width: 1360, height: 840),
+                windowSize: CGSize? = nil,
                 toolsWindowSize: CGSize = CGSize(width: 600, height: 380),
                 toolsWindowMinSize: CGSize = CGSize(width: 600, height: 360),
                 chrome: SVChrome = .default, environmentPrefix: String = "SUBVISION_",
@@ -115,7 +125,7 @@ public struct AppShellConfig: Sendable {
         self.releasePageURL = releasePageURL
         self.guideURL = guideURL
         self.issuesURL = issuesURL
-        self.windowSize = windowSize
+        self.windowSize = windowSize ?? chrome.window
         self.toolsWindowSize = toolsWindowSize
         self.toolsWindowMinSize = toolsWindowMinSize
         self.chrome = chrome

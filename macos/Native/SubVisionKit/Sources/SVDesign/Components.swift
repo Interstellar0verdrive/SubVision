@@ -579,8 +579,8 @@ public struct SVBar: View {
 
 // MARK: - Activity card
 
-/// One card at the bottom of the sidebar for whatever keeps the app busy:
-/// a batch, a preview, a fix. Soft accent tint.
+/// One card at the bottom of the sidebar for whatever keeps the app busy
+/// (a batch: there is no pause in SubVision). Soft accent tint.
 public struct ActivityCard<Buttons: View>: View {
     var kind: String
     var line: Text
@@ -590,18 +590,12 @@ public struct ActivityCard<Buttons: View>: View {
     @ViewBuilder var buttons: () -> Buttons
 
     public init(kind: String, symbol: String? = nil, line: Text, fraction: Double?, footnote: String? = nil,
-                paused: Bool = false, @ViewBuilder buttons: @escaping () -> Buttons) {
+                @ViewBuilder buttons: @escaping () -> Buttons) {
         self.kind = kind
         self.line = line
         self.fraction = fraction
         self.footnote = footnote
-        if let symbol {
-            self.leading = AnyView(Image(systemName: symbol).svFont(11))
-        } else {
-            self.leading = paused
-                ? AnyView(Image(systemName: "pause.fill").svFont(9))
-                : AnyView(Spinner(size: 11))
-        }
+        self.leading = symbol.map { AnyView(Image(systemName: $0).svFont(11)) } ?? AnyView(Spinner(size: 11))
         self.buttons = buttons
     }
 

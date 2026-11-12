@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copied and adapted from the native macOS app of AnimeUp (AnimeUp/AnimeUpApp.swift
 // and AppModel.swift), by the same author: the delegate's decisions are closures
-// the app sets, and the theme helpers take the state folder as a parameter.
+// the app sets, and the theme is read from the app's own defaults.
 
 import AppKit
 import SwiftUI
@@ -63,10 +63,10 @@ public enum DockMenuEntry {
 }
 
 /// A menu item that runs a closure.
-public final class DockAction: NSMenuItem {
+final class DockAction: NSMenuItem {
     private let run: @MainActor () -> Void
 
-    public init(_ title: String, _ run: @escaping @MainActor () -> Void) {
+    init(_ title: String, _ run: @escaping @MainActor () -> Void) {
         self.run = run
         super.init(title: title, action: #selector(fire), keyEquivalent: "")
         target = self
@@ -88,18 +88,10 @@ public enum ShellTheme {
         }
     }
 
-    /// The theme saved by the engine in `<state>/records/settings.json`, applied
-    /// before the window opens.
-    public static func applySaved(stateFolder: URL, key: String = "theme") {
-        apply(savedSetting(key, in: stateFolder))
-    }
-
-    /// A string value of `<state>/records/settings.json`.
-    public static func savedSetting(_ key: String, in state: URL) -> String? {
-        let file = state.appendingPathComponent("records/settings.json")
-        guard let data = try? Data(contentsOf: file),
-              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        return dict[key] as? String
+    /// The theme saved in the app's defaults (`system`, `light`, `dark`; the
+    /// `@AppStorage` of Settings › General), applied before the window opens.
+    public static func applySaved(defaults: UserDefaults = .standard, key: String = "theme") {
+        apply(defaults.string(forKey: key))
     }
 
     /// The appearance in force now, as a colour scheme.
@@ -129,13 +121,17 @@ public struct ShellWindow<Content: View>: Scene {
     }
 }
 
-/// The standard About panel, with a link to the project under the version.
+/// The standard About panel: a line about the app (`app.menu.about_credits`),
+/// then a link to the project, under the version.
 @MainActor
-public func showAboutPanel(repositoryURL: URL) {
+public func showAboutPanel(repositoryURL: URL, credits line: String? = nil) {
+    let small = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
     let text = repositoryURL.absoluteString.replacingOccurrences(of: "https://", with: "")
-    let credits = NSMutableAttributedString(string: text, attributes: [
-        .link: repositoryURL, .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-    ])
+    let credits = NSMutableAttributedString()
+    if let line, !line.isEmpty {
+        credits.append(NSAttributedString(string: line + "\n", attributes: [.font: small, .foregroundColor: NSColor.labelColor]))
+    }
+    credits.append(NSAttributedString(string: text, attributes: [.link: repositoryURL, .font: small]))
     let centred = NSMutableParagraphStyle(); centred.alignment = .center
     credits.addAttribute(.paragraphStyle, value: centred, range: NSRange(location: 0, length: credits.length))
     NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])

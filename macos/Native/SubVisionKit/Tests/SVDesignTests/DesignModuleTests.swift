@@ -29,7 +29,10 @@ import Testing
 @Test func chromeDefaults() {
     let chrome = SVChrome.default
     #expect(chrome.sidebarWidth == 236 && chrome.collapseBelow == 1240)
+    #expect(chrome.window == CGSize(width: 1360, height: 840))
     #expect(chrome.minWindow == CGSize(width: 720, height: 640))
+    #expect(chrome.inspectorWidth == 300 && chrome.inspectorOverlayBelow == 1000)
+    #expect(chrome.inspectorOverlays(windowWidth: 999) && !chrome.inspectorOverlays(windowWidth: 1000))
     let narrow = SVChrome(sidebarWidth: 200, collapseBelow: 1000)
     #expect(narrow.sidebarWidth == 200 && narrow.page.top == 28)
 }
@@ -41,6 +44,8 @@ import Testing
     #expect(AlertIconSource.symbols.image("error") != nil)
     let none = AlertIconSource { _ in nil }
     #expect(none.image("info") == nil)
+    // Every icon of the design has its fallback symbol.
+    #expect(Set(AlertIconSource.symbolNames.keys) == Set(AlertIconName.all))
 }
 
 /// The tokens change with the appearance: one PNG per scheme, a background
@@ -81,5 +86,5 @@ private func galleryDirectory() -> URL {
     if let dir = ProcessInfo.processInfo.environment["SVDESIGN_GALLERY_DIR"], !dir.isEmpty {
         return URL(fileURLWithPath: dir)
     }
-    return URL(fileURLWithPath: "/private/tmp/claude-503/-Users-albertoangeli--claude-spares-spare-AKF5Ex/f95acff4-3b10-4790-bb56-d271ac0eb05c/scratchpad/svdesign-gallery")
+    return FileManager.default.temporaryDirectory.appendingPathComponent("svdesign-gallery")
 }

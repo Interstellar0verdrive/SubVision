@@ -4,9 +4,9 @@
 
 import Foundation
 
-/// `hello`: who answered and what it can do. Every field but `engine`,
-/// `version` and `protocol` is optional in the JSON, so an older or
-/// stripped-down engine still decodes.
+/// `hello`: who answered and what it can do, as `serve.py` sends it. Every
+/// field but `engine`, `version` and `protocol` is optional in the JSON, so
+/// an older or stripped-down engine still decodes.
 public struct EngineHello: Codable, Sendable, Equatable {
     public struct FFmpeg: Codable, Sendable, Equatable {
         public var path: String
@@ -32,6 +32,13 @@ public struct EngineHello: Codable, Sendable, Equatable {
     /// BCP-47 codes Vision supports on this Mac.
     public var languages: [String]
     public var stateFolder: String?
+
+    /// How long `hello` may take: the first answer comes after the launcher
+    /// has checked (or set up) uv, Python and the virtual environment.
+    public static let timeout: Duration = .seconds(90)
+
+    /// The engine speaks `EngineProtocol.version`.
+    public var isCompatible: Bool { self.protocol == EngineProtocol.version }
 
     public init(engine: String, version: String, protocol: Int, pid: Int? = nil, python: String? = nil,
                 vision: Bool = false, livetext: Bool = false, ffmpeg: FFmpeg? = nil,

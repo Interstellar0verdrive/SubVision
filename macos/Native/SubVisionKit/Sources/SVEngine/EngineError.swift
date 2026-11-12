@@ -23,6 +23,12 @@ public enum EngineError: Error, Equatable, CustomStringConvertible {
     /// The engine answered with `{"error": {"code", "message"}}`.
     case remote(code: String, message: String)
 
+    /// The engine's error code (`busy`, `bad_params`, `not_found`...) of a `.remote` error.
+    public var remoteCode: String? {
+        if case .remote(let code, _) = self { return code }
+        return nil
+    }
+
     public var description: String {
         switch self {
         case .launcherMissing(let p): return "engine launcher not found: \(p)"

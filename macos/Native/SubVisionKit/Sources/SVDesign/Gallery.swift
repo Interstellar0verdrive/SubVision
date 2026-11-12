@@ -150,9 +150,8 @@ public struct SVDesignGallery: View {
             SnapSlider(values: [2, 4, 6, 8, 12], selection: $fps) { "\($0) fps" }
             SVSlider(value: $level, in: 0...1).frame(width: 250)
             ActivityCard(kind: "Processing", line: Text("episode-01.mp4 · ocr 1 240 / 3 600"), fraction: 0.34,
-                         footnote: "About 4 minutes left") {
-                Button("Pause") {}.svButton(.secondary, .small)
-                Button("Stop") {}.svButton(.destructive, .small)
+                         footnote: "Ends around 14:20") {
+                Button("Stop All") {}.svButton(.secondary, .small, fullWidth: true)
             }
             .frame(width: 236)
         }

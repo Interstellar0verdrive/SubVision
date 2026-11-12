@@ -9,6 +9,8 @@ The local Swift package of the SubVision 2.0 macOS app: everything that doesn't 
 - `SVLocalization`: the localiser, with JSON catalogues per language and switching at run time.
 - `SVShell`: the app frame, with window and settings scenes, tools setup at first launch, log, Dock progress, notifications and debug snapshots.
 
+Working notes on the public API, in Italian: `API.md`.
+
 ## Build and test
 
 ```sh

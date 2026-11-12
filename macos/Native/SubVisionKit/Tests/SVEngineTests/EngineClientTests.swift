@@ -206,12 +206,12 @@ struct Pid: Decodable, Sendable { var pid: Int }
     @Test func environmentIsolation() {
         let cfg = EngineConfiguration(codeFolder: URL(fileURLWithPath: "/code"),
                                       stateFolder: URL(fileURLWithPath: "/state"),
-                                      extraEnvironment: ["SUBVISION_LANG": "it"])
+                                      extraEnvironment: ["SUBVISION_FFMPEG": "/opt/homebrew/bin/ffmpeg"])
         let env = cfg.environment(base: ["SUBVISION_STATO": "/somebody/else", "SUBVISION_CODE": "/old",
                                          "PYTHONPATH": "/x", "VIRTUAL_ENV": "/v", "PATH": "/opt/x"])
         #expect(env["SUBVISION_STATO"] == "/state" && env["SUBVISION_CODE"] == "/code")
         #expect(env["PYTHONPATH"] == nil && env["VIRTUAL_ENV"] == nil)
-        #expect(env["SUBVISION_LANG"] == "it")
+        #expect(env["SUBVISION_FFMPEG"] == "/opt/homebrew/bin/ffmpeg")
         #expect(env["PYTHONUNBUFFERED"] == "1")
         #expect(env["PATH"]!.hasPrefix("/opt/x:") && env["PATH"]!.contains("/usr/bin"))
     }
@@ -225,9 +225,9 @@ struct Pid: Decodable, Sendable { var pid: Int }
         #expect(release.codeFolder.lastPathComponent == "SubVision")
         #expect(release.launcher.lastPathComponent == "subvision")
         let env = EngineConfiguration.standard(debug: true, environment: [
-            "SUBVISION_CODE": "/c", "SUBVISION_STATO": "/s", "SUBVISION_LANG": "it"])
+            "SUBVISION_CODE": "/c", "SUBVISION_STATO": "/s", "SUBVISION_FFMPEG": "/opt/homebrew/bin/ffmpeg"])
         #expect(env.codeFolder.path == "/c" && env.stateFolder.path == "/s")
-        #expect(env.extraEnvironment == ["SUBVISION_LANG": "it"])
+        #expect(env.extraEnvironment == ["SUBVISION_FFMPEG": "/opt/homebrew/bin/ffmpeg"])
     }
 
     @Test func helloToleratesMissingFields() throws {

@@ -2,7 +2,7 @@
 // Copied and adapted from the design system of the native macOS app of AnimeUp
 // (AnimeUpKit/DesignSystem/Chrome.swift, version 2.1), by the same author.
 // The measures were constants there; here they are a configuration the app
-// sets, with AnimeUp's values as the defaults.
+// sets, with the values of SubVision's design boards as the defaults.
 //
 // The window frame: the page on `bg`, a floating sidebar panel inset 8 pt,
 // its top row holding the window's own traffic lights and the Settings gear.
@@ -24,20 +24,27 @@ public struct SVChrome: Sendable, Equatable {
     public var page = EdgeInsets(top: 28, leading: 28, bottom: 28, trailing: 28)
     /// Below this window width the sidebar folds away into a top bar.
     public var collapseBelow: CGFloat = 1240
+    /// The window the boards are drawn at, and its first size.
+    public var window = CGSize(width: 1360, height: 840)
     /// The smallest window: the pages are laid out for it.
     public var minWindow = CGSize(width: 720, height: 640)
     /// Width the traffic lights take in the top row (three 14 pt buttons, 6 pt apart).
     public var lightsWidth: CGFloat = 54
+    /// The parameters inspector of Process and Preview (⌥⌘I).
+    public var inspectorWidth: CGFloat = 300
+    /// Below this window width the inspector opens over the page, from the right.
+    public var inspectorOverlayBelow: CGFloat = 1000
 
-    /// AnimeUp's measures, the starting point.
+    /// SubVision's measures (design boards DS4, E1, N1, N2).
     public static let `default` = SVChrome()
 
     public init(sidebarWidth: CGFloat = 236, sidebarInset: CGFloat = 8,
                 sidebarPadding: EdgeInsets = EdgeInsets(top: 12, leading: 10, bottom: 12, trailing: 10),
                 sidebarSpacing: CGFloat = 14, topRowHeight: CGFloat = 24, topRowPadding: CGFloat = 4,
                 page: EdgeInsets = EdgeInsets(top: 28, leading: 28, bottom: 28, trailing: 28),
-                collapseBelow: CGFloat = 1240, minWindow: CGSize = CGSize(width: 720, height: 640),
-                lightsWidth: CGFloat = 54) {
+                collapseBelow: CGFloat = 1240, window: CGSize = CGSize(width: 1360, height: 840),
+                minWindow: CGSize = CGSize(width: 720, height: 640), lightsWidth: CGFloat = 54,
+                inspectorWidth: CGFloat = 300, inspectorOverlayBelow: CGFloat = 1000) {
         self.sidebarWidth = sidebarWidth
         self.sidebarInset = sidebarInset
         self.sidebarPadding = sidebarPadding
@@ -46,9 +53,15 @@ public struct SVChrome: Sendable, Equatable {
         self.topRowPadding = topRowPadding
         self.page = page
         self.collapseBelow = collapseBelow
+        self.window = window
         self.minWindow = minWindow
         self.lightsWidth = lightsWidth
+        self.inspectorWidth = inspectorWidth
+        self.inspectorOverlayBelow = inspectorOverlayBelow
     }
+
+    /// In a window this wide, the inspector covers the page instead of sitting beside it.
+    public func inspectorOverlays(windowWidth: CGFloat) -> Bool { windowWidth < inspectorOverlayBelow }
 }
 
 extension EnvironmentValues {
@@ -59,6 +72,10 @@ extension EnvironmentValues {
     /// smaller: the page title's line box puts its capitals 11 pt below its top,
     /// and from the bar's hairline the gap must look like the 28 pt at the sides.
     @Entry public var svPageTop: CGFloat = 28
+
+    /// The window's width, set by the shell's frame (for the inspector, which
+    /// overlays the page below `SVChrome.inspectorOverlayBelow`).
+    @Entry public var svWindowWidth: CGFloat = SVChrome.default.window.width
 }
 
 /// Where the traffic lights go, in window coordinates (top-left origin).

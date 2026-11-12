@@ -15,9 +15,9 @@ import SVShell
 import SwiftUI
 
 let demoTools = [
-    ToolRow(key: "ffmpeg", name: "FFmpeg", version: "7.1", megabytes: 38),
-    ToolRow(key: "python", name: "Python", version: "3.13", megabytes: 42, kind: .runtime),
-    ToolRow(key: "warmup", name: "Preparing recognition", kind: .task),
+    ToolRow(key: "python", name: "uv + Python", version: "3.13", detail: "engine and recognition", megabytes: 51, kind: .runtime),
+    ToolRow(key: "ffmpeg", name: "FFmpeg", version: "9.0.2", detail: "reads the frames", megabytes: 28),
+    ToolRow(key: "warmup", name: "Preparing text recognition", detail: "Vision's models for this Mac", kind: .task),
 ]
 
 let config = AppShellConfig(
@@ -93,11 +93,10 @@ final class DemoModel {
         status = .starting
         do {
             try await engine.start()
-            let h = try await engine.call("hello", timeout: .seconds(30), as: EngineHello.self)
+            let h = try await engine.hello()
             hello = h
             tools.runtimeReady()
-            let s = try await engine.call(config.toolsMethods.status, as: ToolsStatusReply.self)
-            tools.decide(s)
+            tools.decide(try await engine.toolsStatus())
             status = .ready
         } catch {
             status = .failed(String(describing: error))
@@ -108,7 +107,7 @@ final class DemoModel {
     func showLog() { NSWorkspace.shared.open(configuration.logFile) }
 
     func demoAlert() -> SVAlert {
-        let alert = SVAlert(icon: "stop-file", tone: .red, title: "Stop this file?", text: "What is done so far is kept.\nYou can pick it up again later.")
+        let alert = SVAlert(icon: AlertIconName.stopFile, tone: .red, title: "Stop this file?", text: "What is done so far is kept.\nYou can pick it up again later.")
         alert.button("Stop", role: .destructiveSolid)
         alert.button("Cancel")
         return alert
@@ -128,7 +127,7 @@ struct DemoRoot: View {
             } else {
                 MainSplit(tabs: model.tabs, selection: $model.tab, sidebarChoice: $model.sidebarChoice,
                           footer: ShellFooter(appVersion: config.appVersion, engineVersion: model.hello?.version,
-                                              checkingUpdates: model.checkingUpdates, repositoryURL: config.repositoryURL,
+                                              pythonVersion: model.hello?.python, checkingUpdates: model.checkingUpdates, repositoryURL: config.repositoryURL,
                                               checkUpdates: { checkForUpdates(config: config) { model.checkingUpdates = $0 } }),
                           sizeOverride: config.environment("WINDOW"),
                           openSettings: { openSettings() },
@@ -172,7 +171,7 @@ struct DemoPage: View {
                         HStack(spacing: 8) {
                             Button(model.working ? "Stop work" : "Start work", systemImage: model.working ? "stop.fill" : "play.fill") {
                                 model.working.toggle()
-                                DockProgress.update(fraction: model.working ? 0.34 : nil, badge: model.working ? "1" : nil)
+                                DockProgress.update(config, fraction: model.working ? 0.34 : nil, badge: model.working ? "1" : nil)
                             }.svButton(.primary)
                             Button("Show alert") { afterClick { model.demoAlert().runModal() } }.svButton(.secondary)
                         }
@@ -201,7 +200,7 @@ func snapshots(_ model: DemoModel, base: String) async {
     try? await Task.sleep(for: .seconds(1))
     model.working = true
     try? await Task.sleep(for: .milliseconds(300))
-    DebugSnapshot.capture(config, "\(base)-window-live.png")
+    await DebugSnapshot.capture(config, schemes: schemes, "\(base)-window-live.png")
     let sidebar = ShellSidebar(tabs: model.tabs, selection: .constant("process"),
                                footer: ShellFooter(appVersion: config.appVersion, engineVersion: model.hello?.version,
                                                    repositoryURL: config.repositoryURL, checkUpdates: {}),
@@ -216,6 +215,7 @@ func snapshots(_ model: DemoModel, base: String) async {
                          width: 700, height: 300, schemes: schemes, "\(base)-engine-failed.png")
     DebugSnapshot.render(SVAlertCard(alert: model.demoAlert()).padding(48).background(SV.bg), width: 376, schemes: schemes, "\(base)-alert.png")
     AppLog.shared.info("snapshots done")
+    model.working = false   // no quit confirmation
     NSApp.terminate(nil)
 }
 
@@ -231,9 +231,10 @@ struct ShellDemoApp: App {
                     delegate.willTerminate = { Task { await model.engine.terminateNow() } }
                     delegate.quitBlocker = {
                         guard model.working else { return false }
-                        let a = SVAlert(icon: "quit", tone: .yellow, title: ShellTexts.english.quitTitle, text: ShellTexts.english.quitText)
-                        a.button(ShellTexts.english.quitAnyway, role: .destructiveSolid)
-                        a.button(ShellTexts.english.cancel)
+                        let a = SVAlert(icon: AlertIconName.quit, tone: .yellow, title: "Quit while work is running?",
+                                        text: "The work stops now.")
+                        a.button("Quit and Stop", role: .destructiveSolid)
+                        a.button("Cancel")
                         return a.runModal() != 0
                     }
                     delegate.dockMenu = { [.item("Start work") { model.working = true }, .separator, .item("Stop work") { model.working = false }] }

@@ -81,6 +81,13 @@ public struct WindowChrome: NSViewRepresentable {
             placeLights()
         }
 
+        /// A theme switch (Settings › Appearance, or macOS) lays the title bar
+        /// out again: the buttons go back to their slot after it.
+        public override func viewDidChangeEffectiveAppearance() {
+            super.viewDidChangeEffectiveAppearance()
+            DispatchQueue.main.async { [weak self] in self?.placeLights() }
+        }
+
         /// Centres the three buttons in the slot, 20 pt apart (12 pt dots, 8 pt gaps).
         func placeLights() {
             guard let window, let anchor, !window.styleMask.contains(.fullScreen) else { return }

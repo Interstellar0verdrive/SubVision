@@ -35,15 +35,18 @@ public struct ShellTab: Identifiable, Hashable, Sendable {
 /// The sidebar's footer: version, Check for Updates, the project on GitHub.
 public struct ShellFooter {
     public var appVersion: String
+    /// `hello.version` and `hello.python`, for the tooltip.
     public var engineVersion: String?
+    public var pythonVersion: String?
     public var checkingUpdates: Bool
     public var repositoryURL: URL
     public var checkUpdates: @MainActor () -> Void
 
-    public init(appVersion: String, engineVersion: String? = nil, checkingUpdates: Bool = false,
+    public init(appVersion: String, engineVersion: String? = nil, pythonVersion: String? = nil, checkingUpdates: Bool = false,
                 repositoryURL: URL, checkUpdates: @escaping @MainActor () -> Void) {
         self.appVersion = appVersion
         self.engineVersion = engineVersion
+        self.pythonVersion = pythonVersion
         self.checkingUpdates = checkingUpdates
         self.repositoryURL = repositoryURL
         self.checkUpdates = checkUpdates
@@ -108,7 +111,10 @@ public struct MainSplit<SidebarExtra: View, TopBarTrailing: View, Page: View>: V
                         ShellTopBar(tabs: tabs, selection: $selection, texts: texts, canShowSidebar: !narrow,
                                     showSidebar: { sidebarChoice = true }, openSettings: openSettings, trailing: topBarTrailing)
                     }
-                    pageBody.environment(\.svPageTop, inline ? chrome.page.top : 17).overlay(alignment: .top) {
+                    pageBody
+                        .environment(\.svPageTop, inline ? chrome.page.top : 17)
+                        .environment(\.svWindowWidth, g.size.width)
+                        .overlay(alignment: .top) {
                         // What scrolls under the top bar fades into it. At rest the page's
                         // own top padding is under the fade, so nothing shows.
                         if !inline {
@@ -195,7 +201,7 @@ struct ShellFooterView: View {
         HStack(spacing: 8) {
             Text(ShellTexts.fill(texts.version, ["version": footer.appVersion]))
                 .svFont(SVFont.smallNumbers).foregroundStyle(SV.text3)
-                .help(ShellTexts.fill(texts.engineVersion, ["version": footer.engineVersion ?? "…"]))
+                .help(ShellTexts.fill(texts.engineVersion, ["version": footer.engineVersion ?? "…", "python": footer.pythonVersion ?? "…"]))
             FooterLink(help: texts.checkUpdates, action: footer.checkUpdates) {
                 if footer.checkingUpdates {
                     Spinner(size: 10)

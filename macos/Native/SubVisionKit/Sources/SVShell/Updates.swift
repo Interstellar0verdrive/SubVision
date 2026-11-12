@@ -72,21 +72,21 @@ public func checkForUpdates(config: AppShellConfig, texts: ShellTexts = .english
         busy(false)
         switch result {
         case .available(let version, let url):
-            let alert = SVAlert(icon: "update", tone: .accent,
+            let alert = SVAlert(icon: AlertIconName.update, tone: .yellow,
                                 title: ShellTexts.fill(texts.updateAvailable, ["app": config.appName, "version": version]),
-                                text: texts.updateAvailableText)
+                                text: ShellTexts.fill(texts.updateAvailableText, ["current": config.appVersion]))
             alert.button(texts.updateDownload, role: .primary)
             alert.button(texts.updateLater, cancel: true)
             if alert.runModal() == 0 { NSWorkspace.shared.open(url) }
         case .upToDate:
-            let alert = SVAlert(icon: "info", tone: .accent,
+            let alert = SVAlert(icon: AlertIconName.update, tone: .accent,
                                 title: ShellTexts.fill(texts.upToDate, ["app": config.appName, "version": config.appVersion]),
                                 text: texts.upToDateText)
             alert.button(texts.ok, role: .primary)
             alert.runModal()
         case .error(let message):
             AppLog.shared.error("update check failed: \(message)")
-            let alert = SVAlert(icon: "error", tone: .red, title: texts.updateErrorTitle, text: texts.updateErrorText)
+            let alert = SVAlert(icon: AlertIconName.update, tone: .red, title: texts.updateErrorTitle, text: texts.updateErrorText)
             alert.button(texts.ok, role: .primary)
             alert.runModal()
         }
