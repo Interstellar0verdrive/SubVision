@@ -1,0 +1,7 @@
+{
+  "x.hello": "Hello {name}",
+  "x.files.uno": "one file",
+  "x.files.altri": "{n} files",
+  "x.braces": "{{literal}} {a}",
+  "x.only_en": "English only"
+}
