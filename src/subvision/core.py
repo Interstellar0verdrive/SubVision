@@ -37,6 +37,7 @@ import shutil
 import hashlib
 import tempfile
 import subprocess
+import threading
 import datetime
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -110,6 +111,7 @@ class LogEvent:
       boundaries_moved  {band, n}
       srt_written       {path, segments, ocr, refined, elapsed}
       report_written    {path}
+      report_failed     {path, error}
     """
     code: str
     args: Dict[str, Any] = field(default_factory=dict)
@@ -210,25 +212,119 @@ class RunStats:
     qc_path: str = ""
 
 
+# ---------------------------------------------------------------- stop
+# Cooperative cancellation (design from spike S3): the caller passes a
+# threading.Event; the pipeline checks it at its stop points (every ffmpeg
+# poll, every 50 frames of dhash, before every OCR task and variant, before
+# every refined row) and raises Stopped within ~1 s, after terminating its
+# ffmpeg children. No partial result: no SRT, no report, workdir removed.
+class Stopped(Exception):
+    """
+    Raised at a cooperative stop point when the caller's `stop` event is set.
+    Subclass of Exception on purpose (a BaseException would slip through the
+    ThreadPoolExecutor's future machinery in surprising ways), so every
+    generic `except Exception` on the stop path must re-raise it explicitly.
+    """
+
+
+def _check_stop(stop: Optional[threading.Event]) -> None:
+    """STOP POINT: cheap check, raises Stopped if the event is set."""
+    if stop is not None and stop.is_set():
+        raise Stopped()
+
+
+def _stop_proc(proc: subprocess.Popen, grace: float = 1.0) -> None:
+    """
+    Terminates a child: SIGTERM, wait up to `grace`, then SIGKILL. Always
+    reaps the process (communicate) so no zombie and no open pipe is left.
+    """
+    if proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.communicate(timeout=grace)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+
+
+def _run_ffmpeg(cmd: list, stop: Optional[threading.Event] = None,
+                on_poll: Optional[Callable[[], None]] = None,
+                poll: float = 0.1) -> str:
+    """
+    The only place that starts ffmpeg: Popen, polled every `poll` seconds.
+    STOP POINT: at every poll, if `stop` is set the child is terminated
+    (SIGTERM -> SIGKILL after 1 s) and Stopped is raised.
+    stderr is drained continuously by communicate(timeout=...) (an ffmpeg
+    that writes more than the pipe buffer would otherwise block forever).
+    Returns stderr; raises CalledProcessError on a non-zero exit.
+    """
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.PIPE, text=True)
+    try:
+        while True:
+            try:
+                _, err = proc.communicate(timeout=poll)
+                break
+            except subprocess.TimeoutExpired:
+                pass
+            if stop is not None and stop.is_set():
+                _stop_proc(proc)
+                raise Stopped()
+            if on_poll:
+                on_poll()
+    except BaseException:
+        # any other exception (KeyboardInterrupt, bug in on_poll): no orphan
+        _stop_proc(proc)
+        raise
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=err)
+    return err or ""
+
+
 # ---------------------------------------------------------------- ffmpeg
+# Paths of the tools, set by the app/CLI (tools.py) via set_tools(); the
+# bare names fall back to PATH, which an app launched from the Finder does
+# not have, hence the explicit configuration.
+FFMPEG = "ffmpeg"
+FFPROBE = "ffprobe"
+
+
+def set_tools(ffmpeg: str, ffprobe: str) -> None:
+    """Sets the ffmpeg/ffprobe executables used by every call of the engine."""
+    global FFMPEG, FFPROBE
+    FFMPEG = str(ffmpeg)
+    FFPROBE = str(ffprobe)
+
+
 def _run(cmd: list) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, check=True, capture_output=True, text=True)
+    return subprocess.run(cmd, check=True, capture_output=True, text=True,
+                          stdin=subprocess.DEVNULL)
 
 
 def ffprobe_duration(video: str) -> float:
+    """
+    Duration in seconds. Raises EngineError("probe_failed") when ffprobe
+    fails or prints no number (the old version returned 0.0 and the
+    pipeline went on with no progress estimate and a cryptic ffmpeg error).
+    """
     try:
-        out = _run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+        out = _run([FFPROBE, "-v", "error", "-show_entries", "format=duration",
                     "-of", "default=nw=1:nk=1", video]).stdout
-        return float((out or "0").strip())
-    except Exception:
-        return 0.0
+        return float(out.strip())
+    except (subprocess.CalledProcessError, OSError, ValueError) as e:
+        raise EngineError("probe_failed", path=video, error=str(e)) from e
 
 
 def ffprobe_fps(video: str) -> float:
-    """Native frame rate of the video (for boundary refinement)."""
+    """
+    Native frame rate of the video (for boundary refinement). Raises
+    EngineError("probe_failed") when ffprobe cannot read the video stream.
+    """
+    last_err: Optional[Exception] = None
     for entry in ("avg_frame_rate", "r_frame_rate"):
         try:
-            val = _run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+            val = _run([FFPROBE, "-v", "error", "-select_streams", "v:0",
                         "-show_entries", f"stream={entry}",
                         "-of", "default=nk=1:nw=1", video]).stdout.strip()
             if "/" in val:
@@ -238,9 +334,10 @@ def ffprobe_fps(video: str) -> float:
                 fps = float(val)
             if fps > 0.1:
                 return fps
-        except Exception:
+        except (subprocess.CalledProcessError, OSError, ValueError) as e:
+            last_err = e
             continue
-    return 24.0
+    raise EngineError("probe_failed", path=video, error=str(last_err or "no frame rate"))
 
 
 def band_crop(p: OcrParams, band: str) -> str:
@@ -285,29 +382,37 @@ def crop_band(im: Image.Image, p: OcrParams, band: str) -> Image.Image:
 
 def extract_frames(video: str, outdir: Path, p: OcrParams, band: str,
                    progress_cb: Optional[_StepCallback] = None,
+                   stop: Optional[threading.Event] = None,
                    ) -> Tuple[List[Path], float]:
     """
     Extracts the frames of the requested band, WITHOUT enhancement filters:
     the raw image reads better (measured); the variants are generated in PIL
     at OCR time, so they can vote.
     progress_cb(ratio, frames_so_far, frames_expected).
+    STOP POINT: `stop` is polled every 0.1 s while ffmpeg runs; on stop the
+    child is terminated and Stopped is raised (partial frames stay in
+    outdir, the caller removes the workdir).
     """
+    _check_stop(stop)
     outdir.mkdir(parents=True, exist_ok=True)
     vf = f"fps={p.fps},{band_crop(p, band)}"
     pattern = str(outdir / "f_%08d.jpg")
-    cmd = ["ffmpeg", "-hide_banner", "-y", "-i", video, "-vf", vf,
+    # -nostats: no progress line every 0.5 s on stderr (we count files instead)
+    cmd = [FFMPEG, "-hide_banner", "-nostats", "-y", "-i", video, "-vf", vf,
            "-fps_mode", "passthrough", "-q:v", "2", pattern]
     duration = ffprobe_duration(video)
     expected = max(1, int(duration * p.fps)) if duration else 0
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    while proc.poll() is None:
-        time.sleep(0.3)
-        cnt = sum(1 for _ in outdir.glob("f_*.jpg"))
-        if progress_cb and expected:
+    last = [0.0]
+
+    def on_poll():
+        # progress every ~0.3 s as before (the stop poll is every 0.1 s)
+        now = time.monotonic()
+        if progress_cb and expected and now - last[0] >= 0.3:
+            last[0] = now
+            cnt = sum(1 for _ in outdir.glob("f_*.jpg"))
             progress_cb(min(0.99, cnt / expected), cnt, expected)
-    _, err = proc.communicate()
-    if proc.returncode != 0:
-        raise subprocess.CalledProcessError(proc.returncode, cmd, stderr=err)
+
+    _run_ffmpeg(cmd, stop=stop, on_poll=on_poll, poll=0.1)
     frames = sorted(outdir.glob("f_*.jpg"))
     if progress_cb:
         progress_cb(1.0, len(frames), len(frames))
@@ -770,16 +875,20 @@ def merge_segments(segs: List[Tuple[float, float, str]], merge_gap: float,
 # ---------------------------------------------------------------- pipeline
 def select_ocr_targets(frames: List[Path], skip_hamming: int,
                        progress_cb: Optional[_StepCallback] = None,
+                       stop: Optional[threading.Event] = None,
                        ) -> List[int]:
     """
     Frames to OCR: frame 0 and every frame that differs from the PREVIOUS
     one (dhash) by more than skip_hamming. The others inherit the text
     (forward-fill). progress_cb(ratio, frames_analyzed, frames).
+    STOP POINT: checked every 50 frames (dhash of 17k frames takes a while).
     """
     n = len(frames)
     targets: List[int] = []
     prev = None
     for i, fp in enumerate(frames):
+        if i % 50 == 0:
+            _check_stop(stop)
         try:
             h = dhash(fp)
         except Exception:
@@ -887,12 +996,15 @@ def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
                           native_fps: float, crop_expr: str, langs: List[str],
                           p: OcrParams, tmp_root: Path,
                           progress_cb: Optional[_StepCallback] = None,
+                          stop: Optional[threading.Event] = None,
                           ) -> int:
     """
     Refines the start/end of every segment at the NATIVE frame rate: extracts
     a ±dt window around the boundary and looks for the first/last frame in
     which the segment text is visible. Precision ~1 native frame (~±20ms).
     Returns the number of boundaries moved. progress_cb(ratio, done, segments).
+    STOP POINT: before every row, inside every ffmpeg window (polled) and
+    before every OCR of the window.
     """
     moved = 0
     ndt = 1.0 / max(native_fps, 1.0)
@@ -900,25 +1012,29 @@ def refine_segment_bounds(video: str, segs: List[SegInfo], dt: float,
     def window_texts(t0: float, t1: float) -> List[Tuple[float, str]]:
         d = Path(tempfile.mkdtemp(prefix="ref_", dir=str(tmp_root)))
         try:
-            cmd = ["ffmpeg", "-hide_banner", "-y",
+            cmd = [FFMPEG, "-hide_banner", "-nostats", "-y",
                    "-ss", f"{max(0.0, t0):.4f}", "-i", video,
                    "-t", f"{max(0.05, t1 - t0):.4f}",
                    "-vf", crop_expr, "-fps_mode", "passthrough",
                    "-q:v", "2", str(d / "w_%05d.jpg")]
-            subprocess.run(cmd, check=True, capture_output=True)
+            _run_ffmpeg(cmd, stop=stop, poll=0.05)
             out = []
             for k, fp in enumerate(sorted(d.glob("w_*.jpg"))):
+                _check_stop(stop)
                 im = Image.open(fp).convert("RGB")
                 # for mere presence/absence the raw variant is enough
                 txt, _ = ocr_conf(im, langs, p.recognition_level, p.min_confidence)
                 out.append((max(0.0, t0) + k * ndt, txt))
             return out
+        except Stopped:
+            raise          # the generic except below must not swallow it
         except Exception:
             return []
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
     for n, seg in enumerate(segs):
+        _check_stop(stop)
         # START boundary: first native frame with similar text
         win = window_texts(seg.start - dt, seg.start + dt)
         for t, txt in win:
@@ -1582,6 +1698,7 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
                   workdir: Path, stats: RunStats,
                   progress_cb: Optional[ProgressCallback],
                   log_cb: Optional[LogCallback],
+                  stop: Optional[threading.Event] = None,
                   ) -> Tuple[List[SegInfo], List[SegInfo], List[Tuple[float, float, str]]]:
     """
     Processes one band ('bottom' or 'top') and returns (segments, dropped, gaps).
@@ -1603,13 +1720,13 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
             log_cb(LogEvent(code, {"band": band, **args}))
 
     frames, dt = extract_frames(video, workdir / f"frames_{band}", p, band,
-                                stage("extract"))
+                                stage("extract"), stop=stop)
     stats.frames += len(frames)
     log("frames_extracted", n=len(frames), fps=p.fps)
     if not frames:
         return [], [], []
 
-    targets = select_ocr_targets(frames, p.skip_hamming, stage("group"))
+    targets = select_ocr_targets(frames, p.skip_hamming, stage("group"), stop=stop)
     emit("group", 1.0, len(targets), len(frames), "targets")
     log("ocr_targets", targets=len(targets), frames=len(frames))
 
@@ -1619,25 +1736,44 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
     done = 0
 
     def ocr_target(idx: int):
+        # STOP POINT: before every task and before every variant (a single
+        # Vision call is 0.1-0.3 s and cannot be interrupted)
+        _check_stop(stop)
         im = Image.open(frames[idx]).convert("RGB")
-        cands = [ocr_conf(v, langs, p.recognition_level, p.min_confidence, fw)
-                 for _, v, fw in gen_variants(im, p.multi_variant)]
+        cands = []
+        for _, v, fw in gen_variants(im, p.multi_variant):
+            _check_stop(stop)
+            cands.append(ocr_conf(v, langs, p.recognition_level, p.min_confidence, fw))
         text, conf, agree, alts = vote_texts(cands)
         return idx, (text, conf, alts)
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
+    _check_stop(stop)
     with ThreadPoolExecutor(max_workers=max(1, p.workers)) as ex:
         futs = [ex.submit(ocr_target, i) for i in targets]
-        for fut in as_completed(futs):
-            try:
-                idx, res = fut.result()
-                results[idx] = res
-            except Exception as e:
-                log("ocr_error", error=str(e))
-            done += 1
-            stats.ocr_calls += nvar
-            if done % 10 == 0 or done == len(targets):
-                emit("ocr", done / len(targets), done, len(targets), "frames")
+        try:
+            for fut in as_completed(futs):
+                try:
+                    idx, res = fut.result()
+                    results[idx] = res
+                except Stopped:
+                    pass           # a stopped task is not an OCR error
+                except Exception as e:
+                    log("ocr_error", error=str(e))
+                done += 1
+                stats.ocr_calls += nvar
+                if done % 10 == 0 or done == len(targets):
+                    emit("ocr", done / len(targets), done, len(targets), "frames")
+                # STOP POINT: after every completed task; cancel_futures drops
+                # the queued ones, the <= workers in flight finish their current
+                # variant and then raise Stopped at their own check
+                if stop is not None and stop.is_set():
+                    ex.shutdown(wait=False, cancel_futures=True)
+                    raise Stopped()
+        finally:
+            # the `with` exit is shutdown(wait=True) WITHOUT cancel_futures:
+            # on an exception it would wait for every queued task (minutes).
+            ex.shutdown(wait=False, cancel_futures=True)
 
     # ---- forward-fill + sanitize
     per_text: List[str] = []
@@ -1703,10 +1839,12 @@ def _process_band(video: str, band: str, p: OcrParams, langs: List[str],
 
     # ---- boundary refinement at the native frame rate
     if p.refine_timing and kept:
+        _check_stop(stop)
         native = ffprobe_fps(video)
         log("refining", fps=native)
         moved = refine_segment_bounds(video, kept, dt, native, band_crop(p, band),
-                                      langs, p, workdir, stage("refine", "segments"))
+                                      langs, p, workdir, stage("refine", "segments"),
+                                      stop=stop)
         stats.refined += moved
         log("boundaries_moved", n=moved)
 
@@ -1717,7 +1855,8 @@ def process_video(video: str, out_path: str, p: OcrParams,
                   progress_cb: Optional[ProgressCallback] = None,
                   log_cb: Optional[LogCallback] = None,
                   tmp_root: Optional[Path] = None,
-                  ui_lang: str = "it"
+                  ui_lang: str = "it",
+                  stop: Optional[threading.Event] = None,
                   ) -> Tuple[List[Tuple[float, float, str]], RunStats]:
     """
     Full pipeline. progress_cb(ProgressEvent) with step in STEPS and band in
@@ -1725,10 +1864,17 @@ def process_video(video: str, out_path: str, p: OcrParams,
     (tuple_segments, stats); stats.qc_path holds the path of the review
     report (if generated). ui_lang ("it" | "en") is only the language of the
     review-report texts. Raises EngineError("vision_unavailable") when
-    Apple Vision (ocrmac) cannot be imported.
+    Apple Vision (ocrmac) cannot be imported, EngineError("probe_failed")
+    when ffprobe cannot read the video.
+    `stop`: cooperative stop event. When set, the pipeline raises Stopped
+    from the next stop point (<= ~1 s), terminates its ffmpeg children,
+    writes NO srt/report and removes the workdir (the `finally` below).
+    A failing review report does not fail the job: the SRT already written
+    stays and the error becomes a LogEvent("report_failed").
     """
     if not vision_available():
         raise EngineError("vision_unavailable")
+    _check_stop(stop)
     langs = resolve_langs(p.lang_hint)
     tmp_root = Path(tmp_root or tempfile.gettempdir())
     tmp_root.mkdir(parents=True, exist_ok=True)
@@ -1736,7 +1882,10 @@ def process_video(video: str, out_path: str, p: OcrParams,
     stats = RunStats()
     t0 = time.time()
     try:
+        # the first-ever Vision call on a Mac takes ~30 s and cannot be
+        # interrupted: the sidecar runs `warmup` at startup, not here
         warmup(langs, p.recognition_level)
+        _check_stop(stop)
 
         all_segs: List[SegInfo] = []
         all_dropped: List[SegInfo] = []
@@ -1745,11 +1894,13 @@ def process_video(video: str, out_path: str, p: OcrParams,
         bands = ["bottom"] + (["top"] if p.top_band else [])
         for band in bands:
             kept, dropped, g = _process_band(video, band, p, langs, workdir,
-                                             stats, progress_cb, log_cb)
+                                             stats, progress_cb, log_cb, stop=stop)
             all_segs += kept
             all_dropped += dropped
             gaps += g
 
+        # STOP POINT: last one before anything is written next to the video
+        _check_stop(stop)
         all_segs.sort(key=lambda s: (s.start, s.top))
 
         # text postprocess (incl. corrections) + {\an8} tag for the signs
@@ -1774,12 +1925,18 @@ def process_video(video: str, out_path: str, p: OcrParams,
 
         if p.qc_report:
             qc = Path(out_path).with_suffix(".revisione.html")
-            write_qc_html(qc, Path(video).name, Path(out_path).name,
-                          [s for s in all_segs if s.text],
-                          all_dropped, gaps, stats, p, ui_lang=ui_lang)
-            stats.qc_path = str(qc)
-            if log_cb:
-                log_cb(LogEvent("report_written", {"path": str(qc)}))
+            try:
+                write_qc_html(qc, Path(video).name, Path(out_path).name,
+                              [s for s in all_segs if s.text],
+                              all_dropped, gaps, stats, p, ui_lang=ui_lang)
+            except Exception as e:
+                # the SRT is already on disk: a broken report is a log line
+                if log_cb:
+                    log_cb(LogEvent("report_failed", {"path": str(qc), "error": str(e)}))
+            else:
+                stats.qc_path = str(qc)
+                if log_cb:
+                    log_cb(LogEvent("report_written", {"path": str(qc)}))
 
         return final, stats
     finally:

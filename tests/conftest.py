@@ -12,7 +12,6 @@ ever written next to the clips: tests copy them into tmp_path first.
 
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 
@@ -41,22 +40,17 @@ def _find_tool(name: str) -> str | None:
 
 @pytest.fixture(scope="session")
 def ffmpeg_bin() -> str:
-    """Path of ffmpeg (PATH or /opt/homebrew/bin); skips when missing."""
-    path = _find_tool("ffmpeg")
-    if not path or not _find_tool("ffprobe"):
+    """
+    Path of ffmpeg (PATH or /opt/homebrew/bin); skips when missing. Also
+    configures the engine (core.set_tools) with ffmpeg and ffprobe, so every
+    test that needs the tools just requests this fixture.
+    """
+    from subvision import core
+    ffmpeg, ffprobe = _find_tool("ffmpeg"), _find_tool("ffprobe")
+    if not ffmpeg or not ffprobe:
         pytest.skip("ffmpeg/ffprobe not found (PATH or /opt/homebrew/bin)")
-    return path
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _tools_on_path(request) -> None:
-    """
-    The engine still calls ffmpeg/ffprobe by name (configurable paths arrive
-    in F1.4): make /opt/homebrew/bin visible to the whole session.
-    """
-    brew = "/opt/homebrew/bin"
-    if Path(brew).is_dir() and brew not in os.environ.get("PATH", "").split(os.pathsep):
-        os.environ["PATH"] = brew + os.pathsep + os.environ.get("PATH", "")
+    core.set_tools(ffmpeg, ffprobe)
+    return ffmpeg
 
 
 @pytest.fixture(scope="session")
