@@ -39,6 +39,9 @@
 //   row-text <idx>                 what the row of video idx says after its step (a failed row: the error text)
 //   alert-other · alert-other-press <n>   the non-modal alert that is not O1/O2 (O7, an error): title and buttons; press n
 //   lang-menu                      waits for the inspector's language menu to open, reads its items and closes it
+//   The F6 design snapshots: engine-status, vision, disk-free, batch-fake, capture-all, capture-window,
+//   windows, settings-tab, settings-feed, alert-show, alerts-close, menu-shot, dock-tile, compose, gallery
+//   (see DebugCapture.swift)
 
 #if DEBUG
 import AppKit
@@ -323,7 +326,8 @@ enum DebugQA {
             guard !targets.isEmpty else { return "no report window" }
             targets.forEach { $0.close() }
         default:
-            return "unknown"
+            // The F6 design snapshots (DebugCapture.swift).
+            return await DebugCapture.run(command, argument, model) ?? "unknown"
         }
         return "ok · tab \(model.tab.rawValue) · \(model.videos.count) videos · status \(model.status)"
     }

@@ -45,10 +45,10 @@ enum DebugSnapshot {
                 await capture(model, "\(base)-preview-videos.png", schemes: schemes)
                 model.tab = .process
             }
-            // The narrow window: the top bar instead of the sidebar (N1).
+            // The narrow window (760x640, as N1 and N2): the top bar instead of the sidebar.
             if let window = WindowSizer.main(model.config) {
                 let saved = window.frame
-                window.setContentSize(NSSize(width: 900, height: 760))
+                setNarrow(window)
                 try? await Task.sleep(for: .seconds(1))
                 await capture(model, "\(base)-narrow.png", schemes: schemes)
                 window.setFrame(saved, display: true)
@@ -145,7 +145,7 @@ enum DebugSnapshot {
         if let window {
             let saved = window.frame
             model.inspectorOpen = false
-            window.setContentSize(NSSize(width: 900, height: 760))
+            setNarrow(window)
             await settle()
             await capture(model, "\(base)-N1.png", schemes: schemes)
             window.setFrame(saved, display: true)
@@ -270,7 +270,7 @@ enum DebugSnapshot {
         // N2: the narrow window with the inspector over the page.
         if let window {
             let saved = window.frame
-            window.setContentSize(NSSize(width: 900, height: 760))
+            setNarrow(window)
             model.inspectorOpen = true
             try? await Task.sleep(for: .seconds(1))
             await capture(model, "\(base)-N2.png", schemes: schemes)
@@ -427,6 +427,14 @@ enum DebugSnapshot {
             if await window.capture(to: p) { written.append(p) }
         }
         return written
+    }
+
+    /// The narrow boards (N1, N2): the whole window at 760x640 as the boards measure it, its top kept.
+    static func setNarrow(_ window: NSWindow) {
+        var frame = window.frame
+        frame.origin.y += frame.height - 640
+        frame.size = NSSize(width: 760, height: 640)
+        window.setFrame(frame, display: true)
     }
 
     /// The real window, in every scheme asked.

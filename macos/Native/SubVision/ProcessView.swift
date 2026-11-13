@@ -100,6 +100,12 @@ struct ProcessView: View {
 
     /// Design note 16: under 10 GB free on the internal disk, a yellow line over the bar.
     private var diskNote: String? {
+        #if DEBUG
+        // The design snapshots (`DebugCapture`, `disk-free`): the free space fed by hand.
+        if let gb = DebugCapture.freeGB {
+            return gb < 10 ? model.t("app.process.bar.disk_low", ["free": Int(gb.rounded()), "need": 3]) : nil
+        }
+        #endif
         let home = URL(fileURLWithPath: NSHomeDirectory())
         guard let free = try? home.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]).volumeAvailableCapacityForImportantUsage else { return nil }
         let gb = Double(free) / 1_000_000_000
