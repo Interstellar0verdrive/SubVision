@@ -14,6 +14,12 @@
 //   report-export · report-confirm yes|no|ask · report-elsewhere <path>|cancel|ask
 //   report-windows · report-capture <path>
 //   report-close (the front report window; all with "all")
+//   report-lock on|off             the front report's folder read-only (chmod 555) or writable again (755):
+//                                  with it locked, a change in the report cannot be saved (the yellow notice)
+//                                  and an export asks where else to save
+//   report-state                   whether the "changes are not being saved" notice is up, and the last state write
+//   report-alert                   the alert of the report that is up (the overwrite question, a confirm()): title, window
+//   report-alert-press <n>         presses its button n (0 = Replace / OK, 1 = Cancel)
 //   engine-event <name> <json>     an engine event fed by hand to the batch's own handler, e.g.
 //                                  engine-event batch.file.failed {"idx":0,"error":"unknown (X: y)","at_step":"ocr:bottom","code":"unknown","text":"y","detail":"X: y","log":"/path/name.log"}
 //   The stop alerts (F6; O1 and O2 are not modal, the commands keep running under them):
@@ -222,9 +228,32 @@ enum DebugQA {
         case "report-export":
             guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
             let before = front.session.lastExport
-            _ = try? await bridge.call("await exportSrt();")
-            _ = await wait(5) { front.session.lastExport != before }
+            // Not awaited: with the overwrite question up (`report-confirm ask`) the export waits for its answer.
+            Task { _ = try? await bridge.call("await exportSrt();") }
+            _ = await wait(5) { front.session.lastExport != before || bridge.pageAlert?.isOpen == true }
+            if bridge.pageAlert?.isOpen == true { return "asking: \(bridge.pageAlert?.alert.title ?? "")" }
             return front.session.lastExport.map(\.path) ?? "no export"
+        case "report-lock":
+            guard let front = model.report.front else { return "no report window" }
+            let folder = front.session.url.deletingLastPathComponent()
+            do {
+                try FileManager.default.setAttributes([.posixPermissions: argument == "on" ? 0o555 : 0o755], ofItemAtPath: folder.path)
+            } catch {
+                return "error: \(error)"
+            }
+            return "\(argument == "on" ? "read-only" : "writable") · \(folder.path)"
+        case "report-state":
+            guard let front = model.report.front else { return "no report window" }
+            let written = front.session.bridge?.lastStateWritten.map { "\(Int(Date().timeIntervalSince($0))) s ago" } ?? "never"
+            return "state warning \(front.session.stateWarning ? "shown" : "none") · last write \(written) · toast \(front.session.toast?.lastPathComponent ?? "none")"
+        case "report-alert", "report-alert-press":
+            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
+            guard let open = bridge.pageAlert, open.isOpen else { return "none" }
+            let state = "\(open.alert.title) · \(open.alert.texts.joined(separator: " ")) · window \(open.windowNumber) · buttons \(open.alert.buttons.map(\.title).joined(separator: "|"))"
+            guard command == "report-alert-press" else { return state }
+            guard let n = Int(argument), open.alert.buttons.indices.contains(n) else { return "bad button" }
+            open.press(n)
+            return "pressed \(open.alert.buttons[n].title)"
         case "report-confirm":
             ReportBridge.debugConfirm = argument == "yes" ? true : argument == "no" ? false : nil
         case "report-elsewhere":
