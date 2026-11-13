@@ -59,6 +59,8 @@ struct PreviewState {
     var drag: BandDrag?
     /// Where the frame is drawn (SwiftUI's global space), for the DebugQA drag commands.
     var frameRect: CGRect = .zero
+    /// The Preview window is the key window: the Preview commands of the menu bar act on it.
+    var windowKey = false
 }
 
 extension AppModel {
@@ -105,6 +107,16 @@ extension AppModel {
 
     /// The handles: not during the batch (the parameters are locked, A6).
     var canDragBands: Bool { !batch.running && status == .ready }
+
+    // MARK: - The window
+
+    /// The Preview window on a video (the row's Preview button, the ⋯ and context menus,
+    /// the menu bar): one window at a time, brought to the front if open (design note 80).
+    /// nil keeps the video chosen last.
+    func openPreview(_ id: UUID?) {
+        if let id, id != previewVideoID { selectPreviewVideo(id) }
+        log.info("preview window: \(previewVideo?.name ?? "-")")
+    }
 
     // MARK: - The video
 

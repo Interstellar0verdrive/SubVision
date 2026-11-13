@@ -19,10 +19,13 @@ public struct ShellTab: Identifiable, Hashable, Sendable {
     public var done: Bool
     /// A small number on the top bar segment (files waiting).
     public var count: Int?
+    /// A thin line before this tab: it starts the group of the tools (Sub fix after the pages).
+    public var separatorBefore: Bool
 
     public init(id: String, symbol: String, title: String, subtitle: String = "",
-                busy: Bool = false, done: Bool = false, count: Int? = nil) {
+                busy: Bool = false, done: Bool = false, count: Int? = nil, separatorBefore: Bool = false) {
         self.id = id
+        self.separatorBefore = separatorBefore
         self.symbol = symbol
         self.title = title
         self.subtitle = subtitle
@@ -190,6 +193,10 @@ public struct ShellSidebar<Extra: View>: View {
             .padding(.horizontal, chrome.topRowPadding)
             VStack(spacing: 2) {
                 ForEach(tabs) { tab in
+                    if tab.separatorBefore {
+                        // `.side .sepline` of the boards: 1 pt of glass line, 10 pt in from the edges.
+                        Rectangle().fill(SV.glassLine).frame(height: 1).padding(.horizontal, 10).padding(.vertical, 2)
+                    }
                     SidebarTab(symbol: tab.symbol, title: tab.title, subtitle: tab.subtitle, selected: tab.id == selection,
                                trailing: tab.busy ? .busy : tab.done ? .done : .none) {
                         selection = tab.id
@@ -305,6 +312,10 @@ public struct ShellTopBar<Trailing: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             TopBarSegments {
                 ForEach(tabs) { tab in
+                    if tab.separatorBefore {
+                        // `.tsegs .vsep`: a hairline between the pages and the tools.
+                        Rectangle().fill(SV.glassLine).frame(width: 1, height: 18).padding(.horizontal, 3)
+                    }
                     TopBarSegment(symbol: tab.symbol, title: tab.title, selected: tab.id == selection,
                                   busy: tab.busy, count: tab.count) { selection = tab.id }
                 }

@@ -412,7 +412,7 @@ enum DebugQA {
         case "preview-select":
             guard let i = Int(argument), model.videos.indices.contains(i) else { return "bad index" }
             guard model.canPreview(model.videos[i]) else { return "menu item off · \(model.videos[i].name)" }
-            model.tab = .preview
+            model.openPreview(nil)
             model.selectPreviewVideo(model.videos[i].id)
             return "ok · \(model.videos[i].name)"
         case "preview-menu":

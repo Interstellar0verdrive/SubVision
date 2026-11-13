@@ -36,7 +36,13 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
              "report":"/v/ep01.review.html","log":"/v/ep01.log","empty":false}
             """#)
         guard case .batchFileDone(let d) = done else { Issue.record("\(done)"); return }
-        #expect(d.times["extract:bottom"] == 20.5 && d.segments == 12 && !d.empty)
+        #expect(d.times["extract:bottom"] == 20.5 && d.segments == 12 && !d.empty && d.gaps == nil)
+        let withGaps = try event("batch.file.done", #"""
+            {"idx":0,"segments":12,"dropped":1,"refined":5,"elapsed":61.0,"times":{},"srt":"/v/ep01.srt",
+             "report":null,"log":"/v/ep01.log","empty":false,"gaps":[[41.0,49.2]]}
+            """#)
+        guard case .batchFileDone(let g) = withGaps else { Issue.record("\(withGaps)"); return }
+        #expect(g.gaps == [[41.0, 49.2]])
 
         #expect(try event("batch.file.failed", #"{"idx":1,"error":"probe_failed (path=/v/x.mkv)","at_step":"extract:bottom"}"#)
                 == .batchFileFailed(BatchFileFailed(idx: 1, error: "probe_failed (path=/v/x.mkv)", atStep: "extract:bottom")))

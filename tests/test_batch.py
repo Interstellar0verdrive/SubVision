@@ -495,3 +495,6 @@ def test_damaged_video_fails_in_the_middle_of_the_extraction(demo_ita: Path, ffm
     # and the next video is processed as usual
     assert [d["idx"] for d in rec.of("batch.file.done")] == [1]
     assert rec.of("batch.file.done")[0]["segments"] == FAST_PROFILE_LINES
+    # the long gaps of the report travel with the event, as [start, end] pairs
+    gaps = rec.of("batch.file.done")[0]["gaps"]
+    assert isinstance(gaps, list) and all(len(g) == 2 and g[0] < g[1] for g in gaps)

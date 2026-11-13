@@ -260,6 +260,8 @@ class RunStats:
     refined: int = 0
     elapsed: float = 0.0
     qc_path: str = ""
+    # long gaps without subtitles (start, end) in seconds, as the report lists them
+    gaps: List[Tuple[float, float]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------- stop
@@ -2174,6 +2176,7 @@ def process_video(video: str, out_path: str, p: OcrParams,
             final.append((s.start, s.end, ("{\\an8}" + txt) if s.top else txt))
         stats.segments = len(final)
         stats.dropped = len(all_dropped)
+        stats.gaps = [(round(a, 3), round(b, 3)) for a, b, _ in gaps]
         stats.elapsed = time.time() - t0
 
         write_srt(final, out_path)

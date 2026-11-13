@@ -55,7 +55,7 @@ struct Page: View {
         } else {
             switch model.tab {
             case .process: ProcessView()
-            case .preview: PreviewPage()
+            case .review: ReviewPage()
             case .fix: FixPage()
             }
         }

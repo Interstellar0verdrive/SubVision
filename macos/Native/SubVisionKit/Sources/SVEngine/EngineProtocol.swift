@@ -295,6 +295,9 @@ public struct BatchFileDone: Decodable, Sendable, Equatable {
     public var log: String
     /// No subtitles found.
     public var empty: Bool
+    /// The long gaps without subtitles the report lists, `[start, end]` in seconds
+    /// (nil from an engine before the C2 round).
+    public var gaps: [[Double]]? = nil
 }
 
 public struct BatchFileFailed: Decodable, Sendable, Equatable {

@@ -102,10 +102,10 @@ struct GeneralSettings: View {
         SettingsGroup(model.t("app.settings.while_processing")) {
             SettingsRow(model.t("app.settings.notifications"), description: model.t("app.settings.notifications_desc"),
                         defaultText: model.defaultText(model.t("app.settings.on"))) {
-                Toggle("", isOn: $model.notifications).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.primary)
+                Toggle("", isOn: $model.notifications).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
             }
             SettingsRow(model.t("app.settings.dock"), defaultText: model.defaultText(model.t("app.settings.on"))) {
-                Toggle("", isOn: $model.dockProgress).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.primary)
+                Toggle("", isOn: $model.dockProgress).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
             }
         }
     }
@@ -286,7 +286,7 @@ struct UpdateSettings: View {
         SettingsGroup {
             SettingsRow(model.t("app.settings.auto_check"), description: model.t("app.settings.auto_check_desc"),
                         defaultText: model.defaultText(model.t("app.settings.on"))) {
-                Toggle("", isOn: $model.autoCheckUpdates).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.primary)
+                Toggle("", isOn: $model.autoCheckUpdates).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
             }
         }
         SettingsGroup {

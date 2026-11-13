@@ -82,6 +82,9 @@ struct BatchRun: Equatable {
     var readyAgain: Set<UUID> = []
     /// Finished rows opened to show their times and files (E3).
     var expanded: Set<UUID> = []
+    /// The language and frames per second the batch started with: each file keeps them (Review).
+    var lang: String?
+    var fps: Double?
 
     /// The step the engine works on (or the first not started).
     var currentStep: StepRun? {
@@ -156,6 +159,8 @@ extension AppModel {
             videos[i].state = .waiting
         }
         run = BatchRun(ids: ids)
+        run.lang = lang
+        run.fps = ocrParams.fps
         batch = BatchActivity(running: true, index: 1, total: ids.count, name: ready.first?.name ?? "")
         selection = []
         saveVideos()
@@ -371,6 +376,9 @@ extension AppModel {
         videos[i].reportPath = d.report
         videos[i].logPath = d.log
         videos[i].finished = Date()
+        videos[i].gaps = d.gaps
+        videos[i].ocrLang = run.lang
+        videos[i].ocrFPS = run.fps
         for j in run.steps.indices {
             run.steps[j].state = .done
             run.steps[j].ratio = 1

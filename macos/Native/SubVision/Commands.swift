@@ -61,7 +61,7 @@ struct AppCommands: Commands {
         }
         CommandGroup(before: .sidebar) {
             Button(model.t("app.sidebar.tab.process")) { model.tab = .process }.keyboardShortcut("1", modifiers: .command)
-            Button(model.t("app.sidebar.tab.preview")) { model.tab = .preview }.keyboardShortcut("2", modifiers: .command)
+            Button(model.t("app.sidebar.tab.review")) { model.tab = .review }.keyboardShortcut("2", modifiers: .command)
             Button(model.t("app.sidebar.tab.fix")) { model.tab = .fix }.keyboardShortcut("3", modifiers: .command)
             Divider()
             Button(model.t(model.sidebarShown ? "app.menu.hide_sidebar" : "app.menu.show_sidebar")) { model.toggleSidebar() }
@@ -85,16 +85,16 @@ struct AppCommands: Commands {
             Divider()
             // F5.2: Preview, only on its page.
             Button(model.t("app.menu.find_frames")) { model.findFrames() }
-                .disabled(model.tab != .preview || !model.canFindFrames)
+                .disabled(!model.preview.windowKey || !model.canFindFrames)
             Button(model.t("app.menu.try_ocr")) { model.tryOCR() }
                 .keyboardShortcut("t", modifiers: .command)
-                .disabled(model.tab != .preview || !model.canTryOCR)
+                .disabled(!model.preview.windowKey || !model.canTryOCR)
             Button(model.t("app.menu.prev_frame")) { model.previousFrame() }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
-                .disabled(model.tab != .preview || !model.canBrowseFrames)
+                .disabled(!model.preview.windowKey || !model.canBrowseFrames)
             Button(model.t("app.menu.next_frame")) { model.nextFrame() }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
-                .disabled(model.tab != .preview || !model.canBrowseFrames)
+                .disabled(!model.preview.windowKey || !model.canBrowseFrames)
             Divider()
             // F5.3: active only on the Sub fix page, where Start is not (design note 15).
             Button(model.t("app.menu.run_fix")) { model.runFix() }

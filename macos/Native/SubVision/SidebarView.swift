@@ -11,10 +11,10 @@ extension AppModel {
     var tabs: [ShellTab] {
         [ShellTab(id: Tab.process.rawValue, symbol: Tab.process.symbol, title: t("app.sidebar.tab.process"),
                   subtitle: processSubtitle, busy: batch.running, count: countedVideos == 0 ? nil : countedVideos),
-         ShellTab(id: Tab.preview.rawValue, symbol: Tab.preview.symbol, title: t("app.sidebar.tab.preview"),
-                  subtitle: previewSubtitle, busy: isSearchingFrames),
+         ShellTab(id: Tab.review.rawValue, symbol: Tab.review.symbol, title: t("app.sidebar.tab.review"),
+                  subtitle: reviewSubtitle),
          ShellTab(id: Tab.fix.rawValue, symbol: Tab.fix.symbol, title: t("app.sidebar.tab.fix"),
-                  subtitle: fixSubtitle, done: fixDone)]
+                  subtitle: fixSubtitle, done: fixDone, separatorBefore: true)]
     }
 
     /// The videos the sidebar counts: the unreadable ones are left out (board E1).
@@ -34,13 +34,10 @@ extension AppModel {
         return join(parts)
     }
 
-    /// The video's name; "Searching · zone 12 of 20" (A2), "15 of 20 frames with text" (A3), "Read-only" (A6).
-    var previewSubtitle: String {
-        guard let video = previewVideo else { return t("app.sidebar.no_videos") }
-        if batch.running { return t("app.sidebar.prev_readonly") }
-        if case .running(let done, let total, _) = preview.search { return t("app.sidebar.prev_search", ["i": done, "n": total]) }
-        if let result = preview.results[video.id] { return t("app.sidebar.prev_found", ["k": result.found, "n": result.frames.count]) }
-        return video.name
+    /// "Nessun video elaborato" · "2 elaborati" (boards C2-V1, C2-R1).
+    var reviewSubtitle: String {
+        let n = reviewVideos.count
+        return n == 0 ? t("app.sidebar.no_reviews") : tn("app.sidebar.reviews", n)
     }
 }
 

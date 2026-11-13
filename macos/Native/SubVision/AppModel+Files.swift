@@ -74,6 +74,11 @@ struct VideoItem: Identifiable, Codable, Equatable {
     var failLine: Int?
     /// `key:band` of the step it failed or stopped in.
     var atStep: String?
+    /// The long gaps without subtitles of the report, `[start, end]` in seconds (Review, board C2-R1).
+    var gaps: [[Double]]?
+    /// The OCR language and the frames per second the file was processed with ("Italiano · 12 fps").
+    var ocrLang: String?
+    var ocrFPS: Double?
     /// When the outcome arrived.
     var finished: Date?
 
@@ -151,6 +156,7 @@ struct VideoItem: Identifiable, Codable, Equatable {
         state = .ready
         segments = nil; dropped = nil; refined = nil; elapsed = nil; times = nil; plan = nil
         srtPath = nil; reportPath = nil; logPath = nil; error = nil; atStep = nil; finished = nil
+        gaps = nil; ocrLang = nil; ocrFPS = nil
         failCode = nil; failText = nil; failDetail = nil; failTool = nil; failPath = nil; failLine = nil
     }
 }
@@ -339,10 +345,8 @@ extension AppModel {
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 
-    func openInPreview(_ id: UUID) {
-        previewVideoID = id
-        tab = .preview
-    }
+    /// The row's Preview button, its menus: the Preview window on that video (design note 80).
+    func openInPreview(_ id: UUID) { openPreview(id) }
 
     /// The sidebar's Preview line: the chosen video, else the first of the list.
     var previewVideo: VideoItem? {

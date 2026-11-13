@@ -30,12 +30,12 @@ public struct SnapSlider<Value: Hashable>: View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .leading) {
                 Capsule().fill(SV.trackSoft).frame(height: 4).padding(.horizontal, 8)
-                Capsule().fill(SV.primary)
+                Capsule().fill(SV.sysAccent)
                     .frame(width: usable * CGFloat(index) / CGFloat(steps), height: 4)
                     .padding(.leading, 8)
                 // 6 pt dots ringed in the surface colour.
                 ForEach(values.indices, id: \.self) { i in
-                    Circle().fill(i <= index ? SV.primary : SV.track)
+                    Circle().fill(i <= index ? SV.sysAccent : SV.track)
                         .frame(width: 6, height: 6)
                         .overlay(Circle().stroke(SV.surface, lineWidth: 1.5).padding(-0.75))
                         .offset(x: 8 + usable * CGFloat(i) / CGFloat(steps) - 3)
@@ -207,7 +207,7 @@ public struct SVSlider: View {
             let w = g.size.width
             ZStack(alignment: .leading) {
                 Capsule().fill(SV.trackSoft).frame(height: 4)
-                Capsule().fill(SV.primary).frame(width: max(0, w * f), height: 4)
+                Capsule().fill(SV.sysAccent).frame(width: max(0, w * f), height: 4)
                 Circle().fill(SV.knob)
                     .frame(width: knob, height: knob)
                     .shadow(color: SV.knobShadow, radius: 1.5, y: 1)

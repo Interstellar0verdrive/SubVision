@@ -10,7 +10,12 @@
 import SVShell
 import SwiftUI
 
+/// Where the parameters panel is: the main window (Video, with the frame's schema in
+/// Bands) or the Preview window (no schema: the frame is next to it).
+enum InspectorPlace { case main, preview }
+
 struct InspectorView: View {
+    var place: InspectorPlace = .main
     @Environment(AppModel.self) private var model
     @AppStorage(OcrKey.fps) private var fps: Double = ocrDefaults.fps
     @AppStorage(OcrKey.langHint) private var lang: String = ocrDefaults.langHint
@@ -33,6 +38,8 @@ struct InspectorView: View {
     @AppStorage(OcrKey.useCorrections) private var useCorrections = true
     /// The request (`AppModel.languageMenuRequest`) the language menu opens for.
     @State private var languageMenuOpen = 0
+
+    init(place: InspectorPlace = .main) { self.place = place }
 
     /// Locked during the batch (I3): the values it started with are in use.
     private var locked: Bool { model.batch.running }
@@ -293,7 +300,7 @@ struct InspectorView: View {
     // MARK: - Helpers
 
     private func switchControl(_ value: Binding<Bool>) -> some View {
-        Toggle("", isOn: value).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.primary)
+        Toggle("", isOn: value).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
     }
 
     private func intBinding(_ b: Binding<Int>) -> Binding<Double> {
@@ -359,7 +366,7 @@ struct InspectorGroup<Content: View>: View {
                 if let toggle {
                     HStack(spacing: 4) {
                         if toggleChanged { ChangedDot() }
-                        Toggle("", isOn: toggle).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.primary)
+                        Toggle("", isOn: toggle).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
                             .help(toggleHelp ?? "")
                     }
                     .disabled(locked)

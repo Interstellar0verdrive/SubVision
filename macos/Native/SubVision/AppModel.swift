@@ -9,14 +9,18 @@ import Observation
 import SVShell
 import SwiftUI
 
+/// The pages of the sidebar (design note 80): Video (the list, the parameters, Start),
+/// Review (the videos processed), then Sub fix among the tools. Preview is a window of
+/// its own (`PreviewWindow.swift`). `process` keeps its raw value: the notifications
+/// and the QA scenarios name the pages by it.
 enum Tab: String, CaseIterable, Identifiable {
-    case process, preview, fix
+    case process, review, fix
     var id: String { rawValue }
 
     var symbol: String {
         switch self {
         case .process: "captions.bubble"
-        case .preview: "viewfinder"
+        case .review: "doc.text.magnifyingglass"
         case .fix: "text.badge.checkmark"
         }
     }

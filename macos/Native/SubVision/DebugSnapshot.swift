@@ -27,7 +27,7 @@ enum DebugSnapshot {
             try? await Task.sleep(for: .seconds(1.5))
             model.tab = .process
             await capture(model, "\(base)-process-empty.png", schemes: schemes)
-            model.tab = .preview
+            model.openPreview(nil)
             await capture(model, "\(base)-preview-empty.png", schemes: schemes)
             model.tab = .fix
             await capture(model, "\(base)-fix-empty.png", schemes: schemes)
@@ -41,7 +41,7 @@ enum DebugSnapshot {
                 try? await Task.sleep(for: .seconds(1))
                 model.selection = []
                 await capture(model, "\(base)-process-videos.png", schemes: schemes)
-                model.tab = .preview
+                model.openPreview(nil)
                 await capture(model, "\(base)-preview-videos.png", schemes: schemes)
                 model.tab = .process
             }
@@ -217,7 +217,7 @@ enum DebugSnapshot {
         guard let video = model.videos.first(where: { $0.state == .ready }) else { return }
         let window = WindowSizer.main(model.config)
         model.inspectorOpen = false
-        model.tab = .preview
+        model.openPreview(nil)
         model.selectPreviewVideo(video.id)
         try? await Task.sleep(for: .milliseconds(500))
         await capture(model, "\(base)-A1.png", schemes: schemes)

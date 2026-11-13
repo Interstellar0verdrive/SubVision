@@ -215,7 +215,7 @@ struct FixSwitch: View {
     @Binding var isOn: Bool
 
     var body: some View {
-        Toggle("", isOn: $isOn).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.primary)
+        Toggle("", isOn: $isOn).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
     }
 }
 

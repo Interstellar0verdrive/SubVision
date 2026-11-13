@@ -9,7 +9,7 @@ other, and reports through the sidecar events of the protocol (plan, table
     batch.file.started {idx, total, name, srt, log, report, steps:[{key, band, estimate}]}
     batch.step         {idx, step, band, ratio, count, total, unit, elapsed, eta, rate}
     batch.file.done    {idx, segments, dropped, refined, elapsed, times:{"step:band": sec},
-                        srt, report, log, empty}
+                        srt, report, log, empty, gaps:[[start, end], ...]}
     batch.file.failed  {idx, error, at_step, code, message, log, text?, detail?, tool?,
                         path?, line?}
     batch.file.stopped {idx}
@@ -396,6 +396,8 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
             "times": times, "srt": str(srt),
             "report": stats.qc_path or None, "log": str(logp),
             "empty": not segs,
+            # the long gaps without subtitles the report lists (the Review page counts them)
+            "gaps": [[a, b] for a, b in stats.gaps],
         })
 
     done = {**counts, "elapsed": round(time.monotonic() - t_batch, 3)}
