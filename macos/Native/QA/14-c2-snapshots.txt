@@ -1,0 +1,93 @@
+# The snapshots of the C2 design round (design/snapshot/c2): the real windows
+# of the main screens in dark and light, as the boards C2-V1–V5, N1, A1–A3,
+# R1, S1–S2 and P1–P3 show them. Fast profile with the signs band on.
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
+! printf '1\n00:00:01,000 --> 00:00:02,500\nCiao a tutti.\n\n2\n00:00:03,000 --> 00:00:04,000\nCiao a tutti.\n' > "$WORK/sintel_ita_hardsub_demo-prova.srt"
+@launch
+wait-ready 600
+? ^ready
+lang it
+size 1360x840
+params fast
+inspector-set langHint it-IT
+inspector-set ocr.topBand true
+inspector-tab read
+tab review
+theme dark
+capture $OUT/C2-R0-dark.png
+add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4
+tab process
+capture $OUT/C2-V1-P1-dark.png
+theme light
+capture $OUT/C2-V1-P1-light.png
+select 0,1
+? ^selection 2
+capture $OUT/C2-V2-light.png
+theme dark
+capture $OUT/C2-V2-dark.png
+select
+inspector-tab bands
+capture $OUT/C2-P2-dark.png
+theme light
+capture $OUT/C2-P2-light.png
+inspector-tab lines
+capture $OUT/C2-P3-light.png
+theme dark
+capture $OUT/C2-P3-dark.png
+inspector-tab bands
+preview-open 0
+? ^ok · sintel_ita_hardsub_demo\.mp4
+wait-frames 300
+? ^20 frames
+preview-size 1280x860
+preview-capture $OUT/C2-A1-dark.png
+theme light
+preview-capture $OUT/C2-A1-light.png
+try-ocr
+wait-ocr 120
+inspector-set ocr.topKeepPct 26
+preview-capture $OUT/C2-A2-light.png
+theme dark
+preview-capture $OUT/C2-A2-dark.png
+inspector-set ocr.topKeepPct 22
+inspector-tab read
+start
+? status ready
+wait-step 0 ocr 300
+? ^ok
+capture $OUT/C2-V3-dark.png
+preview-capture $OUT/C2-A3-dark.png
+theme light
+capture $OUT/C2-V3-light.png
+theme dark
+preview-close
+wait-batch 900
+? ^batch done · done 2
+capture-all $OUT/C2-V5-dark.png
+theme light
+capture-all $OUT/C2-V5-light.png
+summary-seen
+review-select 0
+? ^ok
+capture $OUT/C2-R1-light.png
+theme dark
+capture $OUT/C2-R1-dark.png
+tab process
+size 760x780
+inspector open
+capture $OUT/C2-N1-dark.png
+theme light
+capture $OUT/C2-N1-light.png
+inspector close
+tab fix
+fix-open $WORK/sintel_ita_hardsub_demo-prova.srt
+capture $OUT/C2-S2-light.png
+theme dark
+capture $OUT/C2-S2-dark.png
+size 1360x840
+capture $OUT/C2-S1-dark.png
+theme light
+capture $OUT/C2-S1-light.png
+theme system
+params default
+inspector-tab read
