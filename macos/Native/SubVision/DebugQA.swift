@@ -3,7 +3,7 @@
 // through the same model methods the buttons and menus call (the shell's
 // `DebugQA.watchCommands`). One command per line; the reply goes to `<file>.out`.
 //
-//   tab process|preview|fix · add <path>[,<path>…] · remove-all · select-all
+//   tab process|review|fix · add <path>[,<path>…] · remove-all · select-all
 //   sidebar · inspector [open|close] · lang en|it · theme system|light|dark
 //   size <w>x<h> · windowid · capture <path> · settings · quit
 //   Preview (F5.2, its own window since C2): preview-open, preview-close, preview-size, preview-capture,
@@ -31,6 +31,9 @@
 //   stop-file [<idx>]              batch.stop for one file, no alert: with <idx> (the batch index, 0-based) the
 //                                  engine stops it only if it is still the one in progress, else "not_running";
 //                                  without it, the file in progress whatever it is. Replies with the engine's answer.
+//   C2 · Video, Review and the panel: inspector-tab read|bands|lines · params-reset (undoable) ·
+//   select <idx>[,<idx>…] (rows of Video; empty deselects) · bottom-bar · remove-selection ·
+//   review-state · review-select <idx> (opens the row of Review) · review <idx> (its report window's title)
 //   F6 · the QA scenarios (macos/Native/QA):
 //   status                         engine status, Vision, tools phase and rows, window, language, tab
 //   wait-ready <s>                 until the engine is ready and the tools window is gone (first launch: downloads)
@@ -139,7 +142,7 @@ enum DebugQA {
         // `wait-step <idx> <key> <s>` (the step reported progress), `states`,
         // `expand <idx>`, `process-again`, `clear-done`, `summary`, `summary-seen`,
         // `inspector-set <key> <value>` (an OcrKey with a number, true/false or text),
-        // `inspector-groups open|closed`).
+        // `inspector-tab read|bands|lines`).
         case "params":
             switch argument {
             case "fast": model.applyOcrParams(.fast)
@@ -227,8 +230,41 @@ enum DebugQA {
             else if let i = Int(p[1]) { model.defaults.set(i, forKey: key) }
             else if let d = Double(p[1]) { model.defaults.set(d, forKey: key) }
             else { model.defaults.set(p[1], forKey: key) }
-        case "inspector-groups":
-            for g in ["ocr", "dlg", "sig", "seg", "adv"] { model.defaults.set(argument == "open", forKey: "inspector.group.\(g)") }
+        case "inspector-tab":
+            // The parameters panel's tab (C2): read, bands or lines.
+            guard ["read", "bands", "lines"].contains(argument) else { return "bad tab" }
+            model.defaults.set(argument, forKey: "inspector.tab")
+        case "params-reset":
+            // "Ripristina" of the panel and View › Restore All Defaults (undoable).
+            model.resetAllParameters()
+            return model.ocrParams == OcrParams() ? "ok · defaults" : "not reset"
+        case "select":
+            // Rows of Video by index ("0,2"), as clicks would; empty deselects.
+            let ids = argument.split(separator: ",").compactMap { Int($0) }.filter { model.videos.indices.contains($0) }.map { model.videos[$0].id }
+            model.selection = Set(ids)
+            return bottomBar(model)
+        case "bottom-bar":
+            return bottomBar(model)
+        case "remove-selection":
+            guard model.canRemoveSelection else { return "cannot remove" }
+            model.removeSelection()
+            return "ok · \(model.videos.count) left"
+        case "review-state":
+            return reviewState(model)
+        case "review-select":
+            guard let idx = Int(argument), model.reviewVideos.indices.contains(idx) else { return "bad index" }
+            let video = model.reviewVideos[idx]
+            model.tab = .review
+            model.reviewSelection = video.id
+            model.run.expanded.insert(video.id)
+            return "ok · \(video.name)"
+        case "review":
+            guard let idx = Int(argument), model.reviewVideos.indices.contains(idx) else { return "bad index" }
+            let video = model.reviewVideos[idx]
+            guard video.outputReport != nil else { return "no report" }
+            model.review(video)
+            _ = await wait(20) { model.report.front?.session.phase == .ready }
+            return model.report.front?.window?.title ?? "no window"
         // F5.2 · Preview (the commands are in `preview(_:_:_:)` below).
         case "preview-open", "preview-close", "preview-size", "preview-capture", "preview-layout",
              "preview-select", "preview-menu", "frames", "frame-bands", "find-frames", "stop-frames", "wait-frames", "frame", "band-set", "drag-handle",
@@ -335,6 +371,26 @@ enum DebugQA {
     }
 
     /// "status ready · vision true · tools notNeeded · rows - · window 1360x840 · lang it · tab process".
+    /// The bottom bar of Video as it reads: "selection 2 · remove on" (design note 58),
+    /// "running …", or "ready N".
+    private static func bottomBar(_ model: AppModel) -> String {
+        if !model.batch.running, !model.selection.isEmpty {
+            return "selection \(model.selection.count) · \(model.tn("app.process.bar.selected", model.selection.count)) · remove \(model.canRemoveSelection ? "on" : "off")"
+        }
+        if model.batch.running { return "running \(model.batch.index) of \(model.batch.total)" }
+        return "ready \(model.readyVideos.count) · finished \(model.finishedVideos.count)"
+    }
+
+    /// The Review page: "review 2 · a.mp4 lines 12 dropped 0 gaps 1 lang it-IT fps 6 reviewed no · …".
+    private static func reviewState(_ model: AppModel) -> String {
+        let rows = model.reviewVideos.map { v in
+            "\(v.name) lines \(v.segments.map(String.init) ?? "-") dropped \(v.dropped.map(String.init) ?? "-")"
+                + " gaps \(v.gaps.map { String($0.count) } ?? "-") lang \(v.ocrLang ?? "-") fps \(v.ocrFPS.map { String(Int($0)) } ?? "-")"
+                + " report \(v.outputReport != nil ? "yes" : "no") reviewed \(model.hasReviewedSRT(v) ? "yes" : "no")"
+        }
+        return (["review \(rows.count)"] + rows).joined(separator: " · ") + " · sidebar \(model.reviewSubtitle)"
+    }
+
     private static func statusLine(_ model: AppModel) -> String {
         let rows = model.tools.rows.map { "\($0.tool.key)=\($0.state)" }.joined(separator: ",")
         return "status \(model.status) · vision \(model.hello?.vision.description ?? "-") · tools \(model.tools.phase)"

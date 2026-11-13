@@ -8,5 +8,5 @@ wait-ready 1500
 ? ^ready · status ready · vision true · tools notNeeded · rows python=done,ffmpeg=done,ffprobe=done,warmup=done ·
 ! test -x "$STATE/bin/uv" && test -x "$STATE/bin/ffmpeg" && test -x "$STATE/bin/ffprobe" && test -d "$STATE/.venv"
 lang it
-text app.process.title
-? ^Elabora$
+text app.review.title
+? ^Revisione$

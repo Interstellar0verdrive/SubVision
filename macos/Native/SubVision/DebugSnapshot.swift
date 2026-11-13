@@ -112,21 +112,20 @@ enum DebugSnapshot {
         }
         let ids = model.videos.prefix(3).map(\.id)
         model.resetOcrParams()
-        model.defaults.set(true, forKey: "inspector.group.ocr")
-        for g in ["dlg", "sig", "seg", "adv"] { model.defaults.set(true, forKey: "inspector.group.\(g)") }
+        model.defaults.set("read", forKey: "inspector.tab")
         model.selection = []
         // I1: the inspector open with the defaults, the list ready.
         model.inspectorOpen = true
         await settle()
         await capture(model, "\(base)-I1.png", schemes: schemes)
-        // I2: groups closed but Segments and Advanced, two values changed.
-        for g in ["ocr", "dlg", "sig"] { model.defaults.set(false, forKey: "inspector.group.\(g)") }
+        // I2: the Lines tab, two values changed (one of them in Reading: its tab gets the dot).
+        model.defaults.set("lines", forKey: "inspector.tab")
         model.defaults.set(1.0, forKey: OcrKey.mergeGap)
         model.defaults.set(1, forKey: OcrKey.skipHamming)
         await settle()
         await capture(model, "\(base)-I2.png", schemes: schemes)
         model.resetOcrParams()
-        for g in ["ocr", "dlg", "sig"] { model.defaults.set(true, forKey: "inspector.group.\(g)") }
+        model.defaults.set("read", forKey: "inspector.tab")
         // E2 / I3: file 2 of 3 with its steps, the first done, the third waiting; the inspector locked.
         model.videos[0].state = .done
         model.videos[0].segments = 312; model.videos[0].dropped = 9; model.videos[0].refined = 588; model.videos[0].elapsed = 5460
