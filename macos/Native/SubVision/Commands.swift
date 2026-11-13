@@ -84,11 +84,18 @@ struct AppCommands: Commands {
                 .keyboardShortcut(".", modifiers: .command)
                 .disabled(!model.batch.running)
             Divider()
-            // F5.2: Preview
-            Button(model.t("app.menu.find_frames")) {}.disabled(true)
-            Button(model.t("app.menu.try_ocr")) {}.keyboardShortcut("t", modifiers: .command).disabled(true)
-            Button(model.t("app.menu.prev_frame")) {}.keyboardShortcut(.leftArrow, modifiers: .command).disabled(true)
-            Button(model.t("app.menu.next_frame")) {}.keyboardShortcut(.rightArrow, modifiers: .command).disabled(true)
+            // F5.2: Preview, only on its page.
+            Button(model.t("app.menu.find_frames")) { model.findFrames() }
+                .disabled(model.tab != .preview || !model.canFindFrames)
+            Button(model.t("app.menu.try_ocr")) { model.tryOCR() }
+                .keyboardShortcut("t", modifiers: .command)
+                .disabled(model.tab != .preview || !model.canTryOCR)
+            Button(model.t("app.menu.prev_frame")) { model.previousFrame() }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+                .disabled(model.tab != .preview || !model.canBrowseFrames)
+            Button(model.t("app.menu.next_frame")) { model.nextFrame() }
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+                .disabled(model.tab != .preview || !model.canBrowseFrames)
             Divider()
             // F5.3: active only on the Sub fix page, where Start is not (design note 15).
             Button(model.t("app.menu.run_fix")) {}

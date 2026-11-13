@@ -66,6 +66,9 @@ enum DebugSnapshot {
             if env["SUBVISION_SNAPSHOT_PROCESS"] == "1" {
                 await processStates(model, base: base, schemes: schemes)
             }
+            if env["SUBVISION_SNAPSHOT_PREVIEW"] == "1" {
+                await previewStates(model, base: base, schemes: schemes)
+            }
             AppLog.shared.info("snapshots done")
             NSApp.terminate(nil)
         }
@@ -187,6 +190,78 @@ enum DebugSnapshot {
         for i in 0..<3 { model.videos[i].resetOutcome() }
         model.run = BatchRun()
         model.saveVideos()
+    }
+
+    // MARK: - F5.2 · Preview (A1–A6, N2)
+
+    /// `SUBVISION_SNAPSHOT_PREVIEW=1`, with a video from `SUBVISION_SNAPSHOT_ADD`:
+    /// the real search and the real OCR test on the first video; A5 is fed by
+    /// hand (the demo clip has text in every zone and its duration reads fine).
+    private static func previewStates(_ model: AppModel, base: String, schemes: [ColorScheme]) async {
+        guard let video = model.videos.first(where: { $0.state == .ready }) else { return }
+        let window = WindowSizer.main(model.config)
+        model.inspectorOpen = false
+        model.tab = .preview
+        model.selectPreviewVideo(video.id)
+        try? await Task.sleep(for: .milliseconds(500))
+        await capture(model, "\(base)-A1.png", schemes: schemes)
+        // A2: the search at zone 12, fed by hand (on the demo clip the real one
+        // is over in a few seconds, less than the two captures take).
+        model.preview.search = .running(done: 12, total: PreviewState.zones, found: 9)
+        try? await Task.sleep(for: .milliseconds(400))
+        await capture(model, "\(base)-A2.png", schemes: schemes)
+        model.preview.search = .idle
+        model.findFrames()
+        guard await DebugQA.wait(180, { !model.isSearchingFrames }), let result = model.previewResult else { return }
+        try? await Task.sleep(for: .seconds(1))
+        // A3: the inspector open, the dialogue band's top edge held at 31 %.
+        model.inspectorOpen = true
+        let savedHeight = BandValues.height(.dialogue)
+        BandValues.setHeight(31, .dialogue)
+        model.preview.drag = BandDrag(band: .dialogue, height: 31, width: BandValues.width(.dialogue))
+        try? await Task.sleep(for: .milliseconds(600))
+        await capture(model, "\(base)-A3.png", schemes: schemes)
+        model.preview.drag = nil
+        BandValues.setHeight(savedHeight, .dialogue)
+        model.inspectorOpen = false
+        // A4: Try OCR on the frame with text.
+        model.tryOCR()
+        _ = await DebugQA.wait(120) { !model.isReadingOCR }
+        try? await Task.sleep(for: .milliseconds(600))
+        await capture(model, "\(base)-A4.png", schemes: schemes)
+        // A5, fed by hand: no zone with text, the duration not read, a stale test with an empty dialogue band.
+        var silent = result
+        silent.frames = result.frames.map { var f = $0; f.band = nil; f.hasText = false; return f }
+        silent.index = min(silent.index, silent.frames.count - 1)
+        model.preview.results[video.id] = silent
+        model.preview.search = .failed(code: "invalid_duration", message: nil)
+        let json = #"{"bands":{"bottom":{"text":"","conf":0,"agree":0,"alts":[],"final":"","ms":214,"variants":3,"empty":true},"top":{"text":"IL MERCATO","conf":0.71,"agree":0.67,"alts":["IL MERCAT0","LL MERCATO"],"final":"{\\an8}IL MERCATO","ms":96,"variants":3,"empty":false}}}"#
+        if let reply = try? EngineCoding.decoder.decode(OcrTestReply.self, from: Data(json.utf8)) {
+            model.preview.test = .done(reply, params: model.ocrParams, useIgnore: model.useIgnore, useCorrections: model.useCorrections)
+            model.preview.testFrame = model.previewFrame?.path
+            model.preview.stale = true
+        }
+        try? await Task.sleep(for: .milliseconds(600))
+        await capture(model, "\(base)-A5.png", schemes: schemes)
+        model.preview.results[video.id] = result
+        model.preview.search = .idle
+        model.clearTest()
+        // A6: during the batch, read-only.
+        model.batch.running = true
+        try? await Task.sleep(for: .milliseconds(600))
+        await capture(model, "\(base)-A6.png", schemes: schemes)
+        model.batch.running = false
+        // N2: the narrow window with the inspector over the page.
+        if let window {
+            let saved = window.frame
+            window.setContentSize(NSSize(width: 900, height: 760))
+            model.inspectorOpen = true
+            try? await Task.sleep(for: .seconds(1))
+            await capture(model, "\(base)-N2.png", schemes: schemes)
+            model.inspectorOpen = false
+            window.setFrame(saved, display: true)
+            try? await Task.sleep(for: .milliseconds(500))
+        }
     }
 
     /// The tools window while it downloads and while it prepares the recognition (T1, T2).

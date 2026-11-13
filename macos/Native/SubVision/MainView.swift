@@ -95,19 +95,6 @@ struct InspectorButton: View {
     }
 }
 
-/// Preview (F5.2): the empty state until a video is in the list.
-struct PreviewPage: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        if model.videos.isEmpty {
-            PreviewEmptyView()
-        } else {
-            PlaceholderPage(title: model.t("app.preview.title"), symbol: Tab.preview.symbol, text: model.t("app.preview.intro"))
-        }
-    }
-}
-
 /// Sub fix (F5.3): the empty state until an SRT is chosen.
 struct FixPage: View {
     @Environment(AppModel.self) private var model
