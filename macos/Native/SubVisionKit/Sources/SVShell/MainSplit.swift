@@ -180,7 +180,7 @@ public struct ShellSidebar<Extra: View>: View {
             VStack(spacing: 2) {
                 ForEach(tabs) { tab in
                     SidebarTab(symbol: tab.symbol, title: tab.title, subtitle: tab.subtitle, selected: tab.id == selection,
-                               trailing: tab.busy ? .busy : tab.done && tab.id != selection ? .done : .none) {
+                               trailing: tab.busy ? .busy : tab.done ? .done : .none) {
                         selection = tab.id
                     }
                 }
@@ -210,6 +210,7 @@ struct ShellFooterView: View {
                 }
             }
             .disabled(footer.checkingUpdates)
+            .accessibilityLabel(texts.checkUpdates)
             Spacer(minLength: 0)
             FooterLink(help: footer.repositoryURL.absoluteString.replacingOccurrences(of: "https://", with: ""),
                        action: { NSWorkspace.shared.open(footer.repositoryURL) }) {
