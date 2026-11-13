@@ -104,11 +104,13 @@
 
   // ---------- small components
   S.btn = (label, role = 'secondary', o = {}) =>
-    `<span class="btn ${role} ${o.size || ''} ${o.full ? 'full' : ''} ${o.dis ? 'dis' : ''}">${o.icon ? icon(o.icon, o.size === 'sm' ? 12 : o.size === 'lg' ? 15 : 13) : ''}${label}${o.kbd ? `<span class="kbd">${o.kbd}</span>` : ''}</span>`;
-  S.chip = (text, tone = '') => `<span class="chip ${tone}">${text}</span>`;
+    `<span class="btn ${role} ${o.size || ''} ${o.full ? 'full' : ''} ${o.dis ? 'dis' : ''}">${o.icon ? icon(o.icon, o.size === 'sm' ? 12 : o.size === 'lg' ? 15 : 13) : ''}<span class="t">${label}</span>${o.kbd ? `<span class="kbd">${o.kbd}</span>` : ''}</span>`;
+  S.chip = (text, tone = '') => `<span class="chip ${tone}"><span class="t">${text}</span></span>`;
   S.dot = (tone = '') => `<span class="dot ${tone}"></span>`;
   S.link = (text, tone = '', ic) => `<span class="ulink ${tone}">${ic ? icon(ic, 12) + ' ' : ''}${text}</span>`;
   S.spin = (sz = '') => `<span class="spin ${sz}"></span>`;
+  /** The warning triangle drawn for a status circle: inside ~68 % of the box, so it keeps a margin from the ring. */
+  ICONS.warnc = '<path d="M8 2.9l5.4 9.4H2.6z"/><path d="M8 6.6v2.6M8 10.8v.1"/>';
   S.bar = (f, tone = '', thick) => `<span class="bar ${tone} ${thick ? 'thick' : ''}"><i style="width:${Math.round(f * 1000) / 10}%"></i></span>`;
   S.toggle = (on, dis) => `<span class="toggle ${on ? 'on' : ''} ${dis ? 'dis' : ''}"></span>`;
   S.capseg = (opts, sel) => `<span class="capseg">${opts.map((o, i) => `<span class="${i === sel ? 'on' : ''}">${o}</span>`).join('')}</span>`;

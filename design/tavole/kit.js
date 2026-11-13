@@ -14,10 +14,10 @@
   K.reportBtn = () => btn(t('app.process.row.open_report'), 'secondary', { size: 'sm', icon: 'doc' });
   K.more = () => `<span class="iconbtn" style="width:22px;height:22px">${icon('dots', 16)}</span>`;
   K.list = (rows, head) => `<div class="list">${head ? `<div class="lhead"><span></span><span class="label">${t('app.process.list.name')}</span><span class="label r">${t('app.process.list.duration')}</span><span class="label r">${t('app.process.list.fps')}</span><span class="label r col-res">${t('app.process.list.size')}</span><span></span></div>` : ''}${rows.join('')}</div>`;
-  const SIC = { done: ['done', 'check'], warn: ['warn', 'warn'], fail: ['fail', 'x'], bad: ['fail', 'x'], stop: ['stop', 'stop'], ready: ['wait', ''], wait: ['wait', ''] };
+  const SIC = { done: ['done', 'check'], warn: ['warn', 'warnc'], fail: ['fail', 'x'], bad: ['fail', 'x'], stop: ['stop', 'stop'], ready: ['wait', ''], wait: ['wait', ''] };
   /** One file row. r: st, name, dir, dur, fps, res, result, rcls, chips, acts, detail, dim */
   K.row = function (r) {
-    const ic = r.st === 'run' ? S.spin() : `<span class="sicon ${SIC[r.st][0]}">${SIC[r.st][1] ? icon(SIC[r.st][1], 13) : ''}</span>`;
+    const ic = r.st === 'run' ? S.spin('m') : `<span class="sicon ${SIC[r.st][0]}">${SIC[r.st][1] ? icon(SIC[r.st][1], 14) : ''}</span>`;
     const cls = { ready: 'ready', wait: 'ready', run: 'run', done: 'done', warn: 'warn', fail: 'fail', bad: 'bad', stop: 'stop' }[r.st];
     return `<div class="fr ${cls} ${r.dim ? 'dim' : ''}"><div class="frow">${ic}
       <div style="min-width:0"><div style="display:flex;gap:8px;align-items:center"><span class="fname">${r.name}</span>${r.chips || ''}</div>

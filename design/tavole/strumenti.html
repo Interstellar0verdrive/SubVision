@@ -10,7 +10,7 @@
 const { t, btn, note, icon, board, spin, bar } = SV;
 const ROWS = [['python', 51], ['ffmpeg', 28], ['ffprobe', 28], ['warmup', 0]];
 function rowH(key, mb, st, o = {}) {
-  const ic = st === 'done' ? `<span class="sicon done">${icon('check', 13)}</span>` : st === 'run' ? spin() : st === 'fail' ? `<span class="sicon fail">${icon('x', 13)}</span>` : `<span class="sicon wait"></span>`;
+  const ic = st === 'done' ? `<span class="sicon done">${icon('check', 14)}</span>` : st === 'run' ? spin('m') : st === 'fail' ? `<span class="sicon fail">${icon('x', 14)}</span>` : `<span class="sicon wait"></span>`;
   const right = st === 'run' && o.frac != null ? `<span style="width:90px;display:flex">${bar(o.frac)}</span>` : '';
   return `<div class="trow ${st === 'run' ? 'run' : st === 'fail' ? 'fail' : st === 'wait' ? 'wait' : ''}">${ic}<span class="tn">${t('app.tools.row.' + key, { version: { python: '3.13', ffmpeg: '9.0.2', ffprobe: '9.0.2' }[key] })} <span class="sub">· ${t('app.tools.row.' + key + '_sub')}</span></span>
     ${right}${st === 'fail' ? SV.chip(t('app.common.stopped_chip'), 'red') : ''}<span class="mb">${mb ? mb + ' MB' : o.secs || ''}</span></div>`;

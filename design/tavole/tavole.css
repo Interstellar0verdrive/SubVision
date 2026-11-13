@@ -22,7 +22,7 @@
   --noticeFill:#F2B84B; --onNotice:#2A1C00; --noticeLine:rgba(242,184,75,0);
   --red:#CD3725; --redHover:#D83A27; --redText:#F59B9B; --redBg:rgba(242,109,109,.10); --redLine:rgba(242,109,109,.55);
   --redSoft:rgba(242,109,109,.07); --redTint:rgba(242,109,109,.16);
-  --chipBg:#1C1F23; --chipLine:rgba(255,255,255,.10); --segOn:#3A3E44; --segShadow:rgba(0,0,0,.4);
+  --chipBg:#1C1F23; --chipLine:rgba(255,255,255,.10); --segOn:#3A3E44; --segShadow:rgba(0,0,0,.4); --dropLine:rgba(255,255,255,.40);
   --shadow:0,0,0; --shadowK:1;
   /* SubVision only: the two bands drawn on the video frame (see note-design ?4) */
   --bandDialogue:#3DD68C; --bandSigns:#4DA3FF;
@@ -42,7 +42,7 @@
   --noticeFill:#FFFFFF; --onNotice:#7F5300; --noticeLine:rgba(245,180,0,.45);
   --red:#CD3725; --redHover:#D83A27; --redText:#B42323; --redBg:#FDECEA; --redLine:rgba(217,64,46,.45);
   --redSoft:rgba(205,55,37,.10); --redTint:rgba(217,64,46,.12);
-  --chipBg:#EEF0F2; --chipLine:rgba(0,0,0,.08); --segOn:#FFFFFF; --segShadow:rgba(0,0,0,.15);
+  --chipBg:#EEF0F2; --chipLine:rgba(0,0,0,.08); --segOn:#FFFFFF; --segShadow:rgba(0,0,0,.15); --dropLine:rgba(0,0,0,.40);
   --shadow:16,24,40; --shadowK:.5;
   --bandDialogue:#3DD68C; --bandSigns:#4DA3FF;
   color-scheme: light;
@@ -147,6 +147,10 @@ html.shot .stage { border-radius: 0; outline: 0; }
 .btn.destructiveSolid { background: var(--red); color: #fff; }
 .btn.notice { background: var(--noticeFill); border-color: var(--noticeLine); color: var(--onNotice); font-weight: 600; }
 .btn.plain { background: transparent; color: var(--text2); padding: 0 6px; }
+/* The label sits low in its line box (SF Pro's ascent rounds up): half a point up in the large and small sizes
+   centres the capitals, measured on pixels; the regular size is already within half a point. */
+.btn .t { position: relative; }
+.btn.lg .t, .btn.sm .t { top: -.5px; }
 .btn.dis { opacity: .4; }
 .btn.hover.primary { background: var(--primaryHover); } .btn.hover.secondary { background: var(--glassHover); }
 .kbd { font: 11px ui-monospace, monospace; color: inherit; opacity: .75; margin-left: 2px; }
@@ -157,6 +161,7 @@ html.shot .stage { border-radius: 0; outline: 0; }
 /* chips, dots, notes, bars */
 .chip { display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 8px; border-radius: 999px; font: 11px ui-monospace, "SF Mono", monospace;
   border: 1px solid var(--chipLine); background: var(--chipBg); color: var(--text2); white-space: nowrap; }
+.chip .t { position: relative; top: -.5px; }
 .chip.accent { background: var(--sel); border-color: var(--softLine); color: var(--primaryText); }
 .chip.green { background: var(--greenBg); border-color: var(--greenLine); color: var(--greenText); }
 .chip.yellow { background: var(--yellowBg); border-color: var(--yellowLine); color: var(--yellowText); }
@@ -182,6 +187,7 @@ html.shot .stage { border-radius: 0; outline: 0; }
 .bar.thick { height: 6px; }
 .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--softLine); border-top-color: var(--primary); display: inline-block; flex: none; }
 .spin.s { width: 11px; height: 11px; border-width: 1.6px; }
+.spin.m { width: 16px; height: 16px; }
 .spin.l { width: 22px; height: 22px; }
 
 /* controls */
@@ -211,9 +217,11 @@ html.shot .stage { border-radius: 0; outline: 0; }
 .checkbox.on { background: var(--primary); border-color: var(--primary); color: var(--onPrimary); }
 
 /* drop zone */
-.drop { border: 1.5px dashed var(--boxLine); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+/* Drop areas: a 2 pt dash in the border colour, strong enough to read in both themes; accent while a file hovers. */
+.drop { border: 2px dashed var(--dropLine); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; text-align: center; color: var(--text2); padding: 28px; }
 .drop .big { color: var(--text); font-weight: 600; font-size: 14px; }
+.drop.over { border-color: var(--primary); background: var(--soft); color: var(--primaryText); }
 
 /* numbered steps */
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
@@ -225,8 +233,8 @@ html.shot .stage { border-radius: 0; outline: 0; }
 
 /* file list (Process) */
 .list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.lhead, .frow { display: grid; grid-template-columns: 18px minmax(0,1fr) 74px 62px 86px 236px; gap: 14px; align-items: center; padding: 0 16px 0 13px; }
-.withinsp .lhead, .withinsp .frow, .narrowcols .lhead, .narrowcols .frow { grid-template-columns: 18px minmax(0,1fr) 66px 56px 200px; }
+.lhead, .frow { display: grid; grid-template-columns: 22px minmax(0,1fr) 74px 62px 86px 236px; gap: 14px; align-items: center; padding: 0 16px 0 13px; }
+.withinsp .lhead, .withinsp .frow, .narrowcols .lhead, .narrowcols .frow { grid-template-columns: 22px minmax(0,1fr) 66px 56px 200px; }
 .withinsp .col-res, .narrowcols .col-res { display: none; }
 .lhead { height: 30px; border-bottom: 1px solid var(--line); }
 .lhead .label { font-size: 10.5px; }
@@ -245,13 +253,14 @@ html.shot .stage { border-radius: 0; outline: 0; }
 .fres.warn { color: var(--yellowText); } .fres.fail { color: var(--redText); } .fres.ok { color: var(--text2); }
 .frow .num { font-size: 12px; color: var(--textCode); }
 .acts { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
-.sicon { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+/* Status circles: 22 pt ring, 14 pt symbol (drawn inside ~68 % of its box, so it never touches the ring). */
+.sicon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; }
 .sicon.done { background: var(--greenBg); border: 1px solid var(--greenLine); color: var(--greenText); }
 .sicon.fail { border: 1px solid var(--redLine); color: var(--redText); }
 .sicon.warn { background: var(--yellowBg); border: 1px solid var(--yellowLine); color: var(--yellowText); }
 .sicon.wait { border: 1px solid var(--glassLine); }
 .sicon.stop { border: 1px solid var(--glassLine); color: var(--text2); }
-.detail { padding: 4px 16px 14px 47px; }
+.detail { padding: 4px 16px 14px 51px; }
 .bandgrp { margin-top: 8px; }
 .srow { display: grid; grid-template-columns: 16px 130px minmax(60px,1fr) 300px; gap: 12px; align-items: center; height: 24px; font-size: 12px; }
 .withinsp .srow, .narrowcols .srow { grid-template-columns: 16px 118px minmax(60px,1fr) 250px; }
