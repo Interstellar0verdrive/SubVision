@@ -29,12 +29,12 @@ struct FixReadyView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.svPageTop) private var top
     @State private var dropTargeted = false
+    /// The width of the page's content: two columns from `twoColumnsFrom` on.
+    @State private var contentWidth: CGFloat = 1000
     /// The width of the single column of a narrow page (file card, options, notes).
     static let columnWidth: CGFloat = 720
     /// The page's content width from which the shared box goes beside the file and the options.
     static let twoColumnsFrom: CGFloat = 860
-    /// The widest the two columns grow (the boards' 1060 pt page).
-    static let twoColumnsUpTo: CGFloat = 1100
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -45,12 +45,13 @@ struct FixReadyView: View {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 0) {
                         outcome
-                        ViewThatFits(in: .horizontal) {
+                        // The page's own width decides (a `ViewThatFits` would measure the texts unwrapped).
+                        if contentWidth >= Self.twoColumnsFrom {
                             HStack(alignment: .top, spacing: 24) {
                                 FixLeftColumn().frame(maxWidth: .infinity, alignment: .topLeading)
                                 FixSharedSection().frame(maxWidth: .infinity, alignment: .topLeading)
                             }
-                            .frame(minWidth: Self.twoColumnsFrom, maxWidth: Self.twoColumnsUpTo)
+                        } else {
                             VStack(alignment: .leading, spacing: 20) {
                                 FixLeftColumn()
                                 FixSharedSection()
@@ -59,6 +60,7 @@ struct FixReadyView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
                     .padding(.bottom, 28)
                 }
                 .scrollIndicators(.automatic)
