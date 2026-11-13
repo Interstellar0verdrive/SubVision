@@ -133,7 +133,7 @@ Il controllo a schermo intero è stato interrotto due volte (l'utente stava usan
 
 ## C2 · cosa provare
 
-L'app è in `/Applications/SubVision.app` (build Release di F6, firma ad hoc). Al primo avvio scarica gli strumenti (uv, Python, ffmpeg, circa 110 MB) e prepara Vision. Scrivi le note qui sotto, numerate da 48, con «[da fare]».
+L'app è in `/Applications/SubVision.app` (build Release di F6, zip `SubVision-v2.0.0-macos-app.zip`, firma ad hoc). Il primo avvio l'ho già fatto io con la tua cartella di stato vera: uv, Python, ffmpeg e ffprobe sono scaricati e Vision è pronto, quindi parte subito. I parametri OCR sono quelli predefiniti. Scrivi le note qui sotto, numerate da 48, con «[da fare]».
 
 **Prove a mano** (non si possono fare da `DebugQA`):
 
