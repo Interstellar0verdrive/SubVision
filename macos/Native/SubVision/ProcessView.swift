@@ -14,6 +14,9 @@ struct ProcessView: View {
     @Environment(\.svChrome) private var chrome
     @Environment(\.svWindowWidth) private var windowWidth
     @State private var dropTargeted = false
+    /// The height the list's scroll view shows: its content fills it, so a click under the rows deselects.
+    @State private var viewport: CGFloat = 0
+    @State private var escMonitor: Any?
 
     var body: some View {
         @Bindable var model = model
@@ -51,15 +54,42 @@ struct ProcessView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background { Color.clear.contentShape(Rectangle()).onTapGesture { model.selection = [] } }
+        .onAppear { installEscape() }
+        .onDisappear { removeEscape() }
         .fileDrop(isTargeted: $dropTargeted) { model.add($0) }
         .sheet(isPresented: Binding(get: { model.run.showSummary }, set: { if !$0 { model.markSummarySeen() } })) {
             FinishedSheet()
         }
     }
 
+    // MARK: - Selection
+
+    /// Esc deselects the rows (design note 58), unless a text field, a sheet or the
+    /// inspector laid over a narrow window has a better use for it.
+    private func installEscape() {
+        guard escMonitor == nil else { return }
+        let chrome = chrome
+        escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [model] event in
+            guard event.keyCode == 53, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+                  model.tab == .process, !model.selection.isEmpty,
+                  let window = event.window, window.isMainWindow, window.attachedSheet == nil,
+                  !(window.firstResponder is NSText),
+                  !(model.inspectorOpen && chrome.inspectorOverlays(windowWidth: window.frame.width)) else { return event }
+            model.selection = []
+            return nil
+        }
+    }
+
+    private func removeEscape() {
+        if let escMonitor { NSEvent.removeMonitor(escMonitor) }
+        escMonitor = nil
+    }
+
     // MARK: - List
 
-    /// The columns shrink and lose the size column with the inspector open or a narrow window (design note 26).
+    /// The columns shrink with the inspector open or a narrow window (design note 26); the size
+    /// column follows the list's own width (`VideoList.sizeColumnFrom`, design note 59).
     private var compact: Bool { model.inspectorOpen || windowWidth < chrome.collapseBelow }
 
     private var list: some View {
@@ -89,8 +119,13 @@ struct ProcessView: View {
                         .padding(.top, 10)
                 }
                 .padding(.bottom, 16)
+                .frame(maxWidth: .infinity, minHeight: viewport, alignment: .topLeading)
+                // A click on the empty space deselects (design note 58); the rows take their own clicks first.
+                .contentShape(Rectangle())
+                .onTapGesture { model.selection = [] }
             }
             .scrollClipDisabled()
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewport = $0 }
             if let note = diskNote {
                 NoteView(.yellow, text: note)
                     .padding(.bottom, 14)
@@ -128,35 +163,26 @@ struct ProcessView: View {
                     StatusChip(model.tn("app.process.bar.next_batch", ready.count))
                 }
                 Spacer(minLength: 8)
-                Button { model.stopAll() } label: {
-                    HStack(spacing: 6) {
-                        Label(model.t("app.common.stop_all"), systemImage: "stop.fill")
-                        Text("⌘.").svFont(10, mono: true).opacity(0.7)
-                    }
-                }
-                .svButton(.destructive, .regular)
+                Button { model.stopAll() } label: { Label(model.t("app.common.stop_all"), systemImage: "stop.fill") }
+                    .svButton(.destructive, .regular)
+                    .help(model.t("app.process.bar.stop_all_help"))
             } else {
                 if !finished.isEmpty {
                     Text(outcomeText(finished, ready: ready.count)).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
                 } else {
                     Text(model.tn("app.process.bar.ready", ready.count, ["t": model.durationText(model.totalDuration)]))
                         .svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
-                    Text(model.t("app.process.bar.outputs")).svSmall()
-                        .frame(maxWidth: 520, alignment: .leading)
-                        .fixedSize(horizontal: false, vertical: true)
+                    OutputsNote(text: model.t("app.process.bar.outputs"))
+                        .layoutPriority(1)
                 }
                 Spacer(minLength: 8)
                 if !finished.isEmpty {
                     Button(model.t("app.process.bar.clear_done")) { model.clearFinished() }.svButton(.secondary, .regular)
                 }
-                Button { model.startBatch() } label: {
-                    HStack(spacing: 6) {
-                        Label(model.t("app.process.bar.start"), systemImage: "play.fill")
-                        Text("⌘↩").svFont(10, mono: true).opacity(0.7)
-                    }
-                }
-                .svButton(.primary, .regular)
-                .disabled(!model.canStart)
+                Button { model.startBatch() } label: { Label(model.t("app.process.bar.start"), systemImage: "play.fill") }
+                    .svButton(.primary, .regular)
+                    .disabled(!model.canStart)
+                    .help(model.t("app.process.bar.start_help"))
             }
         }
         .padding(.horizontal, 28)
@@ -191,6 +217,30 @@ struct ProcessView: View {
     }
 }
 
+/// "SRT, report and log next to each video. If the SRT is already there…": all the room between
+/// the count and Start; when it must wrap, each sentence on its own line, never half of the
+/// second one on the first (design note 61).
+struct OutputsNote: View {
+    var text: String
+
+    private var sentences: [String] {
+        guard let r = text.range(of: ". ") else { return [text] }
+        return [String(text[..<r.lowerBound]) + ".", String(text[r.upperBound...])]
+    }
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            Text(text).svSmall().lineLimit(1).fixedSize()
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(sentences, id: \.self) { sentence in
+                    Text(sentence).svSmall().fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 /// "+ Drop more videos or folders here" under the list (E1).
 struct DropStrip: View {
     @Environment(AppModel.self) private var model
@@ -212,20 +262,30 @@ struct DropStrip: View {
 struct VideoList: View {
     @Environment(AppModel.self) private var model
     var compact: Bool
+    /// The list's own width: the size column needs room, whatever the inspector does (design note 59).
+    @State private var width: CGFloat = 0
+
+    /// From this width of the list on, the size column shows; under it the size goes next to the folder.
+    static let sizeColumnFrom: CGFloat = 760
 
     /// Column widths of the boards: duration, fps, size, actions (E1; narrower with the inspector or in a narrow window).
     var widths: (duration: CGFloat, fps: CGFloat, size: CGFloat?, actions: CGFloat) {
-        compact ? (66, 56, nil, 200) : (74, 62, 86, 236)
+        let size: CGFloat? = width >= Self.sizeColumnFrom ? (compact ? 78 : 86) : nil
+        return compact ? (66, 56, size, 200) : (74, 62, size, 236)
     }
+
+    /// No row has a state yet (a new list): no circle column, the names start at the left (design note 63).
+    private var showsStatus: Bool { model.videos.contains { $0.circle != nil } }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             ForEach(model.videos) { video in
                 Rectangle().fill(SV.line).frame(height: 1)
-                VideoRow(video: video, widths: widths)
+                VideoRow(video: video, widths: widths, showsStatus: showsStatus)
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .background(RoundedRectangle(cornerRadius: SV.Radius.card).fill(SV.surface))
         .overlay(RoundedRectangle(cornerRadius: SV.Radius.card).strokeBorder(SV.line))
         .clipShape(RoundedRectangle(cornerRadius: SV.Radius.card))
@@ -233,7 +293,7 @@ struct VideoList: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            Color.clear.frame(width: StatusCircle.size)
+            if showsStatus { Color.clear.frame(width: StatusCircle.size) }
             label(model.t("app.process.list.name")).frame(maxWidth: .infinity, alignment: .leading)
             label(model.t("app.process.list.duration")).frame(width: widths.duration, alignment: .trailing)
             label(model.t("app.process.list.fps")).frame(width: widths.fps, alignment: .trailing)

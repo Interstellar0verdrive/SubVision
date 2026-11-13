@@ -30,8 +30,8 @@ struct FinishedSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).svFont(15, .semibold).foregroundStyle(SV.text)
-            Text(model.t("app.process.finished.text") + " "
-                 + model.t("app.process.finished.took", ["t": model.durationText(model.run.summary?.elapsed ?? 0)]))
+            // No "the batch took 2 min" (design note 69): each row says how long its file took.
+            Text(model.t("app.process.finished.text"))
                 .svSmall().fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 0) {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, video in
@@ -73,7 +73,10 @@ struct SummaryRow: View {
 
     private var detail: (String, Color) {
         switch video.state {
-        case .done: (model.tn("app.process.finished.lines", video.segments ?? 0), SV.text2)
+        case .done:
+            // "16 righe · elaborato in 01:54"
+            (model.join([model.tn("app.process.finished.lines", video.segments ?? 0)]
+                        + (video.elapsed.map { [model.t("app.process.finished.took_file", ["t": Localizer.clock($0)])] } ?? [])), SV.text2)
         case .noSubs: (model.t("app.process.finished.no_subs"), SV.yellowText)
         case .failed: (model.t("app.process.finished.failed_at", ["step": model.stepLabel(video.atStep)]), SV.redText)
         default: (model.t("app.common.stopped_chip"), SV.text2)

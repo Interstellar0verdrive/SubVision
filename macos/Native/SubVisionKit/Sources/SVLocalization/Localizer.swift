@@ -121,11 +121,11 @@ public final class Localizer: @unchecked Sendable {
         value.formatted(.number.precision(.fractionLength(decimals)).locale(locale))
     }
 
-    /// Elapsed time and ETA as the rows show them: `4:12`, `1:02:03`.
+    /// Every time of the app, always with two digits (design note 70): `04:12`, `00:48`, `01:02:03`.
     public static func clock(_ seconds: Double) -> String {
         let total = max(0, Int(seconds.rounded()))
         let h = total / 3600, m = total / 60 % 60, s = total % 60
-        return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
+        return h > 0 ? String(format: "%02d:%02d:%02d", h, m, s) : String(format: "%02d:%02d", m, s)
     }
 
     /// The key exists in the fallback language.

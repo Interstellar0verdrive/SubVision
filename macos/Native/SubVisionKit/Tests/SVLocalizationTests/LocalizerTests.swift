@@ -44,7 +44,7 @@ import Testing
         #expect(l.number(17000) == "17.000" && l.number(7.25, decimals: 1).hasPrefix("7,"))
         l.setLanguage("en")
         #expect(l.number(17000) == "17,000" && l.number(7.25, decimals: 1).hasPrefix("7."))
-        #expect(Localizer.clock(252) == "4:12" && Localizer.clock(3723) == "1:02:03" && Localizer.clock(-3) == "0:00")
+        #expect(Localizer.clock(252) == "04:12" && Localizer.clock(48) == "00:48" && Localizer.clock(3723) == "01:02:03" && Localizer.clock(-3) == "00:00")
     }
 
     @Test func fallbackAndMissingKeys() {

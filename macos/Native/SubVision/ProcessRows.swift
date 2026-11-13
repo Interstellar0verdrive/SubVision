@@ -12,13 +12,35 @@ import SwiftUI
 /// The blue of the signs band on the frame and in the step headers (design note 4).
 let signsBlue = Color(dark: "#4F8EF7", light: "#2F6FD6")
 
+extension VideoItem {
+    /// The row's circle (design note 63): none for a ready row, a dashed ring while it
+    /// waits in the batch, the spinner, then the outcome, which stays after the batch.
+    var circle: StatusCircle.State? {
+        switch state {
+        case .unreadable: return .failed
+        case .running: return .running
+        case .done: return .done
+        case .noSubs: return .warning
+        case .failed: return .failed
+        case .stopped: return .stopped
+        case .waiting: return exists ? .waiting : .warning
+        case .ready: return exists ? nil : .warning
+        }
+    }
+}
+
 /// One video (E1–E5). Click selects, ⌘-click adds, double-click opens a
 /// finished row, the context menu and ⌫ act on the selection.
 struct VideoRow: View {
     @Environment(AppModel.self) private var model
     var video: VideoItem
     var widths: (duration: CGFloat, fps: CGFloat, size: CGFloat?, actions: CGFloat)
+    /// Some row of the list has a state: every row keeps the circle's column (design note 63).
+    var showsStatus = true
     @State private var hover = false
+
+    /// Where the text starts: after the circle's column, or at the left edge without it.
+    private var textInset: CGFloat { showsStatus ? StatusCircle.size + 14 : 0 }
 
     private var selected: Bool { model.selection.contains(video.id) }
     private var missing: Bool { !video.exists }
@@ -39,22 +61,16 @@ struct VideoRow: View {
         }
     }
 
-    private var circle: StatusCircle.State {
-        if unreadable { return .failed }
-        switch video.state {
-        case .running: return .running
-        case .done: return .done
-        case .noSubs: return .warning
-        case .failed: return .failed
-        case .stopped: return .stopped
-        default: return missing ? .warning : .waiting
-        }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 14) {
-                StatusCircle(circle)
+                if showsStatus {
+                    if let circle = video.circle {
+                        StatusCircle(circle)
+                    } else {
+                        Color.clear.frame(width: StatusCircle.size, height: StatusCircle.size)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(video.name).svFont(12.5).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
@@ -63,7 +79,9 @@ struct VideoRow: View {
                                 .help(model.t("app.process.row.srt_exists_help", ["name": renamedSRT]))
                         }
                     }
-                    Text(video.folder).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
+                    // Without the size column (a narrow list) the resolution goes next to the folder (design note 59).
+                    Text(widths.size == nil ? [video.size, video.folder].compactMap { $0 }.joined(separator: model.t("app.common.list_separator")) : video.folder)
+                        .svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
                     statusLine
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -82,13 +100,21 @@ struct VideoRow: View {
             .padding(.vertical, 8)
             .frame(minHeight: 52)
             if running || video.state == .failed {
+                if running {
+                    // A light line between the row's head and its steps, from the text to the right edge (design note 65).
+                    Rectangle().fill(SV.line).frame(height: 1)
+                        .padding(.leading, textInset)
+                        .padding(.trailing, -16)
+                        .padding(.top, 2)
+                        .padding(.bottom, 8)
+                }
                 StepsPanel(video: video)
-                    .padding(.leading, StatusCircle.size + 14)
-                    .padding(.top, 4)
+                    .padding(.leading, textInset)
+                    .padding(.top, running ? 0 : 4)
                     .padding(.bottom, 12)
             } else if video.state.isFinished, expanded {
                 FinishedDetail(video: video)
-                    .padding(.leading, StatusCircle.size + 14)
+                    .padding(.leading, textInset)
                     .padding(.top, 4)
                     .padding(.bottom, 12)
             }
@@ -118,14 +144,10 @@ struct VideoRow: View {
             case .waiting:
                 Text(waitingText).svFont(11.5).foregroundStyle(SV.text2)
             case .running:
+                // Only the time: the place in the batch is in the sidebar's card and the bottom bar (design note 66).
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    HStack(spacing: 0) {
-                        Text(model.t("app.process.row.file_of", ["i": model.batch.index, "n": model.batch.total]))
-                            .svFont(11.5, .medium).foregroundStyle(SV.primaryText)
-                        Text(model.t("app.common.list_separator")).svFont(11.5).foregroundStyle(SV.text2)
-                        Text(model.t("app.process.row.elapsed", ["t": Localizer.clock(elapsed(at: context.date))]))
-                            .svFont(11.5).foregroundStyle(SV.text2)
-                    }
+                    Text(model.t("app.process.row.elapsed", ["t": Localizer.clock(elapsed(at: context.date))]))
+                        .svFont(11.5).foregroundStyle(SV.text2)
                 }
             case .done:
                 Text(doneText).svFont(11.5).foregroundStyle(SV.text2).lineLimit(2)
@@ -158,12 +180,12 @@ struct VideoRow: View {
         return model.t("app.process.row.waiting")
     }
 
-    /// "312 righe · 9 scartate (nel report) · 588 confini raffinati · 1 h 31 min".
+    /// "312 righe · 9 scartate (nel report) · 588 confini raffinati · elaborato in 01:31:00".
     private var doneText: String {
         var parts = [model.tn("app.process.row.lines", video.segments ?? 0)]
         if let dropped = video.dropped, dropped > 0 { parts.append(model.tn("app.process.row.dropped", dropped)) }
         if let refined = video.refined, refined > 0 { parts.append(model.tn("app.process.row.refined", refined)) }
-        if let elapsed = video.elapsed { parts.append(model.durationText(elapsed)) }
+        if let elapsed = video.elapsed { parts.append(model.t("app.process.finished.took_file", ["t": Localizer.clock(elapsed)])) }
         return model.join(parts)
     }
 
@@ -326,6 +348,17 @@ struct StepsPanel: View {
         }
     }
 
+    /// The column of the numbers, shared by every step of both bands (design note 64): as wide as
+    /// the longest text expected, wider for all of them together when one text needs more.
+    @State private var numbersWidth: CGFloat = 0
+
+    /// The longest text a running step is expected to show: "17.040 / 17.040 · ETA 23:40 · 127 fps".
+    private var widestExpected: String {
+        let l = model.localizer, n = l.number(17_040)
+        return model.t("app.steps.running", ["done": n, "total": n, "eta": Localizer.clock(23 * 60 + 40),
+                                             "rate": l.number(127), "unit_s": model.t("app.steps.unit.fps")])
+    }
+
     var body: some View {
         let bands = Array(NSOrderedSet(array: steps.map(\.band))) as? [String] ?? []
         VStack(alignment: .leading, spacing: 10) {
@@ -336,7 +369,7 @@ struct StepsPanel: View {
                         Text(model.bandName(band).uppercased()).svFont(10.5, .semibold).foregroundStyle(SV.text3).tracking(0.3)
                     }
                     ForEach(steps.filter { $0.band == band }) { step in
-                        StepLine(step: step, failedRow: video.state == .failed)
+                        StepLine(step: step, failedRow: video.state == .failed, numbersWidth: numbersWidth)
                     }
                 }
             }
@@ -356,7 +389,24 @@ struct StepsPanel: View {
             }
         }
         .padding(.trailing, 2)
+        // The expected widest text takes part in the measure without being shown.
+        .background(alignment: .topLeading) {
+            Text(widestExpected).svFont(SVFont.smallNumbers).lineLimit(1).fixedSize().hidden()
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { expectedWidth = $0 }
+        }
+        .onPreferenceChange(NumbersWidthKey.self) { measured = $0 }
+        .onChange(of: measured, initial: true) { numbersWidth = max(expectedWidth, measured) }
+        .onChange(of: expectedWidth) { numbersWidth = max(expectedWidth, measured) }
     }
+
+    @State private var expectedWidth: CGFloat = 0
+    @State private var measured: CGFloat = 0
+}
+
+/// The widest text of the numbers column among the steps shown.
+struct NumbersWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
 /// "log: ~/Downloads/name.log" in the box of a failed row: a click opens the log (as Open Log does).
@@ -387,6 +437,8 @@ struct StepLine: View {
     @Environment(AppModel.self) private var model
     var step: StepRun
     var failedRow: Bool
+    /// The shared width of the numbers column (`StepsPanel`): all bars come out the same length.
+    var numbersWidth: CGFloat = 180
 
     private var labelColor: Color {
         switch step.state {
@@ -402,7 +454,9 @@ struct StepLine: View {
             Text(model.stepName(step.key)).svFont(12).foregroundStyle(labelColor).frame(width: 118, alignment: .leading).lineLimit(1)
             bar.frame(maxWidth: .infinity)
             Text(right).svFont(SVFont.smallNumbers).foregroundStyle(rightColor).lineLimit(1)
-                .frame(minWidth: 180, alignment: .trailing)
+                .fixedSize()
+                .background { GeometryReader { Color.clear.preference(key: NumbersWidthKey.self, value: $0.size.width) } }
+                .frame(width: max(numbersWidth, 1), alignment: .trailing)
         }
         .help(help)
     }
@@ -435,7 +489,14 @@ struct StepLine: View {
         let l = model.localizer
         switch step.state {
         case .done:
-            let t = Localizer.clock(step.duration ?? step.elapsed)
+            let d = step.duration ?? step.elapsed
+            // Under a second: "in less than 1 s", not "in 00:00" (design note 64).
+            if d < 1 {
+                return step.count > 0
+                    ? model.t("app.steps.done_quick", ["total": l.number(Double(step.count)), "unit": unitName])
+                    : model.t("app.steps.under_second")
+            }
+            let t = Localizer.clock(d)
             if step.count > 0, let rate = averageRate {
                 return model.t("app.steps.done", ["total": l.number(Double(step.count)), "unit": unitName, "t": t,
                                                   "rate": l.number(rate, decimals: rate < 10 ? 1 : 0), "unit_s": rateUnit])
@@ -454,7 +515,8 @@ struct StepLine: View {
             return count
         case .waiting:
             if failedRow { return model.t("app.steps.not_run") }
-            if let e = step.estimate { return model.t("app.steps.waiting_est", ["t": model.durationText(e)]) }
+            // An estimate under a second says nothing ("about 0 s"): "waiting" alone (design note 67).
+            if let e = step.estimate, e >= 1 { return model.t("app.steps.waiting_est", ["t": model.durationText(e)]) }
             return model.t("app.steps.waiting")
         case .aborted: return model.t("app.steps.aborted")
         case .notRun: return model.t("app.steps.not_run")
