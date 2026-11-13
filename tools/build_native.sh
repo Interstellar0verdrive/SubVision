@@ -3,8 +3,13 @@
 # ==========================================================================
 #  tools/build_native.sh - builds the native SubVision 2.0 app for a release
 #
-#    tools/build_native.sh   ->  dist/SubVision-v<version>-macos-app.zip
-#                                dist/SubVision-v<version>-macos-app.zip.sha256
+#    tools/build_native.sh [--smoke]  ->  dist/SubVision-v<version>-macos-app.zip
+#                                         dist/SubVision-v<version>-macos-app.zip.sha256
+#
+#  --smoke: after the zip, its app is unzipped and its engine launcher started
+#  with an empty state folder, twice read-only and once writable (the first
+#  launch sets up Python: it needs the network), then the bundle must hold
+#  exactly the files of the zip and its signature must still verify.
 #
 #  Release build with Xcode, then: a copy in a staging folder, a check of
 #  everything inside the bundle against an allow-list, an ad hoc signature
@@ -38,6 +43,14 @@ APP="$STAGE/SubVision.app"
 # (zip entries keep even seconds only).
 STAMP="202611151120"
 ZIP_STAMP="20261115.112000"
+
+SMOKE=0
+for arg in "$@"; do
+  case "$arg" in
+    --smoke) SMOKE=1 ;;
+    *) echo "usage: $0 [--smoke]" >&2; exit 2 ;;
+  esac
+done
 
 START=$SECONDS
 step() { printf '\n==> %s\n' "$*"; }
@@ -189,6 +202,31 @@ for ts in $(echo "$times" | sort -u); do
     fail "zip entry time $ts falls in working hours"
   fi
 done
+
+# --------------------------------------------------------------------------
+if (( SMOKE )); then
+  step "Smoke test: nothing written inside the bundle"
+  # Nothing may ever be written inside the bundle (a __pycache__ there broke
+  # the signature of the installed app). The engine must start from a
+  # read-only copy (first launch, then the "environment ready" path); then
+  # once more with the copy writable, where a stray write would land, and
+  # the files must still be the zip's and the signature must hold.
+  SMOKEDIR="$(mktemp -d "$REPO/build/smoke.XXXXXX")"
+  trap 'chmod -R u+w "$SMOKEDIR" 2>/dev/null; rm -rf "$CHECK" "$SMOKEDIR"' EXIT
+  ditto -x -k "$ZIP" "$SMOKEDIR"
+  LAUNCHER="$SMOKEDIR/SubVision.app/Contents/Resources/SubVision/subvision"
+  for run in first second third; do
+    if [[ $run == third ]]; then chmod -R u+w "$SMOKEDIR/SubVision.app"; else chmod -R a-w "$SMOKEDIR/SubVision.app"; fi
+    out="$(SUBVISION_STATO="$SMOKEDIR/state" "$LAUNCHER" --version 2>&1)" \
+      || fail "the engine did not start ($run launch): $out"
+    [[ "$out" == *"subvision $VERSION"* ]] || fail "unexpected answer of the engine ($run launch): $out"
+  done
+  diff <(zipinfo -1 "$ZIP" | sed 's|/$||' | sort) \
+       <(cd "$SMOKEDIR" && find SubVision.app | sort) \
+    || fail "the engine wrote inside the bundle (see the lines above)"
+  codesign --verify --deep --strict "$SMOKEDIR/SubVision.app" || fail "the signature broke after a launch"
+  echo "  engine started from a read-only bundle and from a writable one; nothing written in it, signature ok"
+fi
 
 SIZE="$(stat -f %z "$ZIP")"
 SHA="$(cut -d ' ' -f 1 "$ZIP.sha256")"

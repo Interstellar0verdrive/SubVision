@@ -103,7 +103,9 @@ fi
 # after an update of the code the lock differs, and `uv sync --frozen` runs
 # again. Without this check AnimeUp 2.0 kept running an old environment
 # after an update (plan, rule 3.7). The import check guards against a venv
-# that points to a moved or missing Python.
+# that points to a moved or missing Python. -B: -I ignores PYTHONPYCACHEPREFIX,
+# and without -B the import would write __pycache__ next to the code, inside
+# the app bundle (breaking its signature, or failing on a read-only copy).
 PY="$STATO/.venv/bin/python"
 MARKER="$STATO/.venv/.subvision-lock-sha256"
 LOCK_SHA="$(shasum -a 256 "$ROOT/uv.lock" | cut -d' ' -f1)"
@@ -112,7 +114,7 @@ CHECK='import subvision,os,sys; sys.exit(0 if os.path.realpath(subvision.__file_
 environment_ready() {
   [[ -x "$PY" ]] || return 1
   [[ -r "$MARKER" && "$(cat "$MARKER")" == "$LOCK_SHA" ]] || return 1
-  "$PY" -I -c "$CHECK" "$ROOT" >/dev/null 2>&1
+  "$PY" -I -B -c "$CHECK" "$ROOT" >/dev/null 2>&1
 }
 
 if environment_ready; then
