@@ -22,7 +22,7 @@
   --noticeFill:#F2B84B; --onNotice:#2A1C00; --noticeLine:rgba(242,184,75,0);
   --red:#CD3725; --redHover:#D83A27; --redText:#F59B9B; --redBg:rgba(242,109,109,.10); --redLine:rgba(242,109,109,.55);
   --redSoft:rgba(242,109,109,.07); --redTint:rgba(242,109,109,.16);
-  --chipBg:#1C1F23; --chipLine:rgba(255,255,255,.10); --segOn:#3A3E44; --segShadow:rgba(0,0,0,.4); --dropLine:rgba(255,255,255,.40);
+  --chipBg:#1C1F23; --chipLine:rgba(255,255,255,.10); --segOn:#3A3E44; --segShadow:rgba(0,0,0,.4); --dropLine:rgba(255,255,255,.40); --dropHatch:rgba(255,255,255,.035);
   --shadow:0,0,0; --shadowK:1;
   /* SubVision only: the two bands drawn on the video frame (see note-design ?4) */
   --bandDialogue:#3DD68C; --bandSigns:#4DA3FF;
@@ -42,7 +42,7 @@
   --noticeFill:#FFFFFF; --onNotice:#7F5300; --noticeLine:rgba(245,180,0,.45);
   --red:#CD3725; --redHover:#D83A27; --redText:#B42323; --redBg:#FDECEA; --redLine:rgba(217,64,46,.45);
   --redSoft:rgba(205,55,37,.10); --redTint:rgba(217,64,46,.12);
-  --chipBg:#EEF0F2; --chipLine:rgba(0,0,0,.08); --segOn:#FFFFFF; --segShadow:rgba(0,0,0,.15); --dropLine:rgba(0,0,0,.40);
+  --chipBg:#EEF0F2; --chipLine:rgba(0,0,0,.08); --segOn:#FFFFFF; --segShadow:rgba(0,0,0,.15); --dropLine:rgba(0,0,0,.40); --dropHatch:rgba(0,0,0,.03);
   --shadow:16,24,40; --shadowK:.5;
   --bandDialogue:#3DD68C; --bandSigns:#4DA3FF;
   color-scheme: light;
@@ -218,7 +218,7 @@ html.shot .stage { border-radius: 0; outline: 0; }
 
 /* drop zone */
 /* Drop areas: a 2 pt dash in the border colour, strong enough to read in both themes; accent while a file hovers. */
-.drop { border: 2px dashed var(--dropLine); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+.drop { border: 2px dashed var(--dropLine); background: repeating-linear-gradient(135deg, var(--dropHatch) 0 14px, transparent 14px 28px); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; text-align: center; color: var(--text2); padding: 28px; }
 .drop .big { color: var(--text); font-weight: 600; font-size: 14px; }
 .drop.over { border-color: var(--primary); background: var(--soft); color: var(--primaryText); }
@@ -350,10 +350,10 @@ html.shot .stage { border-radius: 0; outline: 0; }
 .twin { width: 600px; background: var(--bg); border-radius: 12px; overflow: hidden; flex: none; padding: 44px 28px 24px; position: relative;
   box-shadow: 0 0 0 1px var(--glassLine), 0 24px 60px rgba(var(--shadow), calc(.45 * var(--shadowK))); display: flex; flex-direction: column; gap: 16px; }
 .twin .lights { position: absolute; left: 14px; top: 12px; }
-.appicon { width: 64px; height: 64px; border-radius: 15px; flex: none; display: grid; place-items: center;
-  background: linear-gradient(160deg, #2b3440, #0e1114); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); position: relative; overflow: hidden; }
-.appicon::after { content: ""; position: absolute; left: 9px; right: 9px; bottom: 13px; height: 9px; border-radius: 3px; background: #F5F5F5; box-shadow: 0 -13px 0 -1px rgba(255,255,255,.45); }
-.appicon::before { content: ""; position: absolute; inset: 9px 9px 30px; border: 2px solid var(--primary); border-radius: 4px; opacity: .9; }
+/* The app icon (design/icona, Icon Composer): the Dark variant in the dark theme, the Light one in the light theme;
+   the squircle and its shadow are in the artwork, so no corners or shadow here. 64 pt, 32 pt in notifications. */
+.appicon { display: block; width: 64px; height: 64px; flex: none; background: url(img/appicon-dark.png) center / contain no-repeat; }
+:root[data-theme="light"] .appicon { background-image: url(img/appicon-light.png); }
 .trows { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .trow { display: flex; align-items: center; gap: 10px; height: 33px; padding: 0 14px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
 .trow:last-child { border-bottom: 0; }
@@ -399,9 +399,7 @@ html.shot .stage { border-radius: 0; outline: 0; }
 /* notifications */
 .notif { width: 344px; background: var(--side); border: 1px solid var(--glassLine); border-radius: 16px; padding: 12px 14px; display: flex; gap: 10px;
   box-shadow: 0 12px 32px rgba(var(--shadow), calc(.35 * var(--shadowK))); backdrop-filter: blur(20px); flex: none; }
-.notif .appicon { width: 32px; height: 32px; border-radius: 8px; }
-.notif .appicon::after { left: 5px; right: 5px; bottom: 7px; height: 5px; box-shadow: 0 -7px 0 -1px rgba(255,255,255,.45); }
-.notif .appicon::before { inset: 5px 5px 16px; border-width: 1.5px; border-radius: 2px; }
+.notif .appicon { width: 32px; height: 32px; }
 .notif .nt { font-weight: 600; font-size: 13px; }
 .notif .nx { font-size: 12.5px; color: var(--text2); line-height: 1.4; }
 .notif .nw { margin-left: auto; font-size: 11px; color: var(--text3); }

@@ -72,12 +72,13 @@ public struct DockColors: Sendable {
     public var running: NSColor
     public var track: NSColor
 
-    public init(running: NSColor, track: NSColor = NSColor.black.withAlphaComponent(0.55)) {
+    public init(running: NSColor, track: NSColor = NSColor.black.withAlphaComponent(0.72)) {
         self.running = running
         self.track = track
     }
 
     /// The accent of the dark tokens: the Dock is drawn once, not per appearance.
+    /// Cyan on a 72 % black track reads on the light icon (white) and on the dark one.
     public static let standard = DockColors(running: NSColor(css: "#2AC9DE"))
 }
 
