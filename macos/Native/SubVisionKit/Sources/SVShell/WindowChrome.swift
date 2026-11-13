@@ -137,12 +137,15 @@ public enum WindowSizer {
     }
 
     public static func toMain(_ config: AppShellConfig) {
-        place(config, config.windowSize, min: config.chrome.minWindow)
+        place(config, config.windowSize, min: config.chrome.minWindow, save: true)
     }
 
     /// On the next turn of the run loop: by then the window is on a screen and
     /// AppKit has applied its own first frame, which would otherwise win.
-    private static func place(_ config: AppShellConfig, _ size: CGSize, min: CGSize) {
+    /// `save`: the frame is written under the window's autosave name once the animation is over.
+    /// An animated `setFrame` is not saved by AppKit, so the next launch reopened the window at
+    /// the tools window's size (stored when the tools window opened), clamped to the minimum.
+    private static func place(_ config: AppShellConfig, _ size: CGSize, min: CGSize, save: Bool = false) {
         DispatchQueue.main.async {
             guard let w = main(config), let screen = w.screen ?? NSScreen.main else { return }
             let area = screen.visibleFrame
@@ -152,6 +155,11 @@ public enum WindowSizer {
             frame.size.height = Swift.min(frame.height, area.height)
             frame.origin = NSPoint(x: (area.midX - frame.width / 2).rounded(), y: (area.midY - frame.height / 2).rounded())
             w.setFrame(frame, display: true, animate: w.isVisible)
+            if save, !w.frameAutosaveName.isEmpty {
+                DispatchQueue.main.asyncAfter(deadline: .now() + w.animationResizeTime(frame) + 0.2) {
+                    w.saveFrame(usingName: w.frameAutosaveName)
+                }
+            }
         }
     }
 }
