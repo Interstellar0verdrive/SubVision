@@ -1,16 +1,25 @@
 // SPDX-License-Identifier: MIT
-// The parameters inspector's place on the Process and Preview pages (design
-// inventory §0 and §3, boards I1 and N2): beside the page in a window of
+// The parameters panel's place on the Video and Preview pages (design boards
+// C2-V1, C2-N1, design note 50): always beside the page in a window of
 // 1000 pt or more, over it from the right below that.
 
+import AppKit
 import SVDesign
 import SwiftUI
 
-/// A page with the inspector on its right, `SVChrome.inspectorWidth` wide.
-/// In a window narrower than `SVChrome.inspectorOverlayBelow` (read from
-/// `svWindowWidth`, which `MainSplit` sets) the inspector covers the page with
-/// a shadow and closes with Esc or a click outside it. The inspector's look
-/// (background, header, groups) is the app's.
+extension EnvironmentValues {
+    /// True for a parameters panel laid over the page of a narrow window: it shows
+    /// its × (design note 57); beside the page it cannot be closed.
+    @Entry public var svInspectorOverlaid = false
+}
+
+/// A page with the parameters panel on its right, `SVChrome.inspectorWidth` wide.
+/// In a window of `SVChrome.inspectorOverlayBelow` or more (read from
+/// `svWindowWidth`, which `MainSplit` sets) the panel is always there and
+/// `isOpen` does not matter. In a narrower window the panel covers the page
+/// with a shadow while `isOpen`, and closes with Esc, a click outside it or
+/// its × (`svInspectorOverlaid`). The panel's look (background, header,
+/// sections) is the app's.
 public struct InspectorSplit<Page: View, Inspector: View>: View {
     @Binding var isOpen: Bool
     @ViewBuilder var page: () -> Page
@@ -29,19 +38,20 @@ public struct InspectorSplit<Page: View, Inspector: View>: View {
         let overlays = chrome.inspectorOverlays(windowWidth: windowWidth)
         HStack(spacing: 0) {
             page().frame(maxWidth: .infinity, maxHeight: .infinity)
-            if isOpen && !overlays {
-                pane.transition(.move(edge: .trailing))
+            if !overlays {
+                pane
             }
         }
         .overlay {
             if isOpen && overlays {
                 ZStack(alignment: .trailing) {
-                    // A click outside the inspector closes it.
+                    // A click outside the panel closes it.
                     Color.clear.contentShape(Rectangle()).onTapGesture { isOpen = false }
                     pane
-                        .background(SV.bg)
-                        .shadow(color: SV.shadow.opacity(0.35), radius: 12, x: -4)
-                        .onExitCommand { isOpen = false }
+                        .environment(\.svInspectorOverlaid, true)
+                        // C2-N1: the shadow falls on the page, to the left.
+                        .shadow(color: SV.shadow.opacity(0.35), radius: 20, x: -16)
+                        .background { EscapeCatcher { isOpen = false } }
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
             }
@@ -53,6 +63,45 @@ public struct InspectorSplit<Page: View, Inspector: View>: View {
         inspector()
             .frame(width: chrome.inspectorWidth)
             .frame(maxHeight: .infinity)
+            .background(SV.surface)
             .overlay(alignment: .leading) { Rectangle().fill(SV.line).frame(width: 1) }
+    }
+}
+
+/// Esc closes the laid-over panel wherever the focus is in its window (the
+/// panel rarely holds it, so `onExitCommand` alone would miss the key). Not
+/// while a sheet is up, and not in another window.
+private struct EscapeCatcher: NSViewRepresentable {
+    var action: () -> Void
+
+    func makeNSView(context: Context) -> CatcherView {
+        let view = CatcherView()
+        view.action = action
+        return view
+    }
+
+    func updateNSView(_ view: CatcherView, context: Context) { view.action = action }
+
+    final class CatcherView: NSView {
+        var action: (() -> Void)?
+        private var monitor: Any?
+
+        deinit {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, let window = self.window, event.window === window, window.attachedSheet == nil,
+                      event.keyCode == 53, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty
+                else { return event }
+                self.action?()
+                return nil
+            }
+        }
     }
 }

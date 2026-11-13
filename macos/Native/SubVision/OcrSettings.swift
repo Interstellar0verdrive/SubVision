@@ -4,8 +4,10 @@
 // band handles of Preview and the note of Sub fix read and write the same
 // values. `AppModel.ocrParams` builds the `OcrParams` of `batch.start`,
 // `preview.*` and `srt.fix` from them; a missing key means the engine's default.
+// "Ripristina" and "Predefinito" of the parameters panel (design note 57)
+// remove keys with an undo on the key window (⌘Z), no confirmation.
 
-import Foundation
+import AppKit
 import SVShell
 
 /// The UserDefaults keys, one per field of `OcrParams`, plus the two lists.
@@ -38,6 +40,9 @@ enum OcrKey {
     static let all = [fps, langHint, bottomKeepPct, keepWPct, topBand, topKeepPct, topKeepWPct, recognitionLevel,
                       minConfidence, multiVariant, skipHamming, refineTiming, minDuration, mergeGap, wrapWidth,
                       workers, qcReport, qcGapWarn, qcConfWarn, qcAgreeWarn]
+
+    /// What "Ripristina" of the parameters panel removes: every parameter and the two lists' switches.
+    static let resettable = all + [useIgnore, useCorrections]
 }
 
 /// The engine's defaults, the ones "Default" goes back to.
@@ -107,7 +112,43 @@ extension AppModel {
     }
 
     /// "Reset all defaults" (design note 14): the keys go, the engine's defaults are back.
+    /// No undo: the QA scripts (`params default`) and the snapshots use it.
     func resetOcrParams() {
         for key in OcrKey.all { defaults.removeObject(forKey: key) }
     }
+
+    /// "↺ Ripristina" of the parameters panel and View › Restore Defaults (design
+    /// note 57): every parameter and the two lists' switches back to the default,
+    /// undone with ⌘Z. Nothing while a batch runs (the panel is locked).
+    func resetAllParameters() {
+        restoreDefaults(OcrKey.resettable)
+    }
+
+    /// Removes `keys` (their defaults are back) and registers the undo on the key
+    /// window: ⌘Z writes the previous values back, ⇧⌘Z removes them again.
+    /// "Predefinito" of a section calls it with that section's keys.
+    func restoreDefaults(_ keys: [String]) {
+        guard !batch.running else { return }
+        let before = SavedDefaults(keys.compactMap { key in defaults.object(forKey: key).map { (key, $0) } })
+        guard !before.values.isEmpty else { return }
+        for key in keys { defaults.removeObject(forKey: key) }
+        let undo = NSApp.keyWindow?.undoManager ?? NSApp.mainWindow?.undoManager
+        undo?.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated {
+                for (key, value) in before.values { model.defaults.set(value, forKey: key) }
+                // Registered while undoing, this is the redo.
+                undo?.registerUndo(withTarget: model) { model in
+                    MainActor.assumeIsolated { model.restoreDefaults(keys) }
+                }
+                undo?.setActionName(model.t("app.inspector.undo_reset"))
+            }
+        }
+        undo?.setActionName(t("app.inspector.undo_reset"))
+    }
+}
+
+/// The values a reset removed, kept for its undo (property-list values, never mutated).
+private struct SavedDefaults: @unchecked Sendable {
+    let values: [(String, Any)]
+    init(_ values: [(String, Any)]) { self.values = values }
 }

@@ -31,7 +31,7 @@ import Testing
     #expect(chrome.sidebarWidth == 236 && chrome.collapseBelow == 1240)
     #expect(chrome.window == CGSize(width: 1360, height: 840))
     #expect(chrome.minWindow == CGSize(width: 720, height: 640))
-    #expect(chrome.inspectorWidth == 300 && chrome.inspectorOverlayBelow == 1000)
+    #expect(chrome.inspectorWidth == 340 && chrome.inspectorOverlayBelow == 1000)
     #expect(chrome.inspectorOverlays(windowWidth: 999) && !chrome.inspectorOverlays(windowWidth: 1000))
     let narrow = SVChrome(sidebarWidth: 200, collapseBelow: 1000)
     #expect(narrow.sidebarWidth == 200 && narrow.page.top == 28)

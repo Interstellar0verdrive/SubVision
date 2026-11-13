@@ -5,21 +5,30 @@
 import SwiftUI
 
 /// A snapping slider: a few fixed values; dots mark them, the knob snaps
-/// to the nearest, and the value under it lights up.
+/// to the nearest, and the value under it lights up. With `ticks` (the
+/// parameters panel, design board C2-P1) the values are small ticks under the
+/// track instead, with no dots and no labels.
 public struct SnapSlider<Value: Hashable>: View {
     var values: [Value]
     var label: (Value) -> String
     @Binding var selection: Value
     var width: CGFloat
+    var ticks: Bool
     @Environment(\.isEnabled) private var enabled
     @State private var dragging: Int?
 
-    public init(values: [Value], selection: Binding<Value>, width: CGFloat = 250,
+    public init(values: [Value], selection: Binding<Value>, width: CGFloat = 250, ticks: Bool = false,
                 label: @escaping (Value) -> String) {
         self.values = values
         self._selection = selection
         self.width = width
+        self.ticks = ticks
         self.label = label
+    }
+
+    /// The ticks variant: no labels.
+    public init(values: [Value], selection: Binding<Value>, width: CGFloat) {
+        self.init(values: values, selection: selection, width: width, ticks: true) { _ in "" }
     }
 
     private var index: Int { dragging ?? values.firstIndex(of: selection) ?? 0 }
@@ -29,23 +38,35 @@ public struct SnapSlider<Value: Hashable>: View {
         let usable = width - 16
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .leading) {
-                Capsule().fill(SV.trackSoft).frame(height: 4).padding(.horizontal, 8)
+                if ticks {
+                    // 1×4 pt ticks just under the track (3 pt below it), at the knob's stops (C2-P1).
+                    ForEach(values.indices, id: \.self) { i in
+                        Rectangle().fill(SV.text3)
+                            .frame(width: 1, height: 4)
+                            .offset(x: 8 + usable * CGFloat(i) / CGFloat(steps) - 0.5, y: 7)
+                    }
+                }
+                // With ticks the track takes the whole width and its fill reaches the knob's
+                // centre, as the continuous slider's (C2-P1); with dots it runs from dot to dot.
+                Capsule().fill(SV.trackSoft).frame(height: 4).padding(.horizontal, ticks ? 0 : 8)
                 Capsule().fill(SV.sysAccent)
-                    .frame(width: usable * CGFloat(index) / CGFloat(steps), height: 4)
-                    .padding(.leading, 8)
+                    .frame(width: usable * CGFloat(index) / CGFloat(steps) + (ticks ? 8 : 0), height: 4)
+                    .padding(.leading, ticks ? 0 : 8)
                 // 6 pt dots ringed in the surface colour.
-                ForEach(values.indices, id: \.self) { i in
-                    Circle().fill(i <= index ? SV.sysAccent : SV.track)
-                        .frame(width: 6, height: 6)
-                        .overlay(Circle().stroke(SV.surface, lineWidth: 1.5).padding(-0.75))
-                        .offset(x: 8 + usable * CGFloat(i) / CGFloat(steps) - 3)
+                if !ticks {
+                    ForEach(values.indices, id: \.self) { i in
+                        Circle().fill(i <= index ? SV.sysAccent : SV.track)
+                            .frame(width: 6, height: 6)
+                            .overlay(Circle().stroke(SV.surface, lineWidth: 1.5).padding(-0.75))
+                            .offset(x: 8 + usable * CGFloat(i) / CGFloat(steps) - 3)
+                    }
                 }
                 Circle().fill(SV.knob)
                     .frame(width: 16, height: 16)
                     .shadow(color: SV.knobShadow, radius: 1.5, y: 1)
                     .offset(x: usable * CGFloat(index) / CGFloat(steps))
             }
-            .frame(width: width, height: 16)
+            .frame(width: width, height: ticks ? 18 : 16)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0)
                 .onChanged { g in
@@ -59,22 +80,28 @@ public struct SnapSlider<Value: Hashable>: View {
                 })
             // Labels under the track's ends (not the control's): the first starts
             // at the first dot, the last ends at the last one, the rest are centred.
-            ZStack(alignment: .leading) {
-                ForEach(values.indices, id: \.self) { i in
-                    Text(label(values[i]))
-                        .svFont(9.5, mono: true)
-                        .foregroundStyle(i == index ? SV.text : SV.text3)
-                        .fixedSize()
-                        .frame(width: 60, alignment: i == 0 ? .leading : i == values.count - 1 ? .trailing : .center)
-                        .offset(x: i == 0 ? 8 : i == values.count - 1 ? width - 8 - 60
-                                : 8 + usable * CGFloat(i) / CGFloat(steps) - 30)
-                }
-            }
-            .frame(width: width, height: 12, alignment: .leading)
+            if !ticks { labels }
         }
         .frame(width: width)
         .opacity(enabled ? 1 : 0.4)
         .animation(.easeOut(duration: 0.12), value: index)
+    }
+
+    private var labels: some View {
+        let steps = max(1, values.count - 1)
+        let usable = width - 16
+        return ZStack(alignment: .leading) {
+            ForEach(values.indices, id: \.self) { i in
+                Text(label(values[i]))
+                    .svFont(9.5, mono: true)
+                    .foregroundStyle(i == index ? SV.text : SV.text3)
+                    .fixedSize()
+                    .frame(width: 60, alignment: i == 0 ? .leading : i == values.count - 1 ? .trailing : .center)
+                    .offset(x: i == 0 ? 8 : i == values.count - 1 ? width - 8 - 60
+                            : 8 + usable * CGFloat(i) / CGFloat(steps) - 30)
+            }
+        }
+        .frame(width: width, height: 12, alignment: .leading)
     }
 }
 
