@@ -6,6 +6,8 @@
 //   tab process|preview|fix · add <path>[,<path>…] · remove-all · select-all
 //   sidebar · inspector · lang en|it · theme system|light|dark
 //   size <w>x<h> · windowid · capture <path> · settings · quit
+//   Preview (F5.2): preview-select, find-frames, stop-frames, wait-frames, frame, band-set,
+//   drag-handle, try-ocr, wait-ocr, preview-state (see the block below)
 
 #if DEBUG
 import AppKit
@@ -62,10 +64,121 @@ enum DebugQA {
             NSApp.sendAction(item.action!, to: item.target, from: item)
         case "quit":
             NSApp.terminate(nil)
+        // F5.2 · Preview (the commands are in `preview(_:_:_:)` below).
+        case "preview-select", "find-frames", "stop-frames", "wait-frames", "frame", "band-set", "drag-handle",
+             "try-ocr", "wait-ocr", "preview-state":
+            return await preview(command, argument, model)
         default:
             return "unknown"
         }
         return "ok · tab \(model.tab.rawValue) · \(model.videos.count) videos · status \(model.status)"
+    }
+
+    // MARK: - F5.2 · Preview
+    //
+    //   preview-select <idx>           the list's video (0-based) in Preview
+    //   find-frames · stop-frames      Find 20 Frames / Stop
+    //   wait-frames <s>                until the search ends (replies with the frames found)
+    //   frame <n>                      the frame shown, 1-based
+    //   band-set <key> <value>         bottom-height, bottom-width, top-height, top-width (percent), top-band (0/1)
+    //   drag-handle <band> <handle> <dx> <dy>   the drag's own function (`BandGeometry.apply`, the one the
+    //                                  gesture calls) with the pointer moved by (dx, dy) pt from the handle
+    //                                  (band: dialogue|signs; handle: height|left|right). Synthesized
+    //                                  NSEvents sent or posted to the window never reach a SwiftUI
+    //                                  DragGesture (it reads the real pointer), so there is no mouse command.
+    //   try-ocr · wait-ocr <s>         Try OCR / until it answers (replies with the texts)
+    //   preview-state                  the page's state and the band values in UserDefaults
+
+    private static func preview(_ command: String, _ argument: String, _ model: AppModel) async -> String {
+        let args = argument.split(separator: " ").map(String.init)
+        switch command {
+        case "preview-select":
+            guard let i = Int(argument), model.videos.indices.contains(i) else { return "bad index" }
+            model.tab = .preview
+            model.selectPreviewVideo(model.videos[i].id)
+            return "ok · \(model.videos[i].name)"
+        case "find-frames":
+            guard model.canFindFrames else { return "cannot find: \(previewState(model))" }
+            model.findFrames()
+            return "ok · searching"
+        case "stop-frames":
+            model.stopFrames()
+            return "ok"
+        case "wait-frames":
+            let ended = await wait(Double(argument) ?? 120) { !model.isSearchingFrames }
+            guard ended else { return "timeout · \(previewState(model))" }
+            if case .failed(let code, let message) = model.preview.search { return "failed \(code) \(message ?? "")" }
+            guard let result = model.previewResult else { return "no frames" }
+            return "\(result.frames.count) frames · \(result.found) with text · index \(result.index + 1)"
+        case "frame":
+            guard let n = Int(argument) else { return "bad number" }
+            model.selectFrame(n - 1)
+            return "ok · frame \(model.previewResult.map { $0.index + 1 } ?? 0)"
+        case "band-set":
+            guard args.count == 2, let value = Int(args[1]) else { return "bad arguments" }
+            switch args[0] {
+            case "bottom-height": BandValues.setHeight(value, .dialogue)
+            case "bottom-width": BandValues.setWidth(value, .dialogue)
+            case "top-height": BandValues.setHeight(value, .signs)
+            case "top-width": BandValues.setWidth(value, .signs)
+            case "top-band": UserDefaults.standard.set(value != 0, forKey: OcrKey.topBand)
+            default: return "unknown key"
+            }
+            return "ok · \(bandValues())"
+        case "drag-handle":
+            guard args.count == 4, let band = PreviewBand(rawValue: args[0]), let handle = BandHandle(rawValue: args[1]),
+                  let dx = Double(args[2]), let dy = Double(args[3]) else { return "bad arguments" }
+            let rect = model.preview.frameRect
+            guard rect.width > 0 else { return "no frame on screen" }
+            let bandRect = BandGeometry.rect(band, height: BandValues.height(band), width: BandValues.width(band), in: rect.size)
+            let start: CGPoint
+            switch handle {
+            case .height: start = CGPoint(x: bandRect.midX, y: band == .dialogue ? bandRect.minY : bandRect.maxY)
+            case .left: start = CGPoint(x: bandRect.minX, y: bandRect.midY)
+            case .right: start = CGPoint(x: bandRect.maxX, y: bandRect.midY)
+            }
+            let end = CGPoint(x: start.x + dx, y: start.y + dy)
+            guard model.canDragBands else { return "bands locked" }
+            let drag = BandGeometry.apply(band, handle, pointer: end, in: rect.size)
+            return "ok · \(drag.band.rawValue) height \(drag.height) width \(drag.width) · \(bandValues())"
+        case "try-ocr":
+            guard model.canTryOCR else { return "cannot try: \(previewState(model))" }
+            model.tryOCR()
+            return "ok · reading"
+        case "wait-ocr":
+            let ended = await wait(Double(argument) ?? 120) { !model.isReadingOCR }
+            guard ended else { return "timeout" }
+            switch model.preview.test {
+            case .done(let reply, _, _, _)?:
+                let bottom = reply.bottom.map { "bottom \"\(oneLine($0.text))\" → \"\(oneLine($0.finalText))\" conf \($0.conf) agree \($0.agree) \(Int($0.ms)) ms" } ?? "bottom —"
+                let top = reply.top.map { " · top \"\(oneLine($0.text))\" → \"\(oneLine($0.finalText))\"" } ?? ""
+                return bottom + top
+            case .failed(let code, let message)?: return "failed \(code) \(message ?? "")"
+            case .reading?: return "still reading"
+            case nil: return "no test"
+            }
+        case "preview-state":
+            return previewState(model)
+        default:
+            return "unknown"
+        }
+    }
+
+    private static func oneLine(_ s: String) -> String { s.replacingOccurrences(of: "\n", with: " / ") }
+
+    private static func bandValues() -> String {
+        "bottom \(BandValues.height(.dialogue))x\(BandValues.width(.dialogue)) · top \(BandValues.signsOn ? "on" : "off") \(BandValues.height(.signs))x\(BandValues.width(.signs))"
+    }
+
+    private static func previewState(_ model: AppModel) -> String {
+        var parts = ["video \(model.previewVideo?.name ?? "none")", "search \(model.preview.search)"]
+        if let r = model.previewResult { parts.append("frames \(r.frames.count) found \(r.found) index \(r.index + 1) band \(model.previewFrame?.band ?? "none")") }
+        parts.append(bandValues())
+        parts.append("test \(model.preview.test == nil ? "none" : model.isReadingOCR ? "reading" : "done")" + (model.preview.stale ? " stale" : ""))
+        parts.append("batch \(model.batch.running)")
+        let r = model.preview.frameRect
+        parts.append("frame \(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))")
+        return parts.joined(separator: " · ")
     }
 }
 #endif

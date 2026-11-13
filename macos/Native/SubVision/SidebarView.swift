@@ -12,7 +12,7 @@ extension AppModel {
         [ShellTab(id: Tab.process.rawValue, symbol: Tab.process.symbol, title: t("app.sidebar.tab.process"),
                   subtitle: processSubtitle, busy: batch.running, count: countedVideos == 0 ? nil : countedVideos),
          ShellTab(id: Tab.preview.rawValue, symbol: Tab.preview.symbol, title: t("app.sidebar.tab.preview"),
-                  subtitle: previewSubtitle),
+                  subtitle: previewSubtitle, busy: isSearchingFrames),
          ShellTab(id: Tab.fix.rawValue, symbol: Tab.fix.symbol, title: t("app.sidebar.tab.fix"),
                   subtitle: fixSubtitle)]
     }
@@ -28,9 +28,12 @@ extension AppModel {
         return join(parts)
     }
 
+    /// The video's name; "Searching · zone 12 of 20" (A2), "15 of 20 frames with text" (A3), "Read-only" (A6).
     var previewSubtitle: String {
         guard let video = previewVideo else { return t("app.sidebar.no_videos") }
         if batch.running { return t("app.sidebar.prev_readonly") }
+        if case .running(let done, let total, _) = preview.search { return t("app.sidebar.prev_search", ["i": done, "n": total]) }
+        if let result = preview.results[video.id] { return t("app.sidebar.prev_found", ["k": result.found, "n": result.frames.count]) }
         return video.name
     }
 
