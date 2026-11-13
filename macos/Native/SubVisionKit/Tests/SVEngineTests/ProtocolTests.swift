@@ -134,5 +134,15 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
         #expect(h.isCompatible && EngineHello.timeout == .seconds(90))
         #expect(EngineError.remote(code: "bad_params", message: "x").remoteCode == "bad_params")
         #expect(EngineError.notRunning.remoteCode == nil)
+        // The optional details of the error object, `data {field, reason}` of bad_params included.
+        let info = RemoteErrorInfo(error: ["code": "bad_params", "message": "lang_hint: not supported", "detail": "d", "tool": "vision",
+                                           "path": "/v/a.srt", "line": 214, "data": ["field": "lang_hint", "reason": "not supported"]])
+        #expect(info == RemoteErrorInfo(detail: "d", tool: "vision", path: "/v/a.srt", line: 214, field: "lang_hint", reason: "not supported"))
+        #expect(EngineError.remote(code: "bad_params", message: "x", info: info).remoteInfo?.field == "lang_hint")
+        #expect(EngineError.remote(code: "busy", message: "x").remoteInfo == RemoteErrorInfo())
+        #expect(EngineError.notRunning.remoteInfo == nil)
+        // batch.file.failed with the fields of protocol 2.0 final: code, text, detail, log.
+        let failed = try reply(#"{"idx":0,"error":"unknown (OCRError: boom)","at_step":"ocr:bottom","code":"unknown","text":"boom","detail":"OCRError: boom","log":"/v/a.log"}"#, as: BatchFileFailed.self)
+        #expect(failed.code == "unknown" && failed.text == "boom" && failed.log == "/v/a.log" && failed.atStep == "ocr:bottom" && failed.line == nil)
     }
 }

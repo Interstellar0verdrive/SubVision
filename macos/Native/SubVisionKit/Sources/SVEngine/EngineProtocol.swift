@@ -92,7 +92,8 @@ public struct StartReply: Decodable, Sendable, Equatable {
     public var isBusy: Bool { !started && reason == "busy" }
 }
 
-/// `batch.stop`, `preview.stop`: `reason` (`no_batch`, `no_preview`) when nothing ran.
+/// `batch.stop`, `preview.stop`: `reason` (`no_batch`, `no_preview`) when nothing ran;
+/// `not_running` when `batch.stop` named a file that is not the one in progress.
 public struct StopReply: Decodable, Sendable, Equatable {
     public var ok: Bool
     public var reason: String?
@@ -302,6 +303,17 @@ public struct BatchFileFailed: Decodable, Sendable, Equatable {
     public var error: String
     /// `key:band` of the step it failed in.
     public var atStep: String?
+    /// The stable code (`probe_failed`, `unknown`...), translated by the app.
+    public var code: String? = nil
+    /// A short text for the row: the exception's own message, no type name, no prefix.
+    public var text: String? = nil
+    /// The technical detail (`Type: message`, stderr).
+    public var detail: String? = nil
+    public var tool: String? = nil
+    public var path: String? = nil
+    public var line: Int? = nil
+    /// The per-file log, where the whole story is.
+    public var log: String? = nil
 }
 
 public struct BatchFileStopped: Decodable, Sendable, Equatable {
@@ -448,8 +460,13 @@ extension EngineClient {
     }
 
     /// `all`: the whole batch; otherwise the file in progress only.
-    public func batchStop(all: Bool) async throws -> StopReply {
-        try await call(EngineMethod.batchStop, params: ["scope": all ? "all" : "file"])
+    /// `file` is the batch index (`idx` of `batch.file.started`) the stop is
+    /// meant for: when another file is in progress by now the engine answers
+    /// `ok: false, reason: "not_running"` and stops nothing.
+    public func batchStop(all: Bool, file: Int? = nil) async throws -> StopReply {
+        var params: [String: Any] = ["scope": all ? "all" : "file"]
+        if let file, !all { params["file"] = file }
+        return try await call(EngineMethod.batchStop, params: params)
     }
 
     public func previewFrames(video: String, params: OcrParams, n: Int = 20, tries: Int = 3) async throws -> StartReply {

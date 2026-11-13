@@ -92,7 +92,7 @@ extension AppModel {
             let reply = try await engine.toolsUse(ffmpeg: path)
             custom.version = reply.ffmpeg?.version
         } catch {
-            custom.error = (error as? EngineError).flatMap { if case .remote(_, let m) = $0 { m } else { nil } } ?? String(describing: error)
+            custom.error = (error as? EngineError).flatMap { if case .remote(_, let m, _) = $0 { m } else { nil } } ?? String(describing: error)
             log.error("tools.use \(path): \(error)")
         }
         let probe = custom.folder.appendingPathComponent("ffprobe")

@@ -162,7 +162,8 @@ public actor EngineClient {
         entry.timer?.cancel()
         if let error = object["error"] as? [String: Any] {
             entry.continuation.resume(throwing: EngineError.remote(code: error["code"] as? String ?? "error",
-                                                                   message: error["message"] as? String ?? ""))
+                                                                   message: error["message"] as? String ?? "",
+                                                                   info: RemoteErrorInfo(error: error)))
         } else if let result = object["result"] {
             if let data = try? JSONSerialization.data(withJSONObject: result, options: [.fragmentsAllowed]) {
                 entry.continuation.resume(returning: data)

@@ -70,7 +70,7 @@ struct Pid: Decodable, Sendable { var pid: Int }
         do {
             _ = try await client.raw("no.such.method")
             Issue.record("an unknown method answered")
-        } catch let EngineError.remote(code, _) {
+        } catch let EngineError.remote(code, _, _) {
             #expect(code == "unknown_method")
         }
         await client.stop()
