@@ -85,6 +85,10 @@ final class ReportBridge: NSObject {
         super.init()
         let config = WKWebViewConfiguration()
         config.userContentController = controller
+        // The page's own memory (localStorage, keyed by the SRT's name) must not outlive the window:
+        // the review state is `<name>.revisione.json`, and a report made again for the same video
+        // would otherwise start from the old choices.
+        config.websiteDataStore = .nonPersistent()
         controller.addScriptMessageHandler(self, contentWorld: .page, name: Self.handlerName)
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self

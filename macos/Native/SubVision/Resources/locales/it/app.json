@@ -207,7 +207,7 @@
   "app.menu.stop_all": "Ferma tutto",
   "app.menu.stop_file": "Ferma il file in corso",
   "app.menu.try_ocr": "Prova OCR su questo fotogramma",
-  "app.menu.undo_remove": "Annulla Togli",
+  "app.menu.undo_remove": "Togli dall’elenco",
   "app.menu.view": "Vista",
   "app.menu.window": "Finestra",
   "app.notify.batch_done": "Lotto finito",

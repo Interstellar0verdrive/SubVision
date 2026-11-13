@@ -207,7 +207,7 @@
   "app.menu.stop_all": "Stop All",
   "app.menu.stop_file": "Stop the Current File",
   "app.menu.try_ocr": "Try OCR on This Frame",
-  "app.menu.undo_remove": "Undo Remove",
+  "app.menu.undo_remove": "Remove from List",
   "app.menu.view": "View",
   "app.menu.window": "Window",
   "app.notify.batch_done": "Batch finished",
