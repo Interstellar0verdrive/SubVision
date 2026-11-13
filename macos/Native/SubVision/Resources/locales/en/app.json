@@ -30,6 +30,7 @@
   "app.alerts.stop_title": "Stop {name}?",
   "app.alerts.stopall_text": "The file in progress stops now, without a half-written SRT; the ones after it don’t start. The SRTs already made stay.",
   "app.alerts.stopall_title": "Stop the whole batch?",
+  "app.alerts.update_error_text": "Try again later.",
   "app.alerts.update_text": "You have v{current}. The release page has the notes and the download.",
   "app.alerts.update_title": "SubVision v{version} is available",
   "app.alerts.use_bundled": "Use the Downloaded Ones",

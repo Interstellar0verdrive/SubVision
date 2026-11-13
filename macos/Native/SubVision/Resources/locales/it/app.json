@@ -30,6 +30,7 @@
   "app.alerts.stop_title": "Fermare {name}?",
   "app.alerts.stopall_text": "Il file in corso si ferma subito, senza SRT a metà; quelli dopo non partono. Gli SRT già fatti restano.",
   "app.alerts.stopall_title": "Fermare tutto il lotto?",
+  "app.alerts.update_error_text": "Riprova più tardi.",
   "app.alerts.update_text": "Hai la v{current}. La pagina della release ha le note e il download.",
   "app.alerts.update_title": "È disponibile SubVision v{version}",
   "app.alerts.use_bundled": "Usa quelli scaricati",

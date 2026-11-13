@@ -1,0 +1,6 @@
+<!-- SPDX-License-Identifier: MIT · copied from the alert icons of the native macOS app of AnimeUp, by the same author -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40" fill="none" stroke="#000000" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="20" cy="20" r="15" />
+  <path d="M20 9.5v16m-6-6 6 6 6-6" />
+  <line x1="12.5" y1="30" x2="27.5" y2="30" />
+</svg>
