@@ -7,14 +7,31 @@ import AppKit
 import SVShell
 import UniformTypeIdentifiers
 
-/// One row of the list. F5.1 adds the outcome of a batch to it.
+/// One row of the list, with the outcome of its last batch (design notes 8–9):
+/// the outcome stays until Process Again or Remove Finished.
 struct VideoItem: Identifiable, Codable, Equatable {
     enum State: String, Codable {
         /// Goes into the next batch.
         case ready
         /// `videos.probe` found no video track: left out of the batch.
         case unreadable
-        // F5.1: waiting, running, done, noSubs, failed, stopped.
+        /// In the batch that runs, not started yet.
+        case waiting
+        /// The file the batch works on.
+        case running
+        /// SRT written.
+        case done
+        /// Finished, no subtitles found (`batch.file.done.empty`).
+        case noSubs
+        /// `batch.file.failed`.
+        case failed
+        /// Stopped by the person (`batch.file.stopped`).
+        case stopped
+
+        /// Done, failed or stopped: an outcome to keep, to show or to clear.
+        var isFinished: Bool { [.done, .noSubs, .failed, .stopped].contains(self) }
+        /// Part of the batch in progress.
+        var inBatch: Bool { self == .waiting || self == .running }
     }
 
     var id: UUID
@@ -28,6 +45,28 @@ struct VideoItem: Identifiable, Codable, Equatable {
     /// The reason it cannot be read (`detail` of `probe_failed`).
     var problem: String?
     var added: Date
+
+    // The outcome of the last batch (nil until one ran this file).
+    /// Lines in the SRT.
+    var segments: Int?
+    var dropped: Int?
+    var refined: Int?
+    /// Seconds the file took.
+    var elapsed: Double?
+    /// Seconds per step, by `key:band`.
+    var times: [String: Double]?
+    /// The steps of the last plan (`key:band`), to list the times in order.
+    var plan: [String]?
+    /// Where the engine wrote the SRT, the report and the log (the SRT may carry a date in its name).
+    var srtPath: String?
+    var reportPath: String?
+    var logPath: String?
+    /// `batch.file.failed.error` (`code (k=v, …)` or `Type: message`).
+    var error: String?
+    /// `key:band` of the step it failed or stopped in.
+    var atStep: String?
+    /// When the outcome arrived.
+    var finished: Date?
 
     init(path: String) {
         id = UUID()
@@ -53,6 +92,25 @@ struct VideoItem: Identifiable, Codable, Equatable {
         guard let width, let height, width > 0, height > 0 else { return nil }
         return "\(width)×\(height)"
     }
+
+    /// The SRT the last batch wrote (or `<stem>.srt`), its report and its log.
+    var outputSRT: URL { srtPath.map { URL(fileURLWithPath: $0) } ?? srtURL }
+    var outputLog: URL { logPath.map { URL(fileURLWithPath: $0) } ?? url.deletingPathExtension().appendingPathExtension("log") }
+    var logExists: Bool { FileManager.default.fileExists(atPath: outputLog.path) }
+    /// The report of the last batch, when it exists on disk.
+    var outputReport: URL? {
+        let candidate = reportPath.map { URL(fileURLWithPath: $0) } ?? reportURL
+        return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
+    }
+    /// The code of `error` (before the first space): `app.errors.<code>`.
+    var errorCode: String? { error?.split(separator: " ", maxSplits: 1).first.map(String.init) }
+
+    /// Drops the outcome: back to the next batch (Process Again, design note 9).
+    mutating func resetOutcome() {
+        state = .ready
+        segments = nil; dropped = nil; refined = nil; elapsed = nil; times = nil; plan = nil
+        srtPath = nil; reportPath = nil; logPath = nil; error = nil; atStep = nil; finished = nil
+    }
 }
 
 extension AppModel {
@@ -62,9 +120,12 @@ extension AppModel {
         guard let data = try? Data(contentsOf: videosFile) else { return }
         do {
             videos = try JSONDecoder().decode([VideoItem].self, from: data)
+            // A batch the last run never finished (a crash, a kill): those rows are ready again.
+            for i in videos.indices where videos[i].state.inBatch { videos[i].resetOutcome() }
         } catch {
             log.error("videos.json: \(error)")
         }
+        loadSummary()
     }
 
     func saveVideos() {
@@ -208,8 +269,25 @@ extension AppModel {
 
     func removeSelection() { removeWithUndo(selection) }
 
-    /// Rows that can be removed now (not the ones a batch is working on, F5.1).
-    var canRemoveSelection: Bool { !selection.isEmpty }
+    /// Rows that can be removed now (not the ones a batch is working on).
+    var canRemoveSelection: Bool {
+        !selection.isEmpty && !videos.contains { selection.contains($0.id) && $0.state.inBatch }
+    }
+
+    /// Process Again (the row, the context menu): a finished row goes back to ready (design note 9).
+    func processAgain(_ ids: Set<UUID>) {
+        for i in videos.indices where ids.contains(videos[i].id) && videos[i].state.isFinished {
+            videos[i].resetOutcome()
+        }
+        saveVideos()
+    }
+
+    /// Remove Finished (the bottom bar): every done, failed or stopped row goes.
+    func clearFinished() {
+        removeWithUndo(Set(videos.filter { $0.state.isFinished }.map(\.id)))
+    }
+
+    var finishedVideos: [VideoItem] { videos.filter { $0.state.isFinished } }
 
     func selectAll() { selection = Set(videos.map(\.id)) }
 

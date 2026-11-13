@@ -68,6 +68,8 @@ final class AppModel {
     /// Items dropped that are not videos: the yellow note over the list, until closed.
     var skippedItems: [String] = []
     var batch = BatchActivity()
+    /// The batch in progress as the rows see it (F5.1, `AppModel+Run.swift`).
+    var run = BatchRun()
     /// The video Preview shows (F5.2), chosen from the list.
     var previewVideoID: UUID? { didSet { defaults.set(previewVideoID?.uuidString, forKey: DefaultsKey.previewVideo) } }
     /// The SRT Sub fix works on (F5.3).
@@ -348,7 +350,14 @@ final class AppModel {
         return !Alerts.confirmQuit(self)
     }
 
-    func quitApp() { NSApp.terminate(nil) }
+    /// A sheet that is up (the end-of-batch summary, F5.1) keeps AppKit from
+    /// terminating: it is closed first, unseen, so it comes back at the next launch.
+    func quitApp() {
+        let sheetOpen = run.showSummary
+        run.showSummary = false
+        for window in NSApp.windows { if let sheet = window.attachedSheet { window.endSheet(sheet) } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (sheetOpen ? 0.35 : 0)) { NSApp.terminate(nil) }
+    }
 
     /// The Dock icon's menu (O10): the file in progress, Stop All, Show SubVision.
     func dockMenu() -> [DockMenuEntry] {

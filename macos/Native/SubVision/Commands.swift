@@ -37,14 +37,19 @@ struct AppCommands: Commands {
         }
         CommandGroup(after: .newItem) {
             Divider()
-            Button(model.t("app.menu.open_report")) {}
-                .keyboardShortcut("r", modifiers: .command)
-                .disabled(true)   // F5.1: a finished row selected
+            // F5.1: the finished row selected, when its report or log is on disk.
+            Button(model.t("app.menu.open_report")) {
+                if let report = model.selectedFinished?.outputReport { model.openReport(report) }
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            .disabled(model.selectedFinished?.outputReport == nil || model.tab != .process)
             Button(model.t("app.menu.show_in_finder")) { model.showInFinder(model.selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(model.selection.isEmpty)
-            Button(model.t("app.menu.open_file_log")) {}
-                .disabled(true)   // F5.1
+            Button(model.t("app.menu.open_file_log")) {
+                if let video = model.selectedFinished { model.openLog(video) }
+            }
+            .disabled(model.selectedFinished?.logExists != true || model.tab != .process)
             Divider()
             Button(model.t("app.menu.remove")) { model.removeSelection() }
                 .keyboardShortcut(.delete, modifiers: [])

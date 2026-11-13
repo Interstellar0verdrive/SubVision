@@ -63,9 +63,130 @@ enum DebugSnapshot {
                                              "\(base)-settings-lists-locked.png")
                 model.batch.running = false
             }
+            if env["SUBVISION_SNAPSHOT_PROCESS"] == "1" {
+                await processStates(model, base: base, schemes: schemes)
+            }
             AppLog.shared.info("snapshots done")
             NSApp.terminate(nil)
         }
+    }
+
+    // MARK: - F5.1: the batch states (E2–E6, I1–I3, N1), fed by hand
+
+    /// The list (three videos from `SUBVISION_SNAPSHOT_ADD`) put in the states of
+    /// the boards: a batch is over in seconds on the demo clips, too fast to catch.
+    private static func processStates(_ model: AppModel, base: String, schemes: [ColorScheme]) async {
+        guard model.videos.count >= 3 else { AppLog.shared.error("process snapshots need three videos"); return }
+        let window = WindowSizer.main(model.config)
+        func settle() async { try? await Task.sleep(for: .milliseconds(600)) }
+        func steps(_ bands: [String], running: String?, failedAt: String? = nil) -> [StepRun] {
+            var out: [StepRun] = []
+            var past = true
+            for band in bands {
+                for key in ["extract", "group", "ocr", "refine"] {
+                    var s = StepRun(key: key, band: band, estimate: [134, 12, 3820, 468][["extract", "group", "ocr", "refine"].firstIndex(of: key)!])
+                    let id = "\(key):\(band)"
+                    if id == failedAt { s.state = .aborted; s.ratio = 0.3; past = false }
+                    else if !past { s.state = failedAt == nil ? .waiting : .notRun }
+                    else if id == running {
+                        s.state = .running; s.ratio = 0.62; s.count = 10565; s.total = 17040; s.eta = 1420; s.rate = 4.5; s.elapsed = 2347; past = false
+                    } else {
+                        s.state = .done; s.ratio = 1; s.count = 17040; s.duration = s.estimate; s.elapsed = s.estimate ?? 0
+                    }
+                    out.append(s)
+                }
+            }
+            return out
+        }
+        let ids = model.videos.prefix(3).map(\.id)
+        model.resetOcrParams()
+        model.defaults.set(true, forKey: "inspector.group.ocr")
+        for g in ["dlg", "sig", "seg", "adv"] { model.defaults.set(true, forKey: "inspector.group.\(g)") }
+        model.selection = []
+        // I1: the inspector open with the defaults, the list ready.
+        model.inspectorOpen = true
+        await settle()
+        await capture(model, "\(base)-I1.png", schemes: schemes)
+        // I2: groups closed but Segments and Advanced, two values changed.
+        for g in ["ocr", "dlg", "sig"] { model.defaults.set(false, forKey: "inspector.group.\(g)") }
+        model.defaults.set(1.0, forKey: OcrKey.mergeGap)
+        model.defaults.set(1, forKey: OcrKey.skipHamming)
+        await settle()
+        await capture(model, "\(base)-I2.png", schemes: schemes)
+        model.resetOcrParams()
+        for g in ["ocr", "dlg", "sig"] { model.defaults.set(true, forKey: "inspector.group.\(g)") }
+        // E2 / I3: file 2 of 3 with its steps, the first done, the third waiting; the inspector locked.
+        model.videos[0].state = .done
+        model.videos[0].segments = 312; model.videos[0].dropped = 9; model.videos[0].refined = 588; model.videos[0].elapsed = 5460
+        model.videos[0].plan = ["extract:bottom", "group:bottom", "ocr:bottom", "refine:bottom", "extract:top", "group:top", "ocr:top", "refine:top"]
+        model.videos[0].times = ["extract:bottom": 134, "group:bottom": 12, "ocr:bottom": 3820, "refine:bottom": 468,
+                                 "extract:top": 121, "group:top": 11, "ocr:top": 842, "refine:top": 52]
+        model.videos[0].finished = Date()
+        model.videos[1].state = .running
+        model.videos[2].state = .waiting
+        model.run = BatchRun(ids: ids, steps: steps(["bottom", "top"], running: "ocr:bottom"), fileStarted: Date().addingTimeInterval(-2480), lastFileElapsed: 5460)
+        model.batch = BatchActivity(running: true, index: 2, total: 3, name: model.videos[1].name, fraction: 0.52,
+                                    endsAround: AppModel.clockTime(Date().addingTimeInterval(3600)))
+        await settle()
+        await capture(model, "\(base)-E2.png", schemes: schemes)
+        // N1: the narrow window with the batch running.
+        if let window {
+            let saved = window.frame
+            model.inspectorOpen = false
+            window.setContentSize(NSSize(width: 900, height: 760))
+            await settle()
+            await capture(model, "\(base)-N1.png", schemes: schemes)
+            window.setFrame(saved, display: true)
+            await settle()
+        }
+        // I3 centre: the saved language is not one of this Mac's.
+        model.batch = BatchActivity()
+        model.run = BatchRun()
+        model.videos[1].state = .ready
+        model.videos[2].state = .ready
+        model.inspectorOpen = true
+        model.defaults.set("xx-XX", forKey: OcrKey.langHint)
+        await settle()
+        await capture(model, "\(base)-I3-language.png", schemes: schemes)
+        model.resetOcrParams()
+        model.inspectorOpen = false
+        // E3: the outcomes, the done row opened; E4 and E5 share the list.
+        model.videos[1].state = .noSubs
+        model.videos[1].segments = 0; model.videos[1].elapsed = 5520; model.videos[1].finished = Date()
+        model.videos[2].state = .failed
+        model.videos[2].error = "unknown (OCRError: Vision request failed (-1) · frame 000412.jpg)"
+        model.videos[2].atStep = "ocr:bottom"
+        model.videos[2].plan = ["extract:bottom", "group:bottom", "ocr:bottom", "refine:bottom"]
+        model.videos[2].times = ["extract:bottom": 1, "group:bottom": 0.4, "ocr:bottom": 3]
+        model.videos[2].finished = Date()
+        model.run.expanded = [ids[0]]
+        await settle()
+        await capture(model, "\(base)-E3.png", schemes: schemes)
+        model.run.expanded = []
+        await settle()
+        await capture(model, "\(base)-E4.png", schemes: schemes)
+        // E5: a file stopped, the batch going on with the next.
+        model.videos[0].state = .stopped
+        model.videos[0].atStep = "ocr:bottom"
+        model.videos[1].state = .running
+        model.videos[2].resetOutcome()
+        model.videos[2].state = .waiting
+        model.run = BatchRun(ids: ids, steps: steps(["bottom"], running: "extract:bottom"), fileStarted: Date().addingTimeInterval(-4))
+        model.run.steps[0].ratio = 0.05; model.run.steps[0].count = 800; model.run.steps[0].eta = nil; model.run.steps[0].rate = nil
+        model.batch = BatchActivity(running: true, index: 2, total: 3, name: model.videos[1].name, fraction: 0.35)
+        await settle()
+        await capture(model, "\(base)-E5.png", schemes: schemes)
+        // E6: the sheet, rendered on its own (a sheet is another window).
+        model.batch = BatchActivity()
+        model.run = BatchRun(ids: ids)
+        model.videos[0].state = .done; model.videos[0].atStep = nil
+        model.videos[1].state = .noSubs
+        model.videos[2].state = .failed; model.videos[2].atStep = "ocr:bottom"; model.videos[2].error = "unknown (OCRError: Vision request failed (-1))"
+        model.run.summary = BatchSummary(ids: ids, done: 2, failed: 1, stopped: 0, skipped: 0, elapsed: 11040, when: Date(), seen: true)
+        SVShell.DebugSnapshot.render(FinishedSheet().environment(model), width: 520, schemes: schemes, "\(base)-E6.png")
+        for i in 0..<3 { model.videos[i].resetOutcome() }
+        model.run = BatchRun()
+        model.saveVideos()
     }
 
     /// The tools window while it downloads and while it prepares the recognition (T1, T2).

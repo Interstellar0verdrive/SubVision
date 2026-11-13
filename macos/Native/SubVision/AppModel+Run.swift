@@ -1,17 +1,512 @@
 // SPDX-License-Identifier: MIT
-// The batch (F5.1): `batch.start`, the rows' steps and outcomes, Stop and
-// Stop All, the end-of-batch sheet and the notifications. The stubs below
-// keep the app building until F5.1 fills them.
+// The batch (F5.1, design boards E2–E6, O1, O2, O10): `batch.start`, the
+// rows' steps and outcomes from the `batch.*` events, Stop and Stop All with
+// their confirmations, `BatchActivity` for the sidebar and the Dock, the
+// end-of-batch summary (kept until seen) and the notifications. Some of the
+// shape (stop confirmations after the click, the summary seen or not) is
+// adapted from the AppModel+Run of the native macOS app of AnimeUp (by the
+// same author).
 
+import AppKit
 import SVShell
 
+/// One step of the file in progress (`batch.file.started.steps[]`, then `batch.step`).
+struct StepRun: Identifiable, Equatable {
+    enum State: Equatable {
+        case waiting, running, done
+        /// The file failed or was stopped in this step.
+        case aborted
+        /// The steps after the aborted one.
+        case notRun
+    }
+
+    var key: String
+    var band: String
+    /// Seconds, from the previous file of the batch.
+    var estimate: Double?
+    var state: State = .waiting
+    var ratio = 0.0
+    var count = 0
+    var total = 0
+    /// frames, targets or segments.
+    var unit = "frames"
+    var elapsed = 0.0
+    var eta: Double?
+    var rate: Double?
+    /// Seconds it took, once done.
+    var duration: Double?
+
+    var id: String { "\(key):\(band)" }
+
+    init(key: String, band: String, estimate: Double? = nil, state: State = .waiting) {
+        self.key = key
+        self.band = band
+        self.estimate = estimate
+        self.state = state
+    }
+
+    init(_ planned: PlannedStep) {
+        self.init(key: planned.key, band: planned.band, estimate: planned.estimate)
+    }
+}
+
+/// `batch.done`, kept in `<state>/records/batch-summary.json` until the
+/// summary sheet (E6) has been seen: the notification's click or the next
+/// launch reopen it.
+struct BatchSummary: Codable, Equatable {
+    var ids: [UUID]
+    var done: Int
+    var failed: Int
+    var stopped: Int
+    var skipped: Int
+    var elapsed: Double
+    var error: String?
+    var when: Date
+    var seen = false
+}
+
+/// The batch in progress as the rows see it; `AppModel.batch` is the short form.
+struct BatchRun: Equatable {
+    /// The videos of the batch in the engine's order (`idx`).
+    var ids: [UUID] = []
+    /// The steps of the file in progress.
+    var steps: [StepRun] = []
+    var fileStarted: Date?
+    /// Seconds the previous file took, for "Ends around".
+    var lastFileElapsed: Double?
+    /// Stop All was asked: a batch stopped on purpose with nothing done shows no summary.
+    var stoppedByUser = false
+    var summary: BatchSummary?
+    var showSummary = false
+    /// Finished rows opened to show their times and files (E3).
+    var expanded: Set<UUID> = []
+
+    /// The step the engine works on (or the first not started).
+    var currentStep: StepRun? {
+        steps.first { $0.state == .running } ?? steps.first { $0.state == .waiting }
+    }
+
+    /// The file's fraction: by estimate when every step has one, else one share each.
+    var fileFraction: Double {
+        guard !steps.isEmpty else { return 0 }
+        let weights = steps.map { $0.estimate ?? 0 }
+        let useWeights = steps.allSatisfy { ($0.estimate ?? 0) > 0 }
+        var total = 0.0, done = 0.0
+        for (i, step) in steps.enumerated() {
+            let w = useWeights ? weights[i] : 1
+            total += w
+            switch step.state {
+            case .done: done += w
+            case .running: done += w * min(max(step.ratio, 0), 1)
+            default: break
+            }
+        }
+        return total > 0 ? done / total : 0
+    }
+
+    /// Seconds left in this file, from the estimates (nil without them).
+    var fileRemaining: Double? {
+        guard !steps.isEmpty, steps.allSatisfy({ $0.estimate != nil }) else { return nil }
+        var left = 0.0
+        for step in steps {
+            switch step.state {
+            case .waiting: left += step.estimate ?? 0
+            case .running:
+                if let eta = step.eta { left += eta } else { left += max(0, (step.estimate ?? 0) - step.elapsed) }
+            default: break
+            }
+        }
+        return left
+    }
+}
+
 extension AppModel {
-    func startBatch() { log.info("batch.start: not yet (\(readyVideos.count) ready)") }
-    func stopCurrentFile() {}
-    func stopAll() {}
+    private var summaryFile: URL { configuration.stateFolder.appendingPathComponent("records/batch-summary.json") }
+
+    // MARK: - Start
+
+    /// Start (⌘↩): the ready rows go into the batch with the inspector's parameters.
+    func startBatch() {
+        guard canStart else { return }
+        let ready = readyVideos
+        let lang = ocrLanguage
+        if let known = hello?.languages, !known.isEmpty, !known.contains(where: { $0.caseInsensitiveCompare(lang) == .orderedSame }) {
+            Alerts.languageUnsupported(self, language: lang, count: known.count)
+            return
+        }
+        let ids = ready.map(\.id)
+        // The rows wait before the request: the first event can come back before the reply.
+        for i in videos.indices where ids.contains(videos[i].id) {
+            videos[i].resetOutcome()
+            videos[i].state = .waiting
+        }
+        run = BatchRun(ids: ids)
+        batch = BatchActivity(running: true, index: 1, total: ids.count, name: ready.first?.name ?? "")
+        selection = []
+        saveVideos()
+        updateDock()
+        log.info("batch.start: \(ids.count) videos, \(ocrParams.langHint), fps \(ocrParams.fps)")
+        Task {
+            do {
+                let reply = try await engine.batchStart(videos: ready.map(\.path), params: ocrParams,
+                                                        useIgnore: useIgnore, useCorrections: useCorrections, lang: language)
+                if !reply.started {
+                    rollBackStart(ids)
+                    log.error("batch.start refused: \(reply.reason ?? "?")")
+                    Alerts.error(self, title: t("app.menu.start"), text: t(reply.isBusy ? "app.errors.busy" : "app.errors.unknown", ["detail": reply.reason ?? ""]))
+                }
+            } catch {
+                rollBackStart(ids)
+                log.error("batch.start failed: \(error)")
+                if let e = error as? EngineError, e.remoteCode == "bad_params", String(describing: e).contains("lang_hint") {
+                    Alerts.languageUnsupported(self, language: lang, count: hello?.languages.count ?? 0)
+                } else if let e = error as? EngineError, let code = e.remoteCode {
+                    Alerts.error(self, title: t("app.menu.start"), text: engineErrorText(code, detail: String(describing: e)))
+                } else {
+                    Alerts.error(self, title: t("app.menu.start"), text: String(describing: error))
+                }
+            }
+        }
+    }
+
+    private func rollBackStart(_ ids: [UUID]) {
+        for i in videos.indices where ids.contains(videos[i].id) && videos[i].state.inBatch { videos[i].state = .ready }
+        run = BatchRun()
+        batch = BatchActivity()
+        saveVideos()
+        updateDock()
+    }
+
+    /// `app.errors.<code>` with what the message carries as `detail`.
+    func engineErrorText(_ code: String, detail: String) -> String {
+        let key = "app.errors.\(code)"
+        guard localizer.has(key) else { return detail }
+        let d = detail.split(separator: ":", maxSplits: 1).last.map { $0.trimmingCharacters(in: .whitespaces) } ?? detail
+        return t(key, ["detail": d, "tool": "", "path": "", "line": ""])
+    }
+
+    // MARK: - Stop
+
+    /// The video the batch works on.
+    var runningVideo: VideoItem? { videos.first { $0.state == .running } }
+
+    /// Stop on the row or ⌥⌘. (O1): the file stops, the batch goes on.
+    func stopCurrentFile() {
+        guard batch.running, let video = runningVideo else { return }
+        afterClick { [self] in
+            guard Alerts.confirmStopFile(self, name: video.name) else { return }
+            Task { await stop(all: false) }
+        }
+    }
+
+    /// Stop All (⌘., the sidebar card, the bottom bar, the Dock; O2).
+    func stopAll() {
+        guard batch.running else { return }
+        afterClick { [self] in
+            guard Alerts.confirmStopAll(self) else { return }
+            run.stoppedByUser = true
+            Task { await stop(all: true) }
+        }
+    }
+
+    /// Without a confirmation (the quit alert said it already, the QA scenarios).
+    func stop(all: Bool) async {
+        if all { run.stoppedByUser = true }
+        do {
+            let reply = try await engine.batchStop(all: all)
+            log.info("batch.stop \(all ? "all" : "file"): \(reply.ok) \(reply.reason ?? "")")
+        } catch {
+            log.error("batch.stop failed: \(error)")
+        }
+    }
+
+    // MARK: - Events
 
     /// The `batch.*` events, from the one consumer in `AppModel.listen()`.
     func handleBatch(_ message: EngineMessage, name: String) {
-        log.debug("event \(name)")
+        switch message {
+        case .batchFileStarted(let f): fileStarted(f)
+        case .batchStep(let s): step(s)
+        case .batchFileDone(let d): fileDone(d)
+        case .batchFileFailed(let f): fileFailed(f)
+        case .batchFileStopped(let s): fileStopped(s)
+        case .batchDone(let d): batchDone(d)
+        default: log.debug("event \(name) ignored here")
+        }
+    }
+
+    private func index(of idx: Int) -> Int? {
+        guard run.ids.indices.contains(idx) else { return nil }
+        let id = run.ids[idx]
+        return videos.firstIndex { $0.id == id }
+    }
+
+    private func fileStarted(_ f: BatchFileStarted) {
+        guard let i = index(of: f.idx) else { log.error("batch.file.started idx \(f.idx) unknown"); return }
+        videos[i].state = .running
+        videos[i].plan = f.steps.map(\.id)
+        videos[i].srtPath = f.srt
+        videos[i].logPath = f.log
+        videos[i].reportPath = f.report
+        run.steps = f.steps.map(StepRun.init)
+        run.fileStarted = Date()
+        batch.index = f.idx + 1
+        batch.total = f.total
+        batch.name = f.name
+        refreshActivity()
+        saveVideos()
+    }
+
+    private func step(_ s: BatchStep) {
+        guard let k = run.steps.firstIndex(where: { $0.id == s.id }) else { return }
+        // A step that reports means the ones before it are over (the engine's tracker does the same).
+        for j in run.steps.indices where j < k && run.steps[j].state != .done {
+            run.steps[j].state = .done
+            run.steps[j].ratio = 1
+            if run.steps[j].duration == nil { run.steps[j].duration = run.steps[j].elapsed }
+        }
+        run.steps[k].state = s.ratio >= 1 ? .done : .running
+        run.steps[k].ratio = s.ratio
+        run.steps[k].count = s.count
+        run.steps[k].total = s.total
+        run.steps[k].unit = s.unit
+        run.steps[k].elapsed = s.elapsed
+        run.steps[k].eta = s.eta
+        run.steps[k].rate = s.rate
+        if s.ratio >= 1 { run.steps[k].duration = s.elapsed }
+        refreshActivity()
+    }
+
+    private func fileDone(_ d: BatchFileDone) {
+        guard let i = index(of: d.idx) else { return }
+        videos[i].state = d.empty ? .noSubs : .done
+        videos[i].segments = d.segments
+        videos[i].dropped = d.dropped
+        videos[i].refined = d.refined
+        videos[i].elapsed = d.elapsed
+        videos[i].times = d.times
+        videos[i].srtPath = d.srt
+        videos[i].reportPath = d.report
+        videos[i].logPath = d.log
+        videos[i].finished = Date()
+        for j in run.steps.indices {
+            run.steps[j].state = .done
+            run.steps[j].ratio = 1
+            if let t = d.times[run.steps[j].id] { run.steps[j].duration = t }
+        }
+        run.lastFileElapsed = d.elapsed
+        saveVideos()
+        let v = videos[i]
+        notifyFile(v, body: d.empty ? t("app.notify.file_no_subs", ["name": v.name])
+                   : tn("app.notify.file_done", d.segments, ["name": v.name]))
+    }
+
+    private func fileFailed(_ f: BatchFileFailed) {
+        guard let i = index(of: f.idx) else { return }
+        videos[i].state = .failed
+        videos[i].error = f.error
+        videos[i].atStep = f.atStep ?? run.currentStep?.id
+        videos[i].finished = Date()
+        videos[i].times = stepTimes()
+        abortSteps(at: videos[i].atStep)
+        saveVideos()
+        let v = videos[i]
+        log.error("file \(v.name) failed at \(v.atStep ?? "?"): \(f.error)")
+        notifyFile(v, body: t("app.notify.file_failed", ["name": v.name, "step": stepLabel(v.atStep)]))
+    }
+
+    private func fileStopped(_ s: BatchFileStopped) {
+        guard let i = index(of: s.idx) else { return }
+        videos[i].state = .stopped
+        videos[i].atStep = run.currentStep?.id
+        videos[i].finished = Date()
+        videos[i].times = stepTimes()
+        abortSteps(at: videos[i].atStep)
+        saveVideos()
+    }
+
+    private func batchDone(_ d: BatchDone) {
+        // Rows never started (Stop All) are ready again (E5).
+        for i in videos.indices where videos[i].state.inBatch { videos[i].resetOutcome() }
+        if let error = d.error { log.error("batch failed: \(error)") }
+        log.info("batch.done: \(d.done) done, \(d.failed) failed, \(d.stopped) stopped, \(d.skipped) skipped in \(d.elapsed) s")
+        let summary = BatchSummary(ids: run.ids, done: d.done, failed: d.failed, stopped: d.stopped, skipped: d.skipped,
+                                   elapsed: d.elapsed, error: d.error, when: Date())
+        run.summary = summary
+        run.steps = []
+        run.fileStarted = nil
+        // Stopped on purpose with nothing done or failed: the rows say it already (as AnimeUp does).
+        let worthASheet = d.done + d.failed > 0 || d.error != nil
+        run.showSummary = worthASheet
+        if worthASheet { saveSummary() } else { run.summary?.seen = true; removeSummary() }
+        batch = BatchActivity()
+        saveVideos()
+        updateDock()
+        if worthASheet { tab = .process }
+        if let error = d.error {
+            Alerts.error(self, title: t("app.notify.batch_done"), text: engineErrorText(error.split(separator: " ").first.map(String.init) ?? "unknown", detail: error))
+        }
+        if notifications {
+            let readyCount = videos.filter { summary.ids.contains($0.id) && $0.state == .done }.count
+            let warned = videos.filter { summary.ids.contains($0.id) && ($0.state == .noSubs || $0.state == .failed) }.count
+            var parts = [tn("app.notify.batch_ready", readyCount)]
+            if warned > 0 { parts.append(tn("app.notify.batch_warnings", warned)) }
+            notify(title: t("app.notify.batch_done"), body: join(parts), identifier: "batch-done",
+                   userInfo: ["page": Tab.process.rawValue, "sheet": "summary"])
+        }
+    }
+
+    /// The step the file broke in turns red, the ones after it grey (E4, E5).
+    private func abortSteps(at id: String?) {
+        guard let k = run.steps.firstIndex(where: { $0.id == id }) else { return }
+        for j in run.steps.indices {
+            if j < k, run.steps[j].state != .done { run.steps[j].state = .done; run.steps[j].ratio = 1 }
+            if j == k { run.steps[j].state = .aborted }
+            if j > k { run.steps[j].state = .notRun }
+        }
+    }
+
+    /// Seconds per step of the file in progress, for a row that failed or stopped.
+    private func stepTimes() -> [String: Double] {
+        var out: [String: Double] = [:]
+        for s in run.steps where s.state == .done || s.state == .running {
+            out[s.id] = s.duration ?? s.elapsed
+        }
+        return out
+    }
+
+    /// `BatchActivity` (sidebar, Dock, O3): the fraction and "Ends around".
+    private func refreshActivity() {
+        guard batch.running, batch.total > 0 else { return }
+        let done = Double(max(0, batch.index - 1))
+        batch.fraction = (done + run.fileFraction) / Double(batch.total)
+        var remaining: Double?
+        if let left = run.fileRemaining {
+            let after = Double(batch.total - batch.index)
+            let perFile = run.lastFileElapsed ?? run.steps.compactMap(\.estimate).reduce(0, +)
+            remaining = left + after * perFile
+        }
+        batch.endsAround = remaining.map { Self.clockTime(Date().addingTimeInterval($0)) }
+        updateDock()
+    }
+
+    /// "14:20" in the app's language.
+    static func clockTime(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.timeStyle = .short
+        f.dateStyle = .none
+        return f.string(from: date)
+    }
+
+    // MARK: - Labels (shared by the rows, the sheet and the notifications)
+
+    /// "OCR ×3 · dialogue" from `key:band` (design note 18).
+    func stepLabel(_ id: String?) -> String {
+        guard let id else { return "" }
+        let parts = id.split(separator: ":").map(String.init)
+        let key = parts.first ?? id
+        let band = parts.count > 1 ? parts[1] : ""
+        let step = stepName(key)
+        guard !band.isEmpty else { return step }
+        return "\(step) · \(bandName(band, lower: true))"
+    }
+
+    /// The short label of a step (the OCR one with its variants).
+    func stepName(_ key: String) -> String {
+        switch key {
+        case "ocr": t("app.steps.ocr", ["n": ocrParams.multiVariant ? 3 : 1])
+        case "extract", "group", "refine": t("app.steps.\(key)")
+        default: key
+        }
+    }
+
+    func bandName(_ band: String, lower: Bool = false) -> String {
+        let name = band == "top" ? "signs" : "dialogue"
+        return t("app.steps.band.\(name)\(lower ? "_l" : "")")
+    }
+
+    /// "2 h 14 min · 48 min · 55 s" as the texts of the rows and the sheet want it.
+    func durationLong(_ seconds: Double) -> String { durationText(seconds) }
+
+    // MARK: - Summary (E6)
+
+    func markSummarySeen() {
+        run.showSummary = false
+        guard run.summary != nil, run.summary?.seen == false else { return }
+        run.summary?.seen = true
+        removeSummary()
+    }
+
+    private func saveSummary() {
+        guard let summary = run.summary else { return }
+        do {
+            try FileManager.default.createDirectory(at: summaryFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try JSONEncoder().encode(summary).write(to: summaryFile, options: .atomic)
+        } catch {
+            log.error("batch-summary.json: \(error)")
+        }
+    }
+
+    private func removeSummary() { try? FileManager.default.removeItem(at: summaryFile) }
+
+    /// At launch: a summary never seen comes back with its sheet (the batch
+    /// ended with the window closed, the app quit before the sheet was read).
+    func loadSummary() {
+        guard let data = try? Data(contentsOf: summaryFile),
+              let summary = try? JSONDecoder().decode(BatchSummary.self, from: data), !summary.seen,
+              Date().timeIntervalSince(summary.when) < 7 * 86400,
+              videos.contains(where: { summary.ids.contains($0.id) && $0.state.isFinished }) else {
+            removeSummary()
+            return
+        }
+        run.summary = summary
+        run.showSummary = true
+    }
+
+    /// The rows of the sheet: the batch's videos still in the list, in the batch's order.
+    var summaryVideos: [VideoItem] {
+        guard let summary = run.summary else { return [] }
+        return summary.ids.compactMap { id in videos.first { $0.id == id && $0.state.isFinished } }
+    }
+
+    // MARK: - Outputs
+
+    func openLog(_ video: VideoItem) {
+        guard video.logExists else { return }
+        openLogInConsole(video.outputLog.path)
+    }
+
+    func openSRT(_ video: VideoItem) {
+        let url = video.outputSRT
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Show SRTs in Finder (the sheet): the SRTs of the batch, selected.
+    func showSummarySRTs() {
+        let urls = summaryVideos.filter { $0.state == .done }.map(\.outputSRT).filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard !urls.isEmpty else { return }
+        NSWorkspace.shared.activateFileViewerSelecting(urls)
+    }
+
+    /// The finished row whose report Open Report (⌘R) opens: the one selected.
+    var selectedFinished: VideoItem? {
+        guard selection.count == 1, let id = selection.first else { return nil }
+        return videos.first { $0.id == id && $0.state.isFinished }
+    }
+
+    // MARK: - Notifications (design note 23)
+
+    /// One per file only in a batch of several files, and only with the window behind.
+    private func notifyFile(_ video: VideoItem, body: String) {
+        guard notifications, batch.total > 1, !NSApp.isActive else { return }
+        notify(title: t("app.notify.file_title"), body: body, identifier: "file-\(video.id.uuidString)",
+               userInfo: ["page": Tab.process.rawValue])
+    }
+
+    /// Alerts opened by a button wait for the click to finish (a modal loop
+    /// inside the button's own gesture leaves AppKit tracking that click).
+    private func afterClick(_ show: @escaping @MainActor () -> Void) {
+        DispatchQueue.main.async { show() }
     }
 }

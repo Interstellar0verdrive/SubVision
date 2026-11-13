@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-// Process, the home (design boards E0, E1, E7): the header, the notes, the
-// list of videos, the drop strip and the bottom bar. The batch itself and the
-// rows' outcomes come with F5.1.
+// Process, the home (design boards E0–E7): the header, the notes, the list
+// of videos (rows in `ProcessRows.swift`), the drop strip, the bottom bar in
+// its three states (ready, batch running, finished) and the end-of-batch
+// sheet (`FinishedSheet.swift`).
 
 import AppKit
 import SVShell
@@ -50,6 +51,9 @@ struct ProcessView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .fileDrop(isTargeted: $dropTargeted) { model.add($0) }
+        .sheet(isPresented: Binding(get: { model.run.showSummary }, set: { if !$0 { model.markSummarySeen() } })) {
+            FinishedSheet()
+        }
     }
 
     // MARK: - List
@@ -104,29 +108,79 @@ struct ProcessView: View {
 
     // MARK: - Bottom bar
 
+    /// Ready: the count and the outputs line, Start. Running: "File 2 of 3 · ends
+    /// around 14:20", the rows added meanwhile, Stop All. Finished: the outcomes,
+    /// Remove Finished, Start for the rows that are ready (E1, E2, E3, E5).
     private var bottomBar: some View {
         HStack(alignment: .center, spacing: 14) {
             let ready = model.readyVideos
-            Text(model.tn("app.process.bar.ready", ready.count, ["t": model.durationText(model.totalDuration)]))
-                .svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
-            Text(model.t("app.process.bar.outputs")).svSmall()
-                .frame(maxWidth: 520, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 8)
-            Button { model.startBatch() } label: {
-                HStack(spacing: 6) {
-                    Label(model.t("app.process.bar.start"), systemImage: "play.fill")
-                    Text("⌘↩").svFont(10, mono: true).opacity(0.7)
+            let finished = model.finishedVideos
+            if model.batch.running {
+                Text(runningText).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
+                if !ready.isEmpty {
+                    StatusChip(model.tn("app.process.bar.next_batch", ready.count))
                 }
+                Spacer(minLength: 8)
+                Button { model.stopAll() } label: {
+                    HStack(spacing: 6) {
+                        Label(model.t("app.common.stop_all"), systemImage: "stop.fill")
+                        Text("⌘.").svFont(10, mono: true).opacity(0.7)
+                    }
+                }
+                .svButton(.destructive, .regular)
+            } else {
+                if !finished.isEmpty {
+                    Text(outcomeText(finished, ready: ready.count)).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
+                } else {
+                    Text(model.tn("app.process.bar.ready", ready.count, ["t": model.durationText(model.totalDuration)]))
+                        .svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
+                    Text(model.t("app.process.bar.outputs")).svSmall()
+                        .frame(maxWidth: 520, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                if !finished.isEmpty {
+                    Button(model.t("app.process.bar.clear_done")) { model.clearFinished() }.svButton(.secondary, .regular)
+                }
+                Button { model.startBatch() } label: {
+                    HStack(spacing: 6) {
+                        Label(model.t("app.process.bar.start"), systemImage: "play.fill")
+                        Text("⌘↩").svFont(10, mono: true).opacity(0.7)
+                    }
+                }
+                .svButton(.primary, .regular)
+                .disabled(!model.canStart)
             }
-            .svButton(.primary, .regular)
-            .disabled(!model.canStart)
         }
         .padding(.horizontal, 28)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
         .background(SV.bg)
         .overlay(alignment: .top) { Rectangle().fill(SV.line).frame(height: 1) }
+    }
+
+    /// "File 2 di 3 · fine verso le 14:20" (or without the end, before any estimate).
+    private var runningText: String {
+        if let ends = model.batch.endsAround {
+            return model.t("app.process.bar.running", ["i": model.batch.index, "n": model.batch.total, "time": ends])
+        }
+        return model.t("app.process.row.file_of", ["i": model.batch.index, "n": model.batch.total])
+    }
+
+    /// "Lotto fermato · 1 fatto · 1 senza sottotitoli · 1 fallito · 1 pronto".
+    private func outcomeText(_ finished: [VideoItem], ready: Int) -> String {
+        var parts: [String] = []
+        let stopped = finished.filter { $0.state == .stopped }.count
+        let done = finished.filter { $0.state == .done }.count
+        let noSubs = finished.filter { $0.state == .noSubs }.count
+        let failed = finished.filter { $0.state == .failed }.count
+        if model.run.summary?.stopped ?? 0 > 0 || (stopped > 0 && model.run.stoppedByUser) { parts.append(model.t("app.process.bar.stopped")) }
+        if done > 0 { parts.append(model.tn("app.process.bar.done", done)) }
+        if noSubs > 0 { parts.append(model.tn("app.process.bar.no_subs", noSubs)) }
+        if failed > 0 { parts.append(model.tn("app.process.bar.failed", failed)) }
+        if stopped > 0 { parts.append(model.tn("app.process.bar.stopped_count", stopped)) }
+        if ready > 0 { parts.append(model.tn("app.process.bar.ready_count", ready)) }
+        return model.join(parts)
     }
 }
 
@@ -188,115 +242,5 @@ struct VideoList: View {
 
     private func label(_ text: String) -> some View {
         Text(text.uppercased()).svFont(10.5, .semibold).foregroundStyle(SV.text3).tracking(0.3).lineLimit(1)
-    }
-}
-
-/// One video (E1): the status edge and ring, name with chips, folder, the
-/// numbers, and what is wrong with it. Click selects, ⌘-click adds, the
-/// context menu and ⌫ act on the selection.
-struct VideoRow: View {
-    @Environment(AppModel.self) private var model
-    var video: VideoItem
-    var widths: (duration: CGFloat, fps: CGFloat, size: CGFloat?, actions: CGFloat)
-    @State private var hover = false
-
-    private var selected: Bool { model.selection.contains(video.id) }
-    private var missing: Bool { !video.exists }
-    private var unreadable: Bool { video.state == .unreadable }
-    private var dim: Bool { unreadable || missing }
-
-    private var edge: Color {
-        if unreadable { return SV.red }
-        if missing { return SV.yellow }
-        return SV.track
-    }
-
-    private var circle: StatusCircle.State {
-        if unreadable { return .failed }
-        if missing { return .warning }
-        return .waiting
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            StatusCircle(circle)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(2)
-                    if video.srtExists {
-                        StatusChip(model.t("app.process.row.srt_exists"))
-                            .help(model.t("app.process.row.srt_exists_help", ["name": renamedSRT]))
-                    }
-                }
-                Text(video.folder).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
-                if unreadable {
-                    Text(model.t("app.process.row.unreadable")).svFont(11.5).foregroundStyle(SV.redText)
-                        .help(video.problem ?? "")
-                } else if missing {
-                    Text(model.t("app.process.row.not_found")).svFont(11.5).foregroundStyle(SV.yellowText)
-                        .help(model.t("app.process.row.file_missing_help"))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(dim ? 0.55 : 1)
-            Group {
-                number(video.duration.map(Localizer.clock)).frame(width: widths.duration, alignment: .trailing)
-                number(video.fps.map(fpsText)).frame(width: widths.fps, alignment: .trailing)
-                if let size = widths.size {
-                    number(video.size).frame(width: size, alignment: .trailing)
-                }
-            }
-            .opacity(dim ? 0.55 : 1)
-            // F5.1: the row's buttons (Stop, Open Report, ⋯).
-            HStack(spacing: 6) {}
-                .frame(width: widths.actions, alignment: .trailing)
-        }
-        .padding(.vertical, 8)
-        .padding(.leading, 13)
-        .padding(.trailing, 16)
-        .frame(minHeight: 52)
-        .background(selected ? SV.sel : hover ? SV.hoverVeil : .clear)
-        .overlay(alignment: .leading) { Rectangle().fill(edge).frame(width: 3) }
-        .contentShape(Rectangle())
-        .onHover { hover = $0 }
-        .onTapGesture { select() }
-        .contextMenu {
-            Button(model.t("app.menu.show_in_finder")) { model.showInFinder([video.id]) }.disabled(missing)
-            Button(model.t("app.process.row.open_in_preview")) { model.openInPreview(video.id) }.disabled(dim)
-            Divider()
-            Button(model.t("app.menu.remove")) { model.removeWithUndo(selected ? model.selection : [video.id]) }
-        }
-        .help(video.size.map { "\($0) · \(video.path)" } ?? video.path)
-    }
-
-    /// Numbers in mono, "—" where the probe has nothing (unreadable, not yet probed).
-    private func number(_ text: String?) -> some View {
-        Text(text ?? (video.probed ? "—" : "…")).svFont(SVFont.numbers).foregroundStyle(SV.textCode).lineLimit(1)
-    }
-
-    /// "23,976" or "24": the language's separators, no trailing zeros.
-    private func fpsText(_ fps: Double) -> String {
-        let rounded = (fps * 1000).rounded() / 1000
-        return model.localizer.number(rounded, decimals: rounded == rounded.rounded() ? 0 : 3)
-    }
-
-    /// The name a new SRT would get when one is there already (`<stem>_<yyyyMMdd_HHmmss>.srt`).
-    private var renamedSRT: String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyyMMdd_HHmmss"
-        return video.url.deletingPathExtension().lastPathComponent + "_" + f.string(from: Date()) + ".srt"
-    }
-
-    private func select() {
-        let flags = NSApp.currentEvent?.modifierFlags ?? []
-        if flags.contains(.command) {
-            if selected { model.selection.remove(video.id) } else { model.selection.insert(video.id) }
-        } else if flags.contains(.shift), let anchor = model.selection.first,
-                  let a = model.videos.firstIndex(where: { $0.id == anchor }),
-                  let b = model.videos.firstIndex(where: { $0.id == video.id }) {
-            model.selection = Set(model.videos[min(a, b)...max(a, b)].map(\.id))
-        } else {
-            model.selection = [video.id]
-        }
     }
 }
