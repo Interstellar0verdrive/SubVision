@@ -77,12 +77,15 @@ public struct SVMenuItem {
 /// neither it nor what contains it ever sees a hover.
 public struct PopupMenu<Label: View>: View {
     var items: () -> [SVMenuItem]
+    /// A change of this value opens the menu, as a click on the button does (0 never does).
+    var openRequest: Int
     @ViewBuilder var label: Label
     @State private var frame = CGRect.zero
     @Environment(\.isEnabled) private var enabled
 
-    public init(_ items: @escaping () -> [SVMenuItem], @ViewBuilder label: () -> Label) {
+    public init(_ items: @escaping () -> [SVMenuItem], openRequest: Int = 0, @ViewBuilder label: () -> Label) {
         self.items = items
+        self.openRequest = openRequest
         self.label = label()
     }
 
@@ -92,6 +95,9 @@ public struct PopupMenu<Label: View>: View {
             // Disabled reads as disabled, like the design's menus (opacity .45).
             .opacity(enabled ? 1 : 0.45)
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+            .onChange(of: openRequest) { _, request in
+                if request != 0, enabled, frame != .zero { show() }
+            }
     }
 
     private func show() {
@@ -126,10 +132,24 @@ public struct PopupMenu<Label: View>: View {
         }
         // Under the control, its left edge aligned, as a popup button opens.
         let y = view.isFlipped ? frame.maxY + 4 : view.bounds.height - frame.maxY - 4
+        PopupMenuTracking.open = menu
+        defer { PopupMenuTracking.open = nil }
         _ = withExtendedLifetime(handler) {
             menu.popUp(positioning: nil, at: NSPoint(x: frame.minX, y: y), in: view)
         }
     }
+}
+
+/// The popup menu that is open, if any: `popUp` returns only when it closes,
+/// so a test (or the app's debug commands) closes it from a timer with `cancel()`.
+@MainActor
+public enum PopupMenuTracking {
+    public internal(set) static var open: NSMenu?
+
+    /// The titles of the open menu's items, and the one checked.
+    public static var titles: [String] { open?.items.filter { !$0.isSeparatorItem }.map { ($0.state == .on ? "✓ " : "") + $0.title } ?? [] }
+
+    public static func cancel() { open?.cancelTracking() }
 }
 
 private final class MenuHandler: NSObject {

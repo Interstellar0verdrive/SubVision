@@ -876,9 +876,14 @@ public struct TopBarSegment: View {
     public var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: symbol).svFont(12)
+                // While the page works the spinner takes the icon's place, before the word (board N1).
+                if busy {
+                    Spinner(size: 10, tint: selected ? SV.onPrimary : SV.primary).frame(width: 12)
+                } else {
+                    Image(systemName: symbol).svFont(12)
+                }
                 Text(title).svFont(12.5, selected ? .semibold : .regular).lineLimit(1)
-                // The number stays while the batch works: the spinner joins it, never replaces it.
+                // The number stays while the batch works.
                 if let count {
                     // A neutral capsule, glass on the bar, a darker veil on the current segment.
                     Text("\(count)").svFont(10, .semibold, mono: true)
@@ -888,11 +893,10 @@ public struct TopBarSegment: View {
                         .background(Capsule().fill(selected ? SV.chipOnAccent : SV.glass))
                         .overlay(Capsule().strokeBorder(selected ? .clear : SV.glassLine))
                 }
-                if busy { Spinner(size: 10, tint: selected ? SV.onPrimary : SV.primary) }
             }
             .foregroundStyle(selected ? SV.onPrimary : SV.text2)
             .padding(.leading, 12)
-            .padding(.trailing, count != nil || busy ? 8 : 12)
+            .padding(.trailing, count != nil ? 8 : 12)
             .frame(height: 24)
             .background(RoundedRectangle(cornerRadius: 7).fill(selected ? SV.primary : hover ? SV.glassHover : .clear))
             .contentShape(RoundedRectangle(cornerRadius: 7))

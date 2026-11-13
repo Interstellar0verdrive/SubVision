@@ -78,6 +78,8 @@ struct BatchRun: Equatable {
     var stoppedByUser = false
     var summary: BatchSummary?
     var showSummary = false
+    /// Rows that never started and went back to ready when the batch was stopped: they say "ready" (E5).
+    var readyAgain: Set<UUID> = []
     /// Finished rows opened to show their times and files (E3).
     var expanded: Set<UUID> = []
 
@@ -171,12 +173,12 @@ extension AppModel {
             } catch {
                 rollBackStart(ids)
                 log.error("batch.start failed: \(error)")
-                if let e = error as? EngineError, e.remoteCode == "bad_params", String(describing: e).contains("lang_hint") {
+                // `bad_params` names the field refused; an engine that does not say it yet has it in the text.
+                if let e = error as? EngineError, e.remoteCode == "bad_params",
+                   e.remoteInfo?.field == "lang_hint" || (e.remoteInfo?.field == nil && String(describing: e).contains("lang_hint")) {
                     Alerts.languageUnsupported(self, language: lang, count: hello?.languages.count ?? 0)
-                } else if let e = error as? EngineError, let code = e.remoteCode {
-                    Alerts.error(self, title: t("app.menu.start"), text: engineErrorText(code, detail: String(describing: e)))
                 } else {
-                    Alerts.error(self, title: t("app.menu.start"), text: String(describing: error))
+                    Alerts.error(self, title: t("app.menu.start"), text: engineErrorText(error))
                 }
             }
         }
@@ -189,6 +191,19 @@ extension AppModel {
         closeStopAlert()
         saveVideos()
         updateDock()
+    }
+
+    /// An error of a request as the alerts and the notes say it: `app.errors.<code>`
+    /// with the engine's own `detail`, `tool`, `path` and `line` (`RemoteErrorInfo`);
+    /// what the caller knows fills the ones the engine left out.
+    func engineErrorText(_ error: Error, tool: String = "", path: String = "") -> String {
+        guard case .remote(let code, let message, let info)? = error as? EngineError else { return String(describing: error) }
+        var detail = info.detail ?? info.reason ?? (message == code ? "" : message)
+        if let field = info.field, let reason = info.reason, info.detail == nil { detail = "\(field): \(reason)" }
+        let values: [String: Any] = ["detail": detail, "tool": info.tool ?? tool, "path": info.path ?? path,
+                                     "line": info.line.map(String.init) ?? ""]
+        if localizer.has("app.errors.\(code)") { return t("app.errors.\(code)", values) }
+        return t("app.errors.unknown", ["detail": detail.isEmpty ? code : detail])
     }
 
     /// `app.errors.<code>` with what the message carries as `detail`.
@@ -405,7 +420,10 @@ extension AppModel {
     private func batchDone(_ d: BatchDone) {
         closeStopAlert()
         // Rows never started (Stop All) are ready again (E5).
-        for i in videos.indices where videos[i].state.inBatch { videos[i].resetOutcome() }
+        for i in videos.indices where videos[i].state.inBatch {
+            videos[i].resetOutcome()
+            run.readyAgain.insert(videos[i].id)
+        }
         if let error = d.error { log.error("batch failed: \(error)") }
         log.info("batch.done: \(d.done) done, \(d.failed) failed, \(d.stopped) stopped, \(d.skipped) skipped in \(d.elapsed) s")
         let summary = BatchSummary(ids: run.ids, done: d.done, failed: d.failed, stopped: d.stopped, skipped: d.skipped,

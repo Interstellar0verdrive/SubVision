@@ -57,7 +57,7 @@ struct VideoRow: View {
                 StatusCircle(circle)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
+                        Text(video.name).svFont(12.5).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
                         if video.state == .ready, video.srtExists {
                             StatusChip(model.t("app.process.row.srt_exists"))
                                 .help(model.t("app.process.row.srt_exists_help", ["name": renamedSRT]))
@@ -136,7 +136,12 @@ struct VideoRow: View {
                     .help(video.errorDetail ?? "")
             case .stopped:
                 Text(model.t("app.process.row.stopped", ["step": stepOnly, "band": bandOnly])).svFont(11.5).foregroundStyle(SV.text2)
-            case .ready, .unreadable:
+            case .ready:
+                // Back to ready after Stop All (E5); a row that never was in a batch says nothing (E1).
+                if model.run.readyAgain.contains(video.id) {
+                    Text(model.t("app.process.row.ready")).svFont(11.5).foregroundStyle(SV.text2)
+                }
+            case .unreadable:
                 EmptyView()
             }
         }
@@ -458,6 +463,7 @@ struct StepLine: View {
 
     private var averageRate: Double? {
         let d = step.duration ?? step.elapsed
+        // Under a second ("330 frames in 0:00") a rate says nothing: it shows from one second on (note 9).
         guard d > 1, step.count > 0 else { return nil }
         return Double(step.count) / d
     }
@@ -503,31 +509,39 @@ struct FinishedDetail: View {
         return out
     }
 
+    /// Two columns of the same width, as on board E3: FILES starts at the middle of the row.
     var body: some View {
-        HStack(alignment: .top, spacing: 40) {
+        HStack(alignment: .top, spacing: 18) {
             if let times = video.times, !times.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
                     label(model.t("app.process.row.times"))
-                    ForEach(keys, id: \.self) { key in
-                        HStack(spacing: 12) {
-                            Text(model.stepName(key)).svFont(11.5).foregroundStyle(SV.text2).frame(width: 110, alignment: .leading)
-                            Text(bands.compactMap { times["\(key):\($0)"].map(Localizer.clock) }.joined(separator: model.t("app.common.list_separator")))
-                                .svFont(SVFont.smallNumbers).foregroundStyle(SV.textCode)
+                    Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
+                        ForEach(keys, id: \.self) { key in
+                            GridRow {
+                                Text(model.stepName(key)).svFont(11.5).foregroundStyle(SV.text2).lineLimit(1).fixedSize()
+                                Text(bands.compactMap { times["\(key):\($0)"].map(Localizer.clock) }.joined(separator: model.t("app.common.list_separator")))
+                                    .svFont(SVFont.smallNumbers).foregroundStyle(SV.textCode)
+                            }
                         }
                     }
                     Text(bands.map { model.bandName($0) }.joined(separator: model.t("app.common.list_separator")))
                         .svFont(11).foregroundStyle(SV.text3).padding(.top, 2)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             VStack(alignment: .leading, spacing: 5) {
                 label(model.t("app.process.row.files"))
-                if video.state != .stopped {
-                    file(model.t("app.process.row.srt"), video.outputSRT, exists: FileManager.default.fileExists(atPath: video.outputSRT.path))
-                    if let report = video.reportPath.map({ URL(fileURLWithPath: $0) }) ?? (video.reportExists ? video.reportURL : nil) {
-                        file(model.t("app.process.row.report"), report, exists: video.outputReport != nil)
+                // The kinds take the width of the longest ("Report"), the names all the rest:
+                // a name is cut in the middle only when it really does not fit.
+                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
+                    if video.state != .stopped {
+                        file(model.t("app.process.row.srt"), video.outputSRT, exists: FileManager.default.fileExists(atPath: video.outputSRT.path))
+                        if let report = video.reportPath.map({ URL(fileURLWithPath: $0) }) ?? (video.reportExists ? video.reportURL : nil) {
+                            file(model.t("app.process.row.report"), report, exists: video.outputReport != nil)
+                        }
                     }
+                    file(model.t("app.process.row.log"), video.outputLog, exists: video.logExists)
                 }
-                file(model.t("app.process.row.log"), video.outputLog, exists: video.logExists)
                 HStack(spacing: 14) {
                     UnderlineLink(model.t("app.common.show_in_finder")) { model.showInFinder([video.id]) }
                     if video.state == .done {
@@ -539,7 +553,7 @@ struct FinishedDetail: View {
                 }
                 .padding(.top, 4)
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -548,10 +562,11 @@ struct FinishedDetail: View {
     }
 
     private func file(_ kind: String, _ url: URL, exists: Bool) -> some View {
-        HStack(spacing: 12) {
-            Text(kind).svFont(11.5).foregroundStyle(SV.text2).frame(width: 120, alignment: .leading).lineLimit(1)
+        GridRow {
+            Text(kind).svFont(11.5).foregroundStyle(SV.text2).lineLimit(1).fixedSize()
             Text(url.lastPathComponent).svFont(SVFont.smallNumbers).foregroundStyle(exists ? SV.textCode : SV.text3)
                 .strikethrough(!exists, color: SV.text3).lineLimit(1).truncationMode(.middle)
+                .help(url.lastPathComponent)
         }
     }
 }

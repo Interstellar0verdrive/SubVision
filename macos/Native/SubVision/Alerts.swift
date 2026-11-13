@@ -117,17 +117,13 @@ enum Alerts {
 
     /// O7: the OCR language saved is not one Vision reads here; "Choose the Language" opens the inspector.
     static func languageUnsupported(_ model: AppModel, language: String, count: Int) {
-        let raw = Locale(identifier: model.language).localizedString(forIdentifier: language) ?? language
-        // Locale gives "italiano": the title starts with it.
-        let name = raw.prefix(1).uppercased() + raw.dropFirst()
+        // "Latino", not "Latino (Città del Vaticano)": the same name as the inspector's menu.
+        let name = model.languageName(language)
         let a = SVAlert(icon: AlertIconName.language, tone: .yellow, title: model.t("app.alerts.lang_title", ["lang": name]),
                         text: model.tn("app.alerts.lang_text", count))
         a.button(model.t("app.alerts.lang_btn"), role: .primary)
         a.button(model.t("app.common.cancel"), cancel: true)
-        if a.runModal() == 0 {
-            model.tab = .process
-            model.inspectorOpen = true
-        }
+        if a.runModal() == 0 { model.showLanguageMenu() }
     }
 
     /// A plain error (red), OK.
