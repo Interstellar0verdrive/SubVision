@@ -398,7 +398,7 @@ enum DebugSnapshot {
         }
         window.close()
         // R3 top left: the report is not there.
-        let gone = report.deletingLastPathComponent().appendingPathComponent("sintel_ita_hardsub_demo.revisione.html")
+        let gone = report.deletingLastPathComponent().appendingPathComponent("sintel_ita_hardsub_demo.review.html")
         if !FileManager.default.fileExists(atPath: gone.path) {
             let w = model.openReport(gone)
             try? await Task.sleep(for: .milliseconds(600))

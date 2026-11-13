@@ -3,9 +3,12 @@
 // (F5.4, spike S2). The report posts to the script message handler
 // `subvision`: `{type:"export", name, srt}` becomes `<name>` next to the
 // report and gets `{ok, path, bytes}` back; `{type:"state", json}` becomes
-// `<name>.revisione.json` next to it. At load the saved state is injected
-// as `window.__subvisionState`; a report written by the 1.x (no bridge of
-// its own) gets one from a user script. `<a download>` is the safety net.
+// `<name>.review.json` next to it. At load the saved state is injected
+// as `window.__subvisionState` and the app's language as
+// `window.__subvisionLang` (the report carries Italian and English; a change
+// of language while the window is open goes to `window.__subvisionSetLang`);
+// a report written by the 1.x (no bridge of its own) gets one from a user
+// script. `<a download>` is the safety net.
 
 import AppKit
 import SVShell
@@ -32,13 +35,13 @@ struct ReportFile {
 
     var folder: URL { url.deletingLastPathComponent() }
 
-    /// `<stem>.revisione.json` next to the report (`a.revisione.html` → `a.revisione.json`).
+    /// `<stem>.review.json` next to the report (`a.review.html` → `a.review.json`).
     var stateURL: URL {
         let name = url.lastPathComponent
-        if name.lowercased().hasSuffix(".revisione.html") {
+        if name.lowercased().hasSuffix(".review.html") {
             return folder.appendingPathComponent(String(name.dropLast(5)) + ".json")
         }
-        return url.deletingPathExtension().appendingPathExtension("revisione.json")
+        return url.deletingPathExtension().appendingPathExtension("review.json")
     }
 }
 
@@ -66,7 +69,7 @@ final class ReportBridge: NSObject {
     /// The export failed next to the original: asks the person for another place.
     /// Returns the URL chosen, nil to give up.
     var askWhereToSave: (String) -> URL? = { _ in nil }
-    /// Every write of the review state (`<name>.revisione.json`): true when it went through.
+    /// Every write of the review state (`<name>.review.json`): true when it went through.
     var onStateWrite: (Bool) -> Void = { _ in }
     var onNavigationFinished: () -> Void = {}
     var onNavigationFailed: (Error) -> Void = { _ in }
@@ -79,14 +82,18 @@ final class ReportBridge: NSObject {
     /// The alert of the page that is up (a `confirm()`, the overwrite question), for the debug commands.
     private(set) var pageAlert: SVAlertPresentation?
 
-    init(file: ReportFile, t: @escaping (String, [String: Any]) -> String) {
+    /// The app's language ("it" | "en"): the report shows its texts in it.
+    private(set) var language: String
+
+    init(file: ReportFile, language: String, t: @escaping (String, [String: Any]) -> String) {
         self.file = file
+        self.language = language
         self.t = t
         super.init()
         let config = WKWebViewConfiguration()
         config.userContentController = controller
         // The page's own memory (localStorage, keyed by the SRT's name) must not outlive the window:
-        // the review state is `<name>.revisione.json`, and a report made again for the same video
+        // the review state is `<name>.review.json`, and a report made again for the same video
         // would otherwise start from the old choices.
         config.websiteDataStore = .nonPersistent()
         controller.addScriptMessageHandler(self, contentWorld: .page, name: Self.handlerName)
@@ -116,6 +123,8 @@ final class ReportBridge: NSObject {
     /// (also the reload after "Reset all", which must see the empty state).
     private func installUserScripts() {
         controller.removeAllUserScripts()
+        controller.addUserScript(WKUserScript(source: "window.__subvisionLang = \(Self.jsString(language));\n",
+                                              injectionTime: .atDocumentStart, forMainFrameOnly: true))
         if let json = savedStateJSON() {
             var source = "window.__subvisionState = JSON.parse(\(Self.jsString(json)));\n"
             if file.kind == .legacy, let key = file.srtName {
@@ -129,7 +138,7 @@ final class ReportBridge: NSObject {
         }
     }
 
-    /// `<name>.revisione.json` as a JSON object, or nil when absent or not an object.
+    /// `<name>.review.json` as a JSON object, or nil when absent or not an object.
     private func savedStateJSON() -> String? {
         guard let data = FileManager.default.contents(atPath: file.stateURL.path),
               let object = try? JSONSerialization.jsonObject(with: data), object is [String: Any],
@@ -173,7 +182,7 @@ final class ReportBridge: NSObject {
       window.exportSrt = async function () {
         const out = buildSrt();
         if (out == null) return;
-        const fname = DATA.srtName.replace(/\.srt$/i, '') + '-revisionato-' + stamp() + '.srt';
+        const fname = DATA.srtName.replace(/\.srt$/i, '') + '-reviewed-' + stamp() + '.srt';
         const mi = window._lastMergeInfo || 0;
         const mergeNote = mi > 0 ? ' · ' + mi + ' ' + T.mergedDupes : '';
         try {
@@ -202,6 +211,15 @@ final class ReportBridge: NSObject {
 
     // MARK: - JavaScript from the app
 
+    /// The app's language changed: the page switches in place (no reload, the edits stay),
+    /// and the next load ("Reset all" reloads) starts in it.
+    func setLanguage(_ code: String) {
+        guard code != language else { return }
+        language = code
+        installUserScripts()
+        webView.evaluateJavaScript("window.__subvisionSetLang && window.__subvisionSetLang(\(Self.jsString(code)))")
+    }
+
     /// Runs `body` as an async function in the page and returns its value
     /// (`callAsyncJavaScript`: promises are awaited, `evaluateJavaScript` would not).
     func call(_ body: String) async throws -> Any? {
@@ -211,7 +229,7 @@ final class ReportBridge: NSObject {
     // MARK: - Files
 
     /// Where an export goes: `name` next to the report. The name is the report's
-    /// own (`<srt stem>-revisionato-<date>.srt`), kept to its last component.
+    /// own (`<srt stem>-reviewed-<date>.srt`), kept to its last component.
     private func exportTarget(_ name: String) -> URL {
         let clean = URL(fileURLWithPath: name).lastPathComponent
         return file.folder.appendingPathComponent(clean.hasSuffix(".srt") ? clean : clean + ".srt")

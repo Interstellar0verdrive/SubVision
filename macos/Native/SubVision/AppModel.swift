@@ -140,6 +140,8 @@ final class AppModel {
         texts = ShellTexts(localizer)
         defaults.set(localizer.language, forKey: DefaultsKey.language)
         followLanguage(localizer.language)
+        // The open reports follow too (design note 72).
+        for controller in report.windows.values { controller.session.bridge?.setLanguage(localizer.language) }
     }
 
     /// macOS names its own menu items (About, Services, Hide…) in the app's

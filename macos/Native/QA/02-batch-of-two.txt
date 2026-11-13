@@ -20,5 +20,5 @@ wait-batch 900
 states
 ? ^sintel_ita_hardsub_demo.mp4=done:12 sintel_eng_hardsub_demo.mp4=done:12$
 ! cmp "$WORK/sintel_ita_hardsub_demo.srt" "$REF/sintel_ita_hardsub_demo.srt"
-! test -s "$WORK/sintel_ita_hardsub_demo.revisione.html" && test -s "$WORK/sintel_ita_hardsub_demo.log" && test -s "$WORK/sintel_eng_hardsub_demo.srt"
+! test -s "$WORK/sintel_ita_hardsub_demo.review.html" && test -s "$WORK/sintel_ita_hardsub_demo.log" && test -s "$WORK/sintel_eng_hardsub_demo.srt"
 params default

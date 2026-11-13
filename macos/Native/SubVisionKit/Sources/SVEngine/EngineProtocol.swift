@@ -153,7 +153,7 @@ public struct ToolsUseReply: Decodable, Sendable, Equatable {
     public var custom: String?
 }
 
-/// `lists.status` and `lists.import`: `ignore.txt` and `correzioni.txt` in the state folder.
+/// `lists.status` and `lists.import`: `ignore.txt` and `corrections.txt` in the state folder.
 public struct ListsStatus: Decodable, Sendable, Equatable {
     public struct List: Decodable, Sendable, Equatable {
         public var path: String

@@ -33,7 +33,7 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
         let done = try event("batch.file.done", #"""
             {"idx":0,"segments":12,"dropped":1,"refined":5,"elapsed":61.0,
              "times":{"extract:bottom":20.5,"ocr:bottom":40.5},"srt":"/v/ep01.srt",
-             "report":"/v/ep01.revisione.html","log":"/v/ep01.log","empty":false}
+             "report":"/v/ep01.review.html","log":"/v/ep01.log","empty":false}
             """#)
         guard case .batchFileDone(let d) = done else { Issue.record("\(done)"); return }
         #expect(d.times["extract:bottom"] == 20.5 && d.segments == 12 && !d.empty)
@@ -95,9 +95,9 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
     }
 
     @Test func otherReplies() throws {
-        let lists = try reply(#"{"ignore":{"path":"/s/ignore.txt","count":12},"corrections":{"path":"/s/correzioni.txt","count":4}}"#,
+        let lists = try reply(#"{"ignore":{"path":"/s/ignore.txt","count":12},"corrections":{"path":"/s/corrections.txt","count":4}}"#,
                               as: ListsStatus.self)
-        #expect(lists.ignore.count == 12 && lists.corrections.path == "/s/correzioni.txt")
+        #expect(lists.ignore.count == 12 && lists.corrections.path == "/s/corrections.txt")
         let probe = try reply(#"""
             {"videos":[{"path":"/v/a.mkv","duration":1440.5,"fps":23.976,"width":1920,"height":1080},
                        {"path":"/v/b.mkv","error":"probe_failed","message":"no video stream or duration"}]}
