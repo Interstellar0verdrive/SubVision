@@ -231,7 +231,7 @@ class OcrParams:
     qc_conf_warn: float = 0.80         # below this confidence -> "yellow" line
     qc_agree_warn: float = 0.70        # below this variant agreement -> "yellow"
     ignore_lines: List[str] = field(default_factory=list)
-    # automatic "wrong => right" corrections (from correzioni.txt):
+    # automatic "wrong => right" corrections (from corrections.txt):
     # for the RECURRING typos the OCR will never fix (e.g. proper nouns on
     # impossible fonts: "Flamilion => Hamilton"). Applied at pipeline end.
     corrections: List[Tuple[str, str]] = field(default_factory=list)
@@ -2120,7 +2120,7 @@ def load_ignore(path: Path) -> List[str]:
 
 def load_corrections(path: Path) -> List[Tuple[str, str]]:
     """
-    Loads correzioni.txt: one rule per line in the format
+    Loads corrections.txt: one rule per line in the format
         wrong => right
     Empty lines and comments (#) are ignored. Longer rules apply first
     (prevents a short rule from "breaking" a more specific one).

@@ -162,7 +162,7 @@ def test_hello(sidecar: Sidecar, work: dict):
     assert h["state_folder"] == str(work["state"])
     # the state folder exists with its subfolders and the two lists
     assert (work["state"] / "tmp" / "preview").is_dir()
-    assert (work["state"] / "ignore.txt").is_file() and (work["state"] / "correzioni.txt").is_file()
+    assert (work["state"] / "ignore.txt").is_file() and (work["state"] / "corrections.txt").is_file()
 
 
 def test_non_json_line_is_ignored(sidecar: Sidecar):

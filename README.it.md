@@ -191,8 +191,8 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
   Neural Engine resta il collo di bottiglia, ~18 frame/s totali).
 - **Usa ignore.txt** — default: ON. Scarta le frasi in `ignore.txt` (una per
   riga, `#` = commento): watermark del fansub, loghi, scritte fisse.
-- **Usa correzioni.txt** — default: ON. Applica le sostituzioni di
-  `correzioni.txt` (formato: `sbagliato => giusto`, case-insensitive).
+- **Usa corrections.txt** — default: ON. Applica le sostituzioni di
+  `corrections.txt` (formato: `sbagliato => giusto`, case-insensitive).
   L'arma per i typo RICORRENTI che l'OCR non risolverà mai — i nomi propri su
   font impossibili: `Flamilion => Hamilton` sistema tutte le puntate della
   serie. Vale per pipeline, Test OCR e Sub fix.
@@ -213,7 +213,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
   per tarare bande e lingua PRIMA di lanciare una puntata intera.
 - **Sub fix** — pulizia di un `.srt` esistente SENZA rifare l'OCR. Per gli
   SRT esterni (vecchi file fatti con altri strumenti, file scaricati) o per
-  applicare retroattivamente nuove regole di `correzioni.txt` a puntate già
+  applicare retroattivamente nuove regole di `corrections.txt` a puntate già
   elaborate, in pochi secondi.
 
 ## 🧭 Flusso consigliato (per serie nuova)
@@ -249,7 +249,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 | `requirements.txt` | streamlit, pillow, numpy, ocrmac |
 | `run.command` | launcher macOS |
 | `ignore.txt` | frasi da ignorare |
-| `correzioni.txt` | sostituzioni automatiche `sbagliato => giusto` |
+| `corrections.txt` | sostituzioni automatiche `sbagliato => giusto` |
 | `videos/` | metti qui i video; qui compaiono `.srt` / `.revisione.html` / `.log` |
 
 ## 🧪 Uso headless (senza GUI)

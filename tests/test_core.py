@@ -84,7 +84,7 @@ def test_load_lists(tmp_path: Path):
     ign = tmp_path / "ignore.txt"
     ign.write_text("# comment\n\nTraduzione a cura di\n", encoding="utf-8")
     assert core.load_ignore(ign) == ["Traduzione a cura di"]
-    cor = tmp_path / "correzioni.txt"
+    cor = tmp_path / "corrections.txt"
     cor.write_text("# c\nab => cd\nlonger rule => x\nbad line\n", encoding="utf-8")
     assert core.load_corrections(cor) == [("longer rule", "x"), ("ab", "cd")]
     assert core.load_ignore(tmp_path / "missing.txt") == []

@@ -137,7 +137,7 @@ generated in the selected UI language.
 | Line-wrap width | 42 | balanced 2-3 line wrapping, professional subtitling style |
 | Hamming skip | 0 | skip OCR of near-identical frames (1 = ~25% faster, measured safe) |
 | ignore.txt | ON | phrases to discard (watermarks, fansub logos) |
-| correzioni.txt | ON | automatic `wrong => right` replacements for recurring typos |
+| corrections.txt | ON | automatic `wrong => right` replacements for recurring typos |
 
 Every option in the GUI has a **(?)** tooltip with a full explanation.
 
