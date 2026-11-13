@@ -67,6 +67,41 @@ def demo_eng() -> Path:
     return DEMO_ENG
 
 
+# ---------------------------------------------------------------- damaged videos
+# Two repeatable ways to damage a demo clip (the "corrupted video" QA scenario
+# of the app uses the same recipes, see the shell commands in the docstrings).
+HEALTHY_HEAD = 1_000_000      # bytes of the clip left intact by damage_tail()
+
+
+def damage_head(src: Path, dst: Path, cut: int = 100_000) -> Path:
+    """
+    A video that ffprobe refuses ("moov atom not found"): the clip without
+    its first `cut` bytes, where the index of an .mp4 lives.
+
+        tail -c +100001 sintel_ita_hardsub_demo.mp4 > no-index.mp4
+    """
+    dst.write_bytes(src.read_bytes()[cut:])
+    return dst
+
+
+def damage_tail(src: Path, dst: Path, keep: int = HEALTHY_HEAD) -> Path:
+    """
+    A video that ffprobe accepts (the index is intact: 55 s, 1280x544) but
+    that fails in the middle of the extraction: the first `keep` bytes of
+    the clip, then zeros up to the original size. ffmpeg writes the first
+    seconds, then gives up with exit status 69 because more than 2/3 of the
+    frames cannot be decoded ("Decode error rate ... exceeds maximum").
+    With less damage (say, zeros from the middle on, or a truncated file)
+    ffmpeg ends well and the result is a shorter SRT, not an error.
+
+        SRC=sintel_ita_hardsub_demo.mp4
+        { head -c 1000000 "$SRC"; head -c $(( $(stat -f%z "$SRC") - 1000000 )) /dev/zero; } > damaged.mp4
+    """
+    data = src.read_bytes()
+    dst.write_bytes(data[:keep] + bytes(len(data) - keep))
+    return dst
+
+
 @pytest.fixture
 def demo_ita_copy(demo_ita: Path, tmp_path: Path) -> Path:
     """A private copy of the ita clip: the engine writes its outputs next to it."""

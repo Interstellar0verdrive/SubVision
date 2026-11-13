@@ -21,7 +21,7 @@ import pytest
 
 from subvision import core
 
-from conftest import FAST_PROFILE, FAST_PROFILE_LINES
+from conftest import FAST_PROFILE, FAST_PROFILE_LINES, damage_head, damage_tail
 
 PARAMS = {k: v for k, v in FAST_PROFILE.items()}
 
@@ -109,6 +109,18 @@ class SidecarError(Exception):
         super().__init__(f"{error.get('code')}: {error.get('message', '')}")
         self.code = error.get("code")
         self.error = error
+        self.data = error.get("data")
+
+
+def _bad(sidecar: "Sidecar", method: str, params: dict) -> dict:
+    """The error object of a call that must be refused as bad_params about one field."""
+    with pytest.raises(SidecarError) as exc:
+        sidecar.call(method, params)
+    err = exc.value.error
+    assert err["code"] == "bad_params", err
+    assert set(err["data"]) == {"field", "reason"} and err["data"]["reason"], err
+    assert err["message"] == f"{err['data']['field']}: {err['data']['reason']}", err
+    return err
 
 
 def _ffmpeg_on(clip_name: str) -> list[str]:
@@ -167,6 +179,8 @@ def test_unknown_method_and_bad_request(sidecar: Sidecar):
     with pytest.raises(SidecarError) as exc:
         sidecar.call("videos.probe", {"paths": "x"})
     assert exc.value.code == "bad_params"
+    assert exc.value.data == {"field": "paths", "reason": "must be a list of strings"}
+    assert exc.value.error["message"] == "paths: must be a list of strings"
 
 
 def test_tools_status_and_lists(sidecar: Sidecar, work: dict):
@@ -233,20 +247,102 @@ def test_batch_start_and_stop(sidecar: Sidecar, work: dict):
     assert not work["clips"][0].with_suffix(".srt").exists()
     assert not list((work["state"] / "tmp").glob("voc26_*"))
     assert sidecar.call("batch.stop", {"scope": "file"}) == {"ok": False, "reason": "no_batch"}
+    # no batch: the same answer with `file`, which is checked first all the same
+    assert sidecar.call("batch.stop", {"scope": "file", "file": 0}) == {"ok": False, "reason": "no_batch"}
+    assert _bad(sidecar, "batch.stop", {"scope": "file", "file": 1.5})["data"]["field"] == "file"
+
+
+def test_batch_stop_for_one_file(sidecar: Sidecar, work: dict):
+    """F6: `file` names the video the stop is meant for (index or path)."""
+    clips = [str(c) for c in work["clips"]]
+    since = len(sidecar.events)
+    assert sidecar.call("batch.start", {"videos": clips, "params": PARAMS, "lang": "en"}) == {"started": True}
+    i, step = sidecar.wait_event("batch.step", since=since)
+    assert step["idx"] == 0
+    # video 0 is in progress: a stop for another one stops nothing
+    assert sidecar.call("batch.stop", {"scope": "file", "file": 1}) == {"ok": False, "reason": "not_running"}
+    assert sidecar.call("batch.stop", {"scope": "file", "file": clips[1]}) == {"ok": False, "reason": "not_running"}
+    assert sidecar.call("batch.stop", {"scope": "file", "file": 7}) == {"ok": False, "reason": "not_running"}
+    # a `file` of the wrong kind is refused, and stops nothing either
+    for wrong in (1.5, True, [0], {"idx": 0}):
+        err = _bad(sidecar, "batch.stop", {"scope": "file", "file": wrong})
+        assert err["data"]["field"] == "file"
+    assert _bad(sidecar, "batch.stop", {"scope": "next", "file": 0})["data"]["field"] == "scope"
+    assert not any(e == "batch.file.stopped" for e, _ in sidecar.events[since:])
+    # the stop for video 0 is taken: it stops, video 1 starts
+    assert sidecar.call("batch.stop", {"scope": "file", "file": 0}) == {"ok": True}
+    j, stopped = sidecar.wait_event("batch.file.stopped", since=i, timeout=30)
+    assert stopped == {"idx": 0}
+    k, started = sidecar.wait_event("batch.file.started", since=j)
+    assert started["idx"] == 1
+    # the same stop again comes late: video 1 is not touched
+    assert sidecar.call("batch.stop", {"scope": "file", "file": 0}) == {"ok": False, "reason": "not_running"}
+    assert sidecar.call("batch.stop", {"scope": "file", "file": clips[0]}) == {"ok": False, "reason": "not_running"}
+    sidecar.wait_event("batch.step", since=k)
+    assert not any(e == "batch.file.stopped" for e, _ in sidecar.events[k:])
+    # by path
+    assert sidecar.call("batch.stop", {"scope": "file", "file": clips[1]}) == {"ok": True}
+    m, stopped = sidecar.wait_event("batch.file.stopped", since=k, timeout=30)
+    assert stopped == {"idx": 1}
+    _, done = sidecar.wait_event("batch.done", since=m, timeout=30)
+    assert done["stopped"] == 2 and done["done"] == 0 and done["skipped"] == 0 and done["failed"] == 0
+    time.sleep(0.3)
+    assert _ffmpeg_on(work["clips"][0].name) == [] and _ffmpeg_on(work["clips"][1].name) == []
+    assert not any(c.with_suffix(".srt").exists() for c in work["clips"])
+    for c in work["clips"]:
+        c.with_suffix(".log").unlink(missing_ok=True)
+
+
+def test_batch_stop_all_ignores_file(sidecar: Sidecar, work: dict):
+    clips = [str(c) for c in work["clips"]]
+    since = len(sidecar.events)
+    assert sidecar.call("batch.start", {"videos": clips, "params": PARAMS}) == {"started": True}
+    i, _ = sidecar.wait_event("batch.step", since=since)
+    # `file` names a video that is not in progress and is not even an index: ignored
+    assert sidecar.call("batch.stop", {"scope": "all", "file": 1}) == {"ok": True}
+    _, done = sidecar.wait_event("batch.done", since=i, timeout=30)
+    assert done["stopped"] == 1 and done["skipped"] == 1 and done["done"] == 0
+    for c in work["clips"]:
+        c.with_suffix(".log").unlink(missing_ok=True)
 
 
 def test_batch_bad_params(sidecar: Sidecar, work: dict):
-    with pytest.raises(SidecarError) as exc:
-        sidecar.call("batch.start", {"videos": [str(work["clips"][0])],
-                                     "params": {**PARAMS, "lang_hint": "Klingon"}})
-    assert exc.value.code == "bad_params"
-    with pytest.raises(SidecarError) as exc:
-        sidecar.call("batch.start", {"videos": [str(work["clips"][0])],
-                                     "params": {**PARAMS, "nonsense": 1}})
-    assert exc.value.code == "bad_params"
-    with pytest.raises(SidecarError) as exc:
-        sidecar.call("batch.start", {"videos": []})
-    assert exc.value.code == "bad_params"
+    clip = str(work["clips"][0])
+    # an OCR parameter the engine refuses: `field` is its key in `params`
+    err = _bad(sidecar, "batch.start", {"videos": [clip], "params": {**PARAMS, "lang_hint": "Klingon"}})
+    assert err["data"]["field"] == "lang_hint" and "not supported by Vision" in err["data"]["reason"]
+    assert err["detail"] == err["message"] and "field=" not in err["detail"]
+    err = _bad(sidecar, "batch.start", {"videos": [clip], "params": {**PARAMS, "fps": 0}})
+    assert err["data"] == {"field": "fps", "reason": "must be between 0.5 and 60"}
+    assert err["message"] == "fps: must be between 0.5 and 60"
+    err = _bad(sidecar, "batch.start", {"videos": [clip], "params": {**PARAMS, "top_keep_pct": 101}})
+    assert err["data"]["field"] == "top_keep_pct"
+    # an unknown key, a value of the wrong kind, params that are not an object
+    err = _bad(sidecar, "batch.start", {"videos": [clip], "params": {**PARAMS, "nonsense": 1}})
+    assert err["data"] == {"field": "nonsense", "reason": "unknown parameter"}
+    err = _bad(sidecar, "batch.start", {"videos": [clip], "params": {**PARAMS, "workers": "many"}})
+    assert err["data"]["field"] == "workers" and "many" in err["data"]["reason"]
+    err = _bad(sidecar, "batch.start", {"videos": [clip], "params": [1, 2]})
+    assert err["data"] == {"field": "params", "reason": "must be an object"}
+    # the arguments of the methods
+    assert _bad(sidecar, "batch.start", {"videos": []})["data"] == \
+        {"field": "videos", "reason": "must not be empty"}
+    assert _bad(sidecar, "batch.start", {"videos": "a.mkv"})["data"]["field"] == "videos"
+    assert _bad(sidecar, "batch.stop", {"scope": "everything"})["data"] == \
+        {"field": "scope", "reason": "must be file or all"}
+    assert _bad(sidecar, "preview.frames", {"video": 3})["data"]["field"] == "video"
+    assert _bad(sidecar, "preview.frames", {"video": clip, "n": "a lot"})["data"]["field"] == "n"
+    assert _bad(sidecar, "preview.frames", {"video": clip, "params": {"fps": "fast"}})["data"]["field"] == "fps"
+    assert _bad(sidecar, "srt.fix", {"path": 3})["data"]["field"] == "path"
+    assert _bad(sidecar, "srt.fix", {"path": "x.srt", "min_dur": "short"})["data"]["field"] == "min_dur"
+    assert _bad(sidecar, "lists.import", {"kind": "nope", "path": "x"})["data"]["field"] == "kind"
+    assert _bad(sidecar, "lists.import", {"kind": "ignore"})["data"]["field"] == "path"
+    assert _bad(sidecar, "tools.use", {"ffmpeg": 3})["data"]["field"] == "ffmpeg"
+    assert _bad(sidecar, "tools.install", {"keys": "ffmpeg"})["data"]["field"] == "keys"
+    assert _bad(sidecar, "warmup", {"languages": "it-IT"})["data"]["field"] == "languages"
+    # nothing was started by any of them
+    assert sidecar.call("batch.stop", {"scope": "all"}) == {"ok": False, "reason": "no_batch"}
+    assert sidecar.call("preview.stop") == {"ok": False, "reason": "no_preview"}
 
 
 def test_batch_full_run(sidecar: Sidecar, work: dict):
@@ -348,8 +444,54 @@ def test_batch_failed_file_carries_the_details(sidecar: Sidecar, work: dict):
     assert failed["code"] == "probe_failed" and failed["message"] == "probe_failed"
     assert failed["tool"] == "ffprobe" and failed["path"] == str(bogus) and failed["detail"]
     assert failed["at_step"] == "extract:bottom" and failed["error"].startswith("probe_failed")
+    # F6: the log of the file and the short text of its row (the first line of the detail)
+    assert failed["log"] == str(bogus.with_suffix(".log")) and Path(failed["log"]).is_file()
+    assert failed["text"] == failed["detail"].splitlines()[0]
+    assert "Invalid data found when processing input" in failed["detail"]
     _, done = sidecar.wait_event("batch.done", since=since)
     assert done["failed"] == 1
+
+
+def test_damaged_videos(sidecar: Sidecar, work: dict):
+    """
+    The two recipes of conftest on the real sidecar: (a) a video the probe
+    refuses, (b) one the probe accepts and ffmpeg gives up on halfway.
+    """
+    folder = work["root"] / "damaged"
+    folder.mkdir()
+    no_index = damage_head(work["clips"][0], folder / "no-index.mp4")
+    damaged = damage_tail(work["clips"][0], folder / "damaged.mp4")
+    vids = sidecar.call("videos.probe", {"paths": [str(no_index), str(damaged)]})["videos"]
+    assert vids[0]["code"] == "probe_failed" and vids[0]["tool"] == "ffprobe"
+    assert "moov atom not found" in vids[0]["detail"]
+    assert "error" not in vids[1] and "code" not in vids[1]
+    assert 50 < vids[1]["duration"] < 60 and vids[1]["width"] == 1280 and vids[1]["height"] == 544
+
+    since = len(sidecar.events)
+    assert sidecar.call("batch.start", {"videos": [str(no_index), str(damaged)],
+                                        "params": PARAMS, "lang": "it"}) == {"started": True}
+    _, done = sidecar.wait_event("batch.done", since=since, timeout=60)
+    assert done["failed"] == 2 and done["done"] == 0 and done["stopped"] == 0
+    failed = [d for e, d in sidecar.events[since:] if e == "batch.file.failed"]
+    assert [f["idx"] for f in failed] == [0, 1]
+    a, b = failed
+    assert a["code"] == "probe_failed" and a["text"] == "moov atom not found" and a["tool"] == "ffprobe"
+    assert b["code"] == "unknown" and b["message"] == "unknown" and b["tool"] == "ffmpeg"
+    assert b["at_step"] == "extract:bottom" and b["path"] == str(damaged)
+    assert b["text"].startswith("ffmpeg exited with status ") and "Decode error rate" in b["text"]
+    assert b["detail"].startswith("CalledProcessError: ") and "Conversion failed!" in b["detail"]
+    assert b["error"] == f"unknown ({b['text']})"
+    for f, video in ((a, no_index), (b, damaged)):
+        assert set(f) <= {"idx", "at_step", "log", "code", "message", "error", "text",
+                          "detail", "tool", "path", "line"}
+        assert f["log"] == str(video.with_suffix(".log"))
+        assert f"ERRORE: {f['error']}" in Path(f["log"]).read_text(encoding="utf-8")
+        assert not video.with_suffix(".srt").exists()
+        # the prefix of the alert is the app's, not the engine's
+        assert not f["text"].startswith(("Qualcosa", "Something", "ERRORE", "unknown"))
+    time.sleep(0.3)
+    assert _ffmpeg_on(damaged.name) == []
+    assert not list((work["state"] / "tmp").glob("voc26_*"))
 
 
 def test_preview_failed_carries_the_details(sidecar: Sidecar, work: dict):

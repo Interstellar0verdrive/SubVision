@@ -25,14 +25,6 @@ def _first_text_line(text: str) -> int:
     return 1
 
 
-def _first_text_line(text: str) -> int:
-    """1-based number of the first non-empty line (where the parse gave up)."""
-    for i, ln in enumerate(text.splitlines(), 1):
-        if ln.strip():
-            return i
-    return 1
-
-
 def fix_srt(path: Path | str, merge: bool = True, ignore: bool = True,
             flash: bool = True, min_dur: float = 0.2,
             params: Optional[core.OcrParams] = None,
