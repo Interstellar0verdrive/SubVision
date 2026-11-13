@@ -3,7 +3,9 @@
 // few seconds after launch, in light and dark with
 // `SUBVISION_SNAPSHOT_SCHEME=both`, then quits. `SUBVISION_SNAPSHOT_ADD=<paths>`
 // (comma-separated files or folders) fills the list first;
-// `SUBVISION_SNAPSHOT_SETTINGS=1` renders the four Settings tabs.
+// `SUBVISION_SNAPSHOT_SETTINGS=1` renders the four Settings tabs;
+// `SUBVISION_SNAPSHOT_REPORT=<report.html>` opens that report and captures
+// the window of R1–R3 (the export of R2 writes an SRT next to it).
 // Adapted from the DebugSnapshot of the native macOS app of AnimeUp (by the
 // same author); the renderers are the shell's.
 
@@ -62,6 +64,9 @@ enum DebugSnapshot {
                 SVShell.DebugSnapshot.render(SettingsPage(tab: .lists).environment(model), width: 640, schemes: schemes,
                                              "\(base)-settings-lists-locked.png")
                 model.batch.running = false
+            }
+            if let report = env["SUBVISION_SNAPSHOT_REPORT"], !report.isEmpty {
+                await reportWindows(model, report: URL(fileURLWithPath: report), base: base, schemes: schemes)
             }
             AppLog.shared.info("snapshots done")
             NSApp.terminate(nil)
@@ -129,6 +134,57 @@ enum DebugSnapshot {
         t4b.decide(ToolsStatusReply(tools: [.init(key: "ffmpeg", present: true), .init(key: "ffprobe", present: true)]), runTasks: true)
         render(t4b, "tools-t4-update")
         try? FileManager.default.removeItem(at: empty)
+    }
+
+    /// The report window of R1–R3 (F5.4): open, after an export (the toast),
+    /// the file gone, the loading spinner, and the alert of a failed save.
+    private static func reportWindows(_ model: AppModel, report: URL, base: String, schemes: [ColorScheme]) async {
+        let window = model.openReport(report)
+        // R3 bottom: the spinner, while the page loads (the capture may come too late).
+        if window.session.phase == .loading {
+            _ = await captureReport(window, "\(base)-report-r3-loading.png", schemes: schemes, settle: .milliseconds(50))
+        }
+        _ = await DebugQA.wait(15) { window.session.phase != .loading }
+        try? await Task.sleep(for: .milliseconds(600))
+        _ = await captureReport(window, "\(base)-report-r1.png", schemes: schemes)
+        // R2: the export through the bridge, then the toast.
+        if let bridge = window.session.bridge {
+            _ = try? await bridge.call("await exportSrt();")
+            _ = await DebugQA.wait(5) { window.session.toast != nil }
+            try? await Task.sleep(for: .milliseconds(400))
+            _ = await captureReport(window, "\(base)-report-r2.png", schemes: schemes)
+        }
+        window.close()
+        // R3 top left: the report is not there.
+        let gone = report.deletingLastPathComponent().appendingPathComponent("sintel_ita_hardsub_demo.revisione.html")
+        if !FileManager.default.fileExists(atPath: gone.path) {
+            let w = model.openReport(gone)
+            try? await Task.sleep(for: .milliseconds(600))
+            _ = await captureReport(w, "\(base)-report-r3-gone.png", schemes: schemes)
+            w.close()
+        }
+        // R3 top right: the alert of a save that failed next to the original (the card alone).
+        let alert = SVAlert(icon: AlertIconName.error, tone: .red, title: model.t("app.report.save_failed"),
+                            text: model.t("app.report.save_failed_text"))
+        alert.button(model.t("app.report.save_elsewhere"), role: .primary)
+        alert.button(model.t("app.common.cancel"))
+        SVShell.DebugSnapshot.render(SVAlertCard(alert: alert).padding(48), width: 376, schemes: schemes, "\(base)-report-r3-savefail.png")
+    }
+
+    /// A report window, once per scheme, as `SVShell.DebugSnapshot.capture` does for the main one.
+    static func captureReport(_ window: ReportWindowController, _ path: String, schemes: [ColorScheme],
+                              settle: Duration = .milliseconds(500)) async -> [String] {
+        let saved = NSApp.appearance
+        defer { NSApp.appearance = saved }
+        var written: [String] = []
+        for scheme in schemes {
+            NSApp.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
+            window.window?.displayIfNeeded()
+            try? await Task.sleep(for: settle)
+            let p = schemes.count > 1 ? SVShell.DebugSnapshot.path(path, scheme) : path
+            if await window.capture(to: p) { written.append(p) }
+        }
+        return written
     }
 
     /// The real window, in every scheme asked.

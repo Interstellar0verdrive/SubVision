@@ -369,6 +369,8 @@
   "app.report.save_failed": "I can’t save the revised SRT next to the original",
   "app.report.save_failed_text": "The folder can’t be written to, or its disk isn’t connected.",
   "app.report.saved": "Revised SRT saved · {name}",
+  "app.report.unreadable": "I can’t read the report: {name}.",
+  "app.report.unreadable_text": "The file isn’t a SubVision review report, or it can’t be opened.",
   "app.report.window_menu": "Review report · {name}",
   "app.report.window_title": "{name}",
   "app.settings.appearance": "Appearance",

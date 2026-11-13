@@ -6,6 +6,10 @@
 //   tab process|preview|fix · add <path>[,<path>…] · remove-all · select-all
 //   sidebar · inspector · lang en|it · theme system|light|dark
 //   size <w>x<h> · windowid · capture <path> · settings · quit
+//   report-open <path> · report-js <expression> · report-run <statements>
+//   report-export · report-confirm yes|no|ask · report-elsewhere <path>|cancel|ask
+//   report-windows · report-capture <path>
+//   report-close (the front report window; all with "all")
 
 #if DEBUG
 import AppKit
@@ -62,10 +66,57 @@ enum DebugQA {
             NSApp.sendAction(item.action!, to: item.target, from: item)
         case "quit":
             NSApp.terminate(nil)
+        // F5.4: the report windows (ReportWindow.swift, ReportBridge.swift).
+        case "report-open":
+            let front = model.openReport(URL(fileURLWithPath: argument))
+            _ = await wait(15) { front.session.phase != .loading }
+            return "\(front.session.phase) · \(front.session.name) · \(front.session.bridge.map { "\($0.file.kind)" } ?? "-")"
+        case "report-js", "report-run":
+            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
+            do {
+                let body = command == "report-js" ? "return (\(argument));" : argument
+                let value = try await bridge.call(body)
+                return reportValue(value)
+            } catch {
+                return "error: \(error)"
+            }
+        case "report-export":
+            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
+            let before = front.session.lastExport
+            _ = try? await bridge.call("await exportSrt();")
+            _ = await wait(5) { front.session.lastExport != before }
+            return front.session.lastExport.map(\.path) ?? "no export"
+        case "report-confirm":
+            ReportBridge.debugConfirm = argument == "yes" ? true : argument == "no" ? false : nil
+        case "report-elsewhere":
+            ReportSession.debugElsewhere = argument == "ask" ? nil : argument == "cancel" ? .some(nil) : .some(URL(fileURLWithPath: argument))
+        case "report-windows":
+            let windows = model.report.open.map { s in
+                "\(model.report.windows[s.url]?.window?.windowNumber ?? 0) \(s.phase) \(s.name)"
+            }
+            let menu = (NSApp.windowsMenu?.items ?? []).filter { !$0.isSeparatorItem && !$0.title.isEmpty }.map(\.title)
+            return "\(windows.count) report windows: " + windows.joined(separator: " | ") + " · window menu: " + menu.joined(separator: " | ")
+        case "report-capture":
+            guard let front = model.report.front else { return "no report window" }
+            let written = await DebugSnapshot.captureReport(front, argument, schemes: SVShell.DebugSnapshot.schemes(model.config))
+            return written.joined(separator: " ")
+        case "report-close":
+            let targets = argument == "all" ? Array(model.report.windows.values) : [model.report.front].compactMap { $0 }
+            guard !targets.isEmpty else { return "no report window" }
+            targets.forEach { $0.close() }
         default:
             return "unknown"
         }
         return "ok · tab \(model.tab.rawValue) · \(model.videos.count) videos · status \(model.status)"
+    }
+
+    /// A JavaScript value as one line: strings as they are, the rest as JSON.
+    private static func reportValue(_ value: Any?) -> String {
+        guard let value else { return "undefined" }
+        if let text = value as? String { return text }
+        if JSONSerialization.isValidJSONObject(value), let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+           let text = String(data: data, encoding: .utf8) { return text }
+        return "\(value)"
     }
 }
 #endif
