@@ -16,8 +16,9 @@ Perché Apple Vision invece di un LLM/VLM:
 - **Deterministico, 100% offline.**
 
 L'interfaccia è disponibile in **italiano e inglese** (selettore in cima alla
-sidebar; la scelta viene ricordata tra un avvio e l'altro). Anche il report di
-revisione viene generato nella lingua scelta.
+sidebar; la scelta viene ricordata tra un avvio e l'altro). Il report di
+revisione contiene entrambe le lingue: si apre nella lingua del browser
+(nell'app, in quella dell'app, e la segue quando la cambi).
 
 | Schermata principale | Anteprima con le bande |
 | --- | --- |
@@ -263,7 +264,8 @@ python3 -c "import ocr_core as C; \
 `OcrParams()` senza argomenti = default di massima accuratezza. Profilo
 veloce: `OcrParams(fps=6, skip_hamming=1, multi_variant=False,
 top_band=False, refine_timing=False)`. Il parametro `ui_lang` di
-`process_video` ("it"/"en") sceglie la lingua del report di revisione.
+`process_video` ("it"/"en") sceglie solo la lingua iniziale del report di
+revisione (che contiene entrambe le lingue).
 
 ## 📝 Note
 

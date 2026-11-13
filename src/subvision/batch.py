@@ -312,8 +312,9 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
               ) -> Dict[str, Any]:
     """
     Processes `videos` in order. Returns the data of `batch.done`.
-    `lang` is the language of the per-file logs (and of the review reports,
-    unless `ui_lang` says otherwise). Raises EngineError("bad_params") before
+    `lang` is the language of the per-file logs (and the initial language of
+    the review reports, unless `ui_lang` says otherwise: the reports carry
+    both languages and follow the app or the browser language when opened). Raises EngineError("bad_params") before
     starting when the parameters are invalid (nothing is emitted).
     """
     validate_params(params)

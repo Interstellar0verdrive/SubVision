@@ -106,7 +106,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_lists_options(ex)
     _add_tools_option(ex)
     ex.add_argument("--log-lang", choices=("en", "it"), default="en",
-                    help="language of the per-file log and of the review report")
+                    help="language of the per-file log and initial language of the "
+                         "review report (which carries both)")
 
     fx = sub.add_parser("fix", help="clean up an existing SRT (Sub fix)")
     fx.add_argument("srt", help="the .srt file")

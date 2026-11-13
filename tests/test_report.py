@@ -1,14 +1,20 @@
 """
 Review report (write_qc_html): the IT/EN texts must stay the ones of 1.0
 even though the segment flags are now codes. The fixed segments below are
-the same ones used to diff the reports before and after activity 1.2
-(byte-identical in both languages).
+the same ones used to diff the reports before and after activity 1.2.
+Since C2 (item 72) every report carries BOTH languages and picks one when
+it opens (window.__subvisionLang, else the browser language); ui_lang only
+prefills the markup.
 """
 
 from __future__ import annotations
 
+import json
 import re
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from subvision import core
 from subvision.core import OcrParams, RunStats, SegInfo
@@ -35,40 +41,138 @@ def _fixed_report(tmp_path: Path, lang: str) -> str:
     return out.read_text(encoding="utf-8")
 
 
-def test_report_it_texts(tmp_path: Path):
-    html = _fixed_report(tmp_path, "it")
+IT_TEXTS = ('"merged_fade": "unito da fade/typo"',
+            '"too_short": "scartato: troppo breve"',
+            '"noise": "scartato: probabile rumore grafico"',
+            "Righe: <b>3</b> · da ricontrollare: <b>1</b> · "
+            "scartate (recuperabili): <b>2</b> · buchi lunghi: <b>1</b>",
+            "Frame: 330 · OCR: 120 · confini raffinati: 4 · tempo: 00:12",
+            "💾 Salva SRT revisionato", "unisci duplicati",
+            '"addedFlag": "aggiunta a mano"',
+            f"Generato con SubVision v{core.__version__}")
+EN_TEXTS = ('"merged_fade": "merged across fade/typo"',
+            '"too_short": "dropped: too short"',
+            '"noise": "dropped: likely graphic noise"',
+            "Lines: <b>3</b> · to re-check: <b>1</b> · "
+            "dropped (recoverable): <b>2</b> · long gaps: <b>1</b>",
+            "Frames: 330 · OCR: 120 · boundaries refined: 4 · time: 00:12",
+            "💾 Save reviewed SRT", "merge duplicates",
+            '"addedFlag": "added by hand"',
+            f"Generated with SubVision v{core.__version__}")
+
+
+def _i18n_block(html: str) -> dict:
+    raw = html.split('<script type="application/json" id="qci18n">', 1)[1].split("</script>", 1)[0]
+    return json.loads(raw)
+
+
+def _data_block(html: str) -> dict:
+    raw = html.split('<script type="application/json" id="qcdata">', 1)[1].split("</script>", 1)[0]
+    return json.loads(raw)
+
+
+@pytest.mark.parametrize("lang", ["it", "en"])
+def test_report_carries_both_languages(tmp_path: Path, lang: str):
+    html = _fixed_report(tmp_path, lang)
+    # ui_lang only prefills the markup (what shows before the script runs)
+    if lang == "it":
+        assert '<html lang="it">' in html and "<title>Revisione — video.mp4</title>" in html
+    else:
+        assert '<html lang="en">' in html and "<title>Review — video.mp4</title>" in html
+    # ...but the texts of both languages are in every report ("</" is
+    # written "<\\/" inside the JSON blocks)
+    flat = html.replace("<\\/", "</")
+    for text in IT_TEXTS + EN_TEXTS:
+        assert text in flat, text
+    i18n = _i18n_block(html)
+    assert set(i18n) == {"it", "en"}
+    for code in ("too_short", "noise", "merged_fade"):
+        assert code in i18n["it"]["flags"] and code in i18n["en"]["flags"]
+    assert i18n["it"]["html"]["TITLE"] == "Revisione" and i18n["en"]["html"]["TITLE"] == "Review"
+    assert "Righe: <b>3</b>" in i18n["it"]["summary"] and "Lines: <b>3</b>" in i18n["en"]["summary"]
+    assert "Generato con" in i18n["it"]["footer"] and "Generated with" in i18n["en"]["footer"]
+    # the rows carry the flag CODES: the script translates them when shown
+    flags = [r["flags"] for r in _data_block(html)["rows"]]
+    assert flags == [[], ["merged_fade"], [], ["too_short"], ["noise"]]
+    # a closing tag inside the JSON never ends the <script> block early
+    raw = html.split('id="qci18n">', 1)[1].split("</script>", 1)[0]
+    assert "</" not in raw
+
+
+def test_report_unknown_ui_lang_falls_back_to_italian(tmp_path: Path):
+    html = _fixed_report(tmp_path, "fr")
     assert '<html lang="it">' in html
-    assert "<title>Revisione — video.mp4</title>" in html
-    for text in ('"flags": ["unito da fade/typo"]',
-                 '"flags": ["scartato: troppo breve"]',
-                 '"flags": ["scartato: probabile rumore grafico"]',
-                 "Righe: <b>3</b> · da ricontrollare: <b>1</b> · "
-                 "scartate (recuperabili): <b>2</b> · buchi lunghi: <b>1</b>",
-                 "Frame: 330 · OCR: 120 · confini raffinati: 4 · tempo: 00:12",
-                 "💾 Salva SRT revisionato", "unisci duplicati",
-                 '"addedFlag": "aggiunta a mano"',
-                 f"Generato con SubVision v{core.__version__}"):
-        assert text in html, text
-    for code in ("too_short", "noise", "merged_fade"):
-        assert f'"{code}"' not in html, code
+    assert set(_i18n_block(html)) == {"it", "en"}
 
 
-def test_report_en_texts(tmp_path: Path):
-    html = _fixed_report(tmp_path, "en")
-    assert '<html lang="en">' in html
-    assert "<title>Review — video.mp4</title>" in html
-    for text in ('"flags": ["merged across fade/typo"]',
-                 '"flags": ["dropped: too short"]',
-                 '"flags": ["dropped: likely graphic noise"]',
-                 "Lines: <b>3</b> · to re-check: <b>1</b> · "
-                 "dropped (recoverable): <b>2</b> · long gaps: <b>1</b>",
-                 "Frames: 330 · OCR: 120 · boundaries refined: 4 · time: 00:12",
-                 "💾 Save reviewed SRT", "merge duplicates",
-                 '"addedFlag": "added by hand"',
-                 f"Generated with SubVision v{core.__version__}"):
-        assert text in html, text
-    for code in ("too_short", "noise", "merged_fade"):
-        assert f'"{code}"' not in html, code
+def test_report_language_api(tmp_path: Path):
+    """
+    The language is picked at open: window.__subvisionLang ('it' | 'en', set
+    by the app) first, then the browser language; window.__subvisionSetLang
+    switches every visible text in place (no reload).
+    """
+    js = _fixed_report(tmp_path, "it").split("<script>", 1)[1]
+    assert "window.__subvisionLang" in js
+    assert "if (forced === 'it' || forced === 'en') return forced;" in js
+    assert "navigator.languages" in js and "navigator.language" in js
+    assert "window.__subvisionSetLang = function(lang){" in js
+    setlang = js[js.index("window.__subvisionSetLang = function(lang){"):]
+    setlang = setlang[:setlang.index("\n};") + 4]
+    assert "location.reload" not in setlang
+    for call in ("applyStatic();", "refreshRows();", "updateCounter();"):
+        assert call in setlang, call
+    # static texts: html lang, title, data-i18n markup, hint, summary, footer
+    static = js[js.index("function applyStatic(){"):js.index("function refreshRows(){")]
+    for piece in ("document.documentElement.lang = LANG", "document.title =",
+                  "[data-i18n]", "[data-i18n-title]", "[data-i18n-js]",
+                  "document.getElementById('hint').innerHTML = BRIDGE ? T.hintApp : L.html.HINT",
+                  "getElementById('summary').innerHTML = L.summary",
+                  "getElementById('foot').innerHTML = L.footer",
+                  "n.dataset.wide = L.html.SRT_SAVED"):
+        assert piece in static, piece
+    # rows and gaps keep a refresher for their labels (edits are not touched)
+    assert js.count("._i18n = () => {") == 2
+    assert "flagText(f)" in js and "flags:[ADDED_FLAG]" in js and "flags:[T.addedFlag]" not in js
+
+
+JSC = Path("/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc")
+
+
+@pytest.mark.skipif(not JSC.exists(), reason="JavaScriptCore shell not available")
+def test_report_language_choice_runs(tmp_path: Path):
+    """pickLang() of the real report, run in JavaScriptCore."""
+    js = _fixed_report(tmp_path, "it").split("<script>", 1)[1].split("</script>", 1)[0]
+    fn = js[js.index("function pickLang(){"):]
+    fn = fn[:fn.index("\n}\n") + 3]
+    cases = [
+        ("'en'", "['it-IT']", "'it-IT'", "en"),     # the app decides
+        ("'it'", "['en-US']", "'en-US'", "it"),
+        ("'de'", "['it-IT','en']", "'it-IT'", "it"),  # not it/en: browser language
+        ("undefined", "['it']", "'it'", "it"),
+        ("undefined", "['en-GB','it']", "'en-GB'", "en"),
+        ("undefined", "['de-DE']", "'de-DE'", "en"),
+        ("undefined", "[]", "'it-CH'", "it"),       # navigator.language fallback
+        ("undefined", "undefined", "undefined", "en"),
+    ]
+    for forced, langs, lang, expected in cases:
+        src = (f"var window = {{__subvisionLang: {forced}}};\n"
+               f"var navigator = {{languages: {langs}, language: {lang}}};\n"
+               f"{fn}\nprint(pickLang());\n")
+        script = tmp_path / "pick.js"
+        script.write_text(src, encoding="utf-8")
+        out = subprocess.run([str(JSC), str(script)], capture_output=True, text=True, timeout=30)
+        assert out.returncode == 0, out.stderr
+        assert out.stdout.strip() == expected, (forced, langs, lang, out.stdout)
+
+
+@pytest.mark.skipif(not JSC.exists(), reason="JavaScriptCore shell not available")
+def test_report_script_syntax(tmp_path: Path):
+    js = _fixed_report(tmp_path, "en").split("<script>", 1)[1].split("</script>", 1)[0]
+    script = tmp_path / "report.js"
+    script.write_text(js, encoding="utf-8")
+    out = subprocess.run([str(JSC), "-e", f"checkSyntax({json.dumps(str(script))})"],
+                         capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr + out.stdout
 
 
 def test_report_app_bridge_and_state(tmp_path: Path):
@@ -85,8 +189,8 @@ def test_report_app_bridge_and_state(tmp_path: Path):
     # injected initial state has precedence over localStorage
     assert "window.__subvisionState" in js
     assert js.index("window.__subvisionState && typeof") < js.index("localStorage.getItem(LSKEY)")
-    # in-app hint swapped at load, strings present in both languages
-    assert "document.getElementById('hint').innerHTML = T.hintApp" in js
+    # in-app hint swapped at load (and on a language switch), both languages
+    assert "document.getElementById('hint').innerHTML = BRIDGE ? T.hintApp : L.html.HINT" in js
     assert '<div class="hint" id="hint">' in html
     for lang, err, hint in (("it", "Errore nel salvataggio:", "accanto al video"),
                             ("en", "Could not save:", "next to the video")):
@@ -159,6 +263,11 @@ def test_qc_i18n_languages_are_aligned():
     for section in ("html", "js", "flags"):
         assert set(it[section]) == set(en[section]), section
     assert set(it["flags"]) == {core.FLAG_TOO_SHORT, core.FLAG_NOISE, core.FLAG_MERGED_FADE}
-    # every token of the template has a text in both languages
+    # every token of the template has a text in both languages, and the
+    # markup tells the script where it goes (or the script sets it itself)
+    by_script = {"SAVED", "SRT_SAVED", "HINT"}
     for key in it["html"]:
         assert f"__T_{key}__" in core._QC_TEMPLATE, key
+        assert (f'data-i18n="{key}"' in core._QC_TEMPLATE
+                or f'data-i18n-title="{key}"' in core._QC_TEMPLATE
+                or key in by_script), key
