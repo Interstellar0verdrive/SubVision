@@ -92,6 +92,39 @@ enum Alerts {
         }
     }
 
+    // MARK: - F5.1 (O1, O2, O7)
+
+    /// O1: Stop this file. True stops.
+    static func confirmStopFile(_ model: AppModel, name: String) -> Bool {
+        let a = SVAlert(icon: AlertIconName.stopFile, tone: .red, title: model.t("app.alerts.stop_title", ["name": name]),
+                        text: model.t("app.alerts.stop_text"))
+        a.button(model.t("app.common.stop"), role: .destructiveSolid)
+        a.button(model.t("app.common.continue"), cancel: true)
+        return a.runModal() == 0
+    }
+
+    /// O2: Stop the whole batch. True stops.
+    static func confirmStopAll(_ model: AppModel) -> Bool {
+        let a = SVAlert(icon: AlertIconName.stopAll, tone: .red, title: model.t("app.alerts.stopall_title"),
+                        text: model.t("app.alerts.stopall_text"))
+        a.button(model.t("app.common.stop_all"), role: .destructiveSolid)
+        a.button(model.t("app.common.continue"), cancel: true)
+        return a.runModal() == 0
+    }
+
+    /// O7: the OCR language saved is not one Vision reads here; "Choose the Language" opens the inspector.
+    static func languageUnsupported(_ model: AppModel, language: String, count: Int) {
+        let name = Locale(identifier: model.language).localizedString(forIdentifier: language) ?? language
+        let a = SVAlert(icon: AlertIconName.language, tone: .yellow, title: model.t("app.alerts.lang_title", ["lang": name]),
+                        text: model.tn("app.alerts.lang_text", count))
+        a.button(model.t("app.alerts.lang_btn"), role: .primary)
+        a.button(model.t("app.common.cancel"), cancel: true)
+        if a.runModal() == 0 {
+            model.tab = .process
+            model.inspectorOpen = true
+        }
+    }
+
     /// A plain error (red), OK.
     static func error(_ model: AppModel, title: String, text: String) {
         let a = SVAlert(icon: AlertIconName.error, tone: .red, title: title, text: text)

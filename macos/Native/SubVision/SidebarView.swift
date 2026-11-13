@@ -20,11 +20,17 @@ extension AppModel {
     /// The videos the sidebar counts: the unreadable ones are left out (board E1).
     var countedVideos: Int { videos.filter { $0.state != .unreadable }.count }
 
-    /// "Nessun video" · "3 video" · "3 video · 1 in corso" (F5.1 adds the outcomes).
+    /// "Nessun video" · "3 video" · "3 video · 1 in corso" · "4 video · 1 fallito" (E2–E5).
     var processSubtitle: String {
         guard countedVideos > 0 else { return t("app.sidebar.no_videos") }
         var parts = [tn("app.sidebar.videos", countedVideos)]
-        if batch.running { parts.append(t("app.sidebar.running")) }
+        if batch.running { parts.append(t("app.sidebar.running")); return join(parts) }
+        let done = videos.filter { $0.state == .done || $0.state == .noSubs }.count
+        let failed = videos.filter { $0.state == .failed }.count
+        let stopped = videos.filter { $0.state == .stopped }.count
+        if done > 0 { parts.append(tn("app.sidebar.done", done)) }
+        if failed > 0 { parts.append(tn("app.sidebar.failed", failed)) }
+        if stopped > 0 { parts.append(tn("app.sidebar.stopped", stopped)) }
         return join(parts)
     }
 
