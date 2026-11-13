@@ -1,0 +1,49 @@
+# Design notes 77 and 78 on a video of mine (anime, not in the repository:
+# SUBVISION_QA_MEDIA must hold _test-1.mkv). With the signs band on, frame
+# 9 (00:00:27: "Nota: Borscht = …" at the top, "Borscht?" at the bottom)
+# has text in both bands: badge for both, a sign counted. The quick probe
+# no longer calls the busy drawing at 00:00:18 text (17 of 20 with text,
+# none of them false), and Try OCR corrects a frame the search marked
+# wrong: frame-bands plays the false positive, the test takes it away.
+@needs _test-1.mkv
+! cp "$MEDIA/_test-1.mkv" "$WORK/"
+@launch
+wait-ready 600
+? ^ready
+lang it
+params default
+inspector-set langHint it-IT
+band-set top-band 1
+? top on
+add $WORK/_test-1.mkv
+preview-select 0
+? ^ok · _test-1\.mkv$
+find-frames
+? ^ok · searching
+wait-frames 600
+? ^20 frames · 17 with text · 1 with signs
+frames
+? (^| )9:bottom\+top( |$)
+frame 9
+preview-state
+? bands bottom\+top
+capture $OUT/frame-9-both-bands.png
+? frame-9-both-bands.png$
+try-ocr
+? ^ok · reading
+wait-ocr 120
+? top ".*Borscht
+preview-state
+? bands bottom\+top
+frame silent
+? ^ok · frame
+frame-bands bottom
+? bands bottom
+try-ocr
+? ^ok · reading
+wait-ocr 120
+preview-state
+? bands none
+capture $OUT/silent-after-test.png
+? silent-after-test.png$
+params default

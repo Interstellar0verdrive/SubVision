@@ -41,7 +41,7 @@ struct MainView: View {
     private var footer: ShellFooter {
         ShellFooter(appVersion: model.config.appVersion, engineVersion: model.hello?.version, pythonVersion: model.hello?.python,
                     checkingUpdates: model.checkingUpdates, repositoryURL: model.config.repositoryURL,
-                    checkUpdates: { model.checkForUpdates() })
+                    repositoryMark: Image("GitHubMark"), checkUpdates: { model.checkForUpdates() })
     }
 }
 

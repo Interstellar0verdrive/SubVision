@@ -28,7 +28,7 @@ final class ReportSession {
     private(set) var bridge: ReportBridge?
     /// The export just done (R2): the toast's name, until it fades.
     private(set) var toast: URL?
-    /// The review state (`<name>.revisione.json`) could not be written: the
+    /// The review state (`<name>.review.json`) could not be written: the
     /// yellow notice at the bottom, once per run of failures (closing it keeps
     /// it closed until a write goes through and another fails).
     private(set) var stateWarning = false
@@ -61,7 +61,7 @@ final class ReportSession {
             phase = .unreadable
             return
         }
-        let bridge = ReportBridge(file: file, t: { [model] key, values in model.t(key, values) })
+        let bridge = ReportBridge(file: file, language: model.language, t: { [model] key, values in model.t(key, values) })
         bridge.onNavigationFinished = { [weak self] in self?.phase = .ready }
         bridge.onNavigationFailed = { [weak self] error in
             AppLog.shared.error("report load \(file.url.lastPathComponent): \(error)")

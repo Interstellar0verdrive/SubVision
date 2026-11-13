@@ -84,7 +84,7 @@ def test_load_lists(tmp_path: Path):
     ign = tmp_path / "ignore.txt"
     ign.write_text("# comment\n\nTraduzione a cura di\n", encoding="utf-8")
     assert core.load_ignore(ign) == ["Traduzione a cura di"]
-    cor = tmp_path / "correzioni.txt"
+    cor = tmp_path / "corrections.txt"
     cor.write_text("# c\nab => cd\nlonger rule => x\nbad line\n", encoding="utf-8")
     assert core.load_corrections(cor) == [("longer rule", "x"), ("ab", "cd")]
     assert core.load_ignore(tmp_path / "missing.txt") == []
@@ -121,7 +121,7 @@ def test_process_video_fast_profile(demo_ita_copy: Path, ffmpeg_bin: str, tmp_pa
     assert len(segs) == FAST_PROFILE_LINES
     assert stats.segments == FAST_PROFILE_LINES
     assert stats.frames > 0 and stats.ocr_calls > 0
-    report = demo_ita_copy.with_suffix(".revisione.html")
+    report = demo_ita_copy.with_suffix(".review.html")
     assert report.exists() and stats.qc_path == str(report)
     # the workdir is removed after the run
     assert not list((tmp_path / "tmp").glob("voc26_*"))

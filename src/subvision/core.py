@@ -18,7 +18,7 @@ minimize manual rework (skipped subtitles, imprecise timing, typos), so:
 3. TIMING REFINEMENT: the start/end boundaries are recomputed at the
    video's NATIVE frame rate (~1 frame precision, ~±20ms).
 4. Optional TOP BAND for translated signs/banners ({\\an8}).
-5. REVIEW REPORT (.revisione.html): every line carries its confidence,
+5. REVIEW REPORT (.review.html): every line carries its confidence,
    agreement between variants and a thumbnail; doubtful lines, dropped
    flashes and long gaps end up in an HTML report/editor for guided
    manual review.
@@ -231,7 +231,7 @@ class OcrParams:
     qc_conf_warn: float = 0.80         # below this confidence -> "yellow" line
     qc_agree_warn: float = 0.70        # below this variant agreement -> "yellow"
     ignore_lines: List[str] = field(default_factory=list)
-    # automatic "wrong => right" corrections (from correzioni.txt):
+    # automatic "wrong => right" corrections (from corrections.txt):
     # for the RECURRING typos the OCR will never fix (e.g. proper nouns on
     # impossible fonts: "Flamilion => Hamilton"). Applied at pipeline end.
     corrections: List[Tuple[str, str]] = field(default_factory=list)
@@ -1148,8 +1148,13 @@ def _esc(s: str) -> str:
 
 # Review-editor template. NOT an f-string: dynamic values enter via
 # .replace() on __TOKEN__ tokens (the JS/CSS is full of braces).
-# The visible strings (it/en) live in _QC_I18N: they also enter via tokens
-# (__T_*__ in the HTML, the T=__JSTR__ object in the JS).
+# The visible strings (it/en) live in _QC_I18N. BOTH languages travel in
+# the report (the "qci18n" JSON block): the __T_*__ tokens of the markup
+# only prefill it in the ui_lang of write_qc_html (what shows before the
+# script runs); the script then picks the language (window.__subvisionLang
+# set by the app, else the browser language) and fills every text from
+# the JSON (data-i18n* attributes, T object, flag codes of the rows).
+# window.__subvisionSetLang(lang) switches it in place, without a reload.
 _QC_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="__LANG__"><head><meta charset="utf-8">
 <title>__T_TITLE__ — __VIDEO__</title>
@@ -1238,36 +1243,56 @@ _QC_TEMPLATE = r"""<!DOCTYPE html>
  .foot a{color:var(--link);text-decoration:none} .foot a:hover{text-decoration:underline}
 </style></head><body>
 <div class="topbar">
- <b>🎬 __T_TITLE__ — __VIDEO__</b>
+ <b>🎬 <span data-i18n="TITLE">__T_TITLE__</span> — __VIDEO__</b>
  <span style="flex:1"></span>
  <span id="counter"></span>
- <label class="opt" title="__T_MERGE_TIP__">
-   <input type="checkbox" id="mergeOnSave" checked> __T_MERGE_LABEL__</label>
- <button class="sec" onclick="resetAll()">__T_RESET__</button>
- <button onclick="exportSrt()">__T_SAVE__</button>
+ <label class="opt" title="__T_MERGE_TIP__" data-i18n-title="MERGE_TIP">
+   <input type="checkbox" id="mergeOnSave" checked> <span data-i18n="MERGE_LABEL">__T_MERGE_LABEL__</span></label>
+ <button class="sec" onclick="resetAll()" data-i18n="RESET">__T_RESET__</button>
+ <button onclick="exportSrt()" data-i18n="SAVE">__T_SAVE__</button>
  <span class="saved" id="savedNote" data-wide="__T_SRT_SAVED__">__T_SAVED__</span>
 </div>
 <div class="wrap">
-<div class="sum">__SUMMARY__
+<div class="sum"><span id="summary">__SUMMARY__</span>
  <div class="legend" style="margin-top:6px">
-  <span><span class="dot warn"></span>__T_LEG_WARN__</span>
-  <span><span class="dot bad"></span>__T_LEG_BAD__</span>
-  <span><span class="dot added"></span>__T_LEG_ADDED__</span>
+  <span><span class="dot warn"></span><span data-i18n="LEG_WARN">__T_LEG_WARN__</span></span>
+  <span><span class="dot bad"></span><span data-i18n="LEG_BAD">__T_LEG_BAD__</span></span>
+  <span><span class="dot added"></span><span data-i18n="LEG_ADDED">__T_LEG_ADDED__</span></span>
  </div>
  <div class="hint" id="hint">__T_HINT__</div>
 </div>
-<h2>__T_ROWS_H__ <button class="mini sec" onclick="addRow(null)">__T_ADDROW__</button></h2>
+<h2><span data-i18n="ROWS_H">__T_ROWS_H__</span> <button class="mini sec" onclick="addRow(null)" data-i18n="ADDROW">__T_ADDROW__</button></h2>
 <div id="rows"></div>
-<h2>__T_DROPPED_H__</h2>
+<h2 data-i18n="DROPPED_H">__T_DROPPED_H__</h2>
 <div id="dropped"></div>
-<h2>__T_GAPS_H__</h2>
+<h2 data-i18n="GAPS_H">__T_GAPS_H__</h2>
 <div id="gaps"></div>
-<div class="foot">__FOOTER__</div>
+<div class="foot" id="foot">__FOOTER__</div>
 </div>
 <script type="application/json" id="qcdata">__DATA__</script>
+<script type="application/json" id="qci18n">__I18N__</script>
 <script>
 const DATA = JSON.parse(document.getElementById('qcdata').textContent);
-const T = __JSTR__;
+// Both languages: {it|en: {html, js, flags, summary, footer}} (see _QC_I18N).
+const I18N = JSON.parse(document.getElementById('qci18n').textContent);
+// Language at open: window.__subvisionLang ('it' | 'en') when the app set
+// it (WKUserScript at document start), otherwise the browser language.
+function pickLang(){
+  const forced = window.__subvisionLang;
+  if (forced === 'it' || forced === 'en') return forced;
+  let pref = '';
+  try { pref = (navigator.languages && navigator.languages[0]) || navigator.language || ''; } catch(e) {}
+  return String(pref).toLowerCase().startsWith('it') ? 'it' : 'en';
+}
+let LANG = pickLang();
+let T = I18N[LANG].js;
+// Flag codes of the rows (FLAG_* of the pipeline, plus ADDED_FLAG for the
+// lines added by hand): translated when shown, so they follow the language.
+const ADDED_FLAG = 'added';
+function flagText(code){
+  if (code === ADDED_FLAG) return T.addedFlag;
+  return (I18N[LANG].flags || {})[code] || code;
+}
 const LSKEY = 'voc26_rev_' + DATA.srtName;
 // Bridge to the SubVision app (WKWebView): the app registers the script
 // message handler "subvision" and receives {type:"export", name, srt} and
@@ -1276,7 +1301,7 @@ const LSKEY = 'voc26_rev_' + DATA.srtName;
 const BRIDGE = (window.webkit && window.webkit.messageHandlers &&
                 window.webkit.messageHandlers.subvision) || null;
 // Initial state: the app injects the saved editor state as
-// window.__subvisionState (from <name>.revisione.json) and it takes
+// window.__subvisionState (from <name>.review.json) and it takes
 // precedence over localStorage; after "Reset all" the injected state is
 // ignored once (sessionStorage marker), until the app re-injects the new one.
 let saved = {};
@@ -1288,8 +1313,43 @@ if (!ignoreInjected && window.__subvisionState && typeof window.__subvisionState
 } else {
   try { saved = JSON.parse(localStorage.getItem(LSKEY) || '{}'); } catch(e) {}
 }
-if (BRIDGE) { try { document.getElementById('hint').innerHTML = T.hintApp; } catch(e) {} }
 let addCounter = 0;
+let flashing = false;
+
+// Static texts of the page in the current language (markup with data-i18n*,
+// title, <html lang>, hint, summary, footer, resting note of the top bar).
+// The in-app hint replaces the browser one when the bridge is present.
+function applyStatic(){
+  const L = I18N[LANG];
+  document.documentElement.lang = LANG;
+  document.title = L.html.TITLE + ' — ' + DATA.videoName;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = L.html[el.dataset.i18n]; });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = L.html[el.dataset.i18nTitle]; });
+  document.querySelectorAll('[data-i18n-js]').forEach(el => { el.innerHTML = T[el.dataset.i18nJs]; });
+  document.getElementById('hint').innerHTML = BRIDGE ? T.hintApp : L.html.HINT;
+  document.getElementById('summary').innerHTML = L.summary;
+  document.getElementById('foot').innerHTML = L.footer;
+  const n = document.getElementById('savedNote');
+  n.dataset.wide = L.html.SRT_SAVED;
+  if (!flashing) n.textContent = T.saved;
+}
+// Texts built by makeRow / the gaps: every row and gap keeps a refresher
+// that rewrites its labels and tooltips only (inputs, ticks, edits, chosen
+// alternatives and added rows are left as they are).
+function refreshRows(){
+  document.querySelectorAll('.row, .gap').forEach(el => { if (el._i18n) el._i18n(); });
+}
+// Called by the app (evaluateJavaScript) when its language changes while
+// the report is open: everything visible switches in place, no reload.
+window.__subvisionSetLang = function(lang){
+  if (lang !== 'it' && lang !== 'en') return false;
+  window.__subvisionLang = lang;
+  if (lang !== LANG) {
+    LANG = lang; T = I18N[LANG].js;
+    applyStatic(); refreshRows(); updateCounter();
+  }
+  return true;
+};
 
 function persistState(){
   const json = JSON.stringify(saved);
@@ -1427,15 +1487,19 @@ function makeRow(r, container){
                         setState(r.id,{top:nv}); an8.classList.toggle('off',!nv);
                         an8.textContent = an8Label(nv); };
   tags.appendChild(an8);
+  const flagEls = [];
   (r.flags||[]).forEach(f => { const t=document.createElement('span');
-                               t.className='tag'; t.textContent=f; tags.appendChild(t); });
+                               t.className='tag'; t.textContent=flagText(f); tags.appendChild(t);
+                               flagEls.push([t, f]); });
   cx.appendChild(tags);
 
+  const altChips = [];
+  let origChip = null;
   if((r.alts||[]).length || r.text){
     const alt = document.createElement('div');
     (r.alts||[]).forEach(a => {
       const c = document.createElement('span'); c.className='chip'; c.dataset.txt=a;
-      c.title=T.altTip;
+      c.title=T.altTip; altChips.push(c);
       // evidenzia le parole che differiscono dal testo originale della riga
       wordDiff((r.text||'').replace(/\n/g,' '), a.replace(/\n/g,' ')).forEach(([w,d],k)=>{
         if(k) c.appendChild(document.createTextNode(' '));
@@ -1449,6 +1513,7 @@ function makeRow(r, container){
     });
     if(r.text){
       const o = document.createElement('span'); o.className='chip orig'; o.textContent=T.orig;
+      origChip = o;
       o.onclick = () => { ta.value=r.text; ta.dispatchEvent(new Event('input')); };
       alt.appendChild(o);
     }
@@ -1457,9 +1522,20 @@ function makeRow(r, container){
   div.appendChild(cx);
 
   const cc = document.createElement('div'); cc.className='cC';
-  cc.innerHTML = r.conf!=null ? Math.round(r.conf*100)+'%<div class="dur">'+T.agree+' '+
-                 Math.round((r.agree||1)*100)+'%</div>' : '—';
+  const confHtml = () => r.conf!=null ? Math.round(r.conf*100)+'%<div class="dur">'+T.agree+' '+
+                         Math.round((r.agree||1)*100)+'%</div>' : '—';
+  cc.innerHTML = confHtml();
   div.appendChild(cc);
+
+  // language switch: labels and tooltips only (see refreshRows)
+  div._i18n = () => {
+    cb.title=T.includeTip; ti1.title=T.start; ti2.title=T.end; updDur();
+    an8.textContent = an8Label(!an8.classList.contains('off')); an8.title=T.signTip;
+    flagEls.forEach(([t, f]) => { t.textContent = flagText(f); });
+    altChips.forEach(c => { c.title = T.altTip; });
+    if (origChip) origChip.textContent = T.orig;
+    cc.innerHTML = confHtml();
+  };
 
   container.appendChild(div);
   return div;
@@ -1471,7 +1547,7 @@ function addRow(gap){
   const base = gap ? {start: gap.start+0.5, end: Math.min(gap.end-0.5, gap.start+2.5)}
                    : {start: 0, end: 2};
   const r = {id:id, n:'+', start:base.start, end:base.end, text:'', alts:[],
-             flags:[T.addedFlag], conf:null, added:true, dropped:false,
+             flags:[ADDED_FLAG], conf:null, added:true, dropped:false,
              thumb: gap ? gap.thumb : ''};
   DATA.extraRows.push(r);
   setState(id, {text:'', start:base.start, end:base.end, included:true, added:true});
@@ -1551,15 +1627,16 @@ function stamp(){
 // tooltip of the note for as long as the note is shown.
 function flash(msg, tip){
   const n = document.getElementById('savedNote');
+  flashing = true;
   n.textContent = msg; n.title = tip || ''; n.style.opacity = 1;
   n.classList.toggle('long', msg !== T.srtSaved);
-  setTimeout(()=>{ n.style.opacity=0; n.textContent=T.saved; n.title='';
+  setTimeout(()=>{ flashing = false; n.style.opacity=0; n.textContent=T.saved; n.title='';
                    n.classList.remove('long'); }, 2500);
 }
 async function exportSrt(){
   const out = buildSrt();
   if(out == null) return;
-  const fname = DATA.srtName.replace(/\.srt$/i,'') + '-revisionato-' + stamp() + '.srt';
+  const fname = DATA.srtName.replace(/\.srt$/i,'') + '-reviewed-' + stamp() + '.srt';
   const mi = window._lastMergeInfo || 0;
   const mergeNote = mi > 0 ? ' · ' + mi + ' ' + T.mergedDupes : '';
   // 1) SubVision app (WKWebView): the app writes the file next to the original.
@@ -1610,13 +1687,14 @@ function resetAll(){
 }
 
 // ---- render
+applyStatic();
 DATA.extraRows = [];
 const rowsEl = document.getElementById('rows');
 DATA.rows.filter(r=>!r.dropped).forEach(r => makeRow(r, rowsEl));
 const dropEl = document.getElementById('dropped');
 const droppedRows = DATA.rows.filter(r=>r.dropped);
 if(droppedRows.length) droppedRows.forEach(r => makeRow(r, dropEl));
-else dropEl.innerHTML = '<div class="hint">'+T.noneDropped+'</div>';
+else dropEl.innerHTML = '<div class="hint" data-i18n-js="noneDropped">'+T.noneDropped+'</div>';
 const gapsEl = document.getElementById('gaps');
 if(DATA.gaps.length){
   DATA.gaps.forEach((g,gi) => {
@@ -1624,21 +1702,24 @@ if(DATA.gaps.length){
     const img = g.thumb ? '<img src="data:image/jpeg;base64,'+g.thumb+
                 '" style="max-width:400px;border-radius:6px">' : '';
     d.innerHTML = '<div class="cT">'+ts(g.start)+'<br>→ '+ts(g.end)+
-                  '<div class="dur">'+(g.end-g.start).toFixed(1)+T.gapNoSub+'</div></div>'+
-                  '<div>'+img+'</div><div style="flex:1"><div class="hint">'+
-                  T.gapHint+'</div></div>';
-    const btn = document.createElement('button'); btn.className='mini'; btn.textContent=T.addHere;
+                  '<div class="dur"></div></div>'+
+                  '<div>'+img+'</div><div style="flex:1"><div class="hint"></div></div>';
+    const durEl = d.querySelector('.dur'), hintEl = d.querySelector('.hint');
+    const btn = document.createElement('button'); btn.className='mini';
     btn.onclick = () => addRow(g);
     d.lastElementChild.appendChild(btn);
+    d._i18n = () => { durEl.textContent = (g.end-g.start).toFixed(1)+T.gapNoSub;
+                      hintEl.innerHTML = T.gapHint; btn.textContent = T.addHere; };
+    d._i18n();
     gapsEl.appendChild(d);
   });
-} else gapsEl.innerHTML = '<div class="hint">'+T.noneGaps+'</div>';
+} else gapsEl.innerHTML = '<div class="hint" data-i18n-js="noneGaps">'+T.noneGaps+'</div>';
 
 // restore the lines added in previous sessions
 for(const [id, s] of Object.entries(saved)){
   if(s.added && !DATA.rows.find(r=>r.id===id) && !DATA.extraRows.find(r=>r.id===id)){
     const r = {id:id, n:'+', start:s.start||0, end:s.end||2, text:s.text||'', alts:[],
-               flags:[T.addedFlag], conf:null, added:true, dropped:false, thumb:''};
+               flags:[ADDED_FLAG], conf:null, added:true, dropped:false, thumb:''};
     DATA.extraRows.push(r);
     makeRow(r, rowsEl);
   }
@@ -1649,10 +1730,11 @@ updateCounter();
 """
 
 
-# Review-report strings (text only, zero logic).
-# "html": __T_*__ tokens of the markup; "js": the T object used by the scripts;
-# "flags": texts of the segment flag codes (FLAG_*) set by the pipeline;
-# "summary": the recap at the top of the report.
+# Review-report strings (text only, zero logic). Both languages go in every
+# report; the script picks one at open (see _QC_TEMPLATE).
+# "html": __T_*__ tokens / data-i18n keys of the markup; "js": the T object
+# used by the scripts; "flags": texts of the segment flag codes (FLAG_*) set
+# by the pipeline; "summary": the recap at the top of the report.
 _QC_I18N = {
     "it": {
         "html": {
@@ -1670,7 +1752,7 @@ _QC_I18N = {
             "LEG_ADDED": "riga aggiunta a mano",
             "HINT": "Modifica il testo nelle caselle, clicca una <b>lettura alternativa</b> per usarla,\n"
                     " spunta/de-spunta le righe da includere. Le modifiche restano salvate in questo browser.<br>\n"
-                    " <b>💾 Salva SRT revisionato</b> crea <code>nome-revisionato-data.srt</code>: con <b>Chrome/Edge</b> si apre\n"
+                    " <b>💾 Salva SRT revisionato</b> crea <code>nome-reviewed-data.srt</code>: con <b>Chrome/Edge</b> si apre\n"
                     " il dialogo Salva che <b>ricorda la cartella</b> (scegli la cartella dei video la prima volta);\n"
                     " con <b>Safari</b> il file va in Download.",
             "ROWS_H": "Righe SRT",
@@ -1697,7 +1779,7 @@ _QC_I18N = {
             "srtError": "Errore nel salvataggio:",
             "hintApp": "Modifica il testo nelle caselle, clicca una <b>lettura alternativa</b> per usarla,\n"
                        " spunta/de-spunta le righe da includere. Le modifiche vengono salvate accanto al report.<br>\n"
-                       " <b>💾 Salva SRT revisionato</b> crea <code>nome-revisionato-data.srt</code> accanto al video.",
+                       " <b>💾 Salva SRT revisionato</b> crea <code>nome-reviewed-data.srt</code> accanto al video.",
             "confirmReset": "Annullare tutte le modifiche fatte in questo report?",
             "noneDropped": "Nessuna.", "noneGaps": "Nessuno.",
             "gapNoSub": "s senza sub",
@@ -1736,7 +1818,7 @@ _QC_I18N = {
             "LEG_ADDED": "line added by hand",
             "HINT": "Edit the text in the boxes, click an <b>alternative reading</b> to use it,\n"
                     " check/uncheck the lines to include. Changes stay saved in this browser.<br>\n"
-                    " <b>💾 Save reviewed SRT</b> creates <code>name-revisionato-date.srt</code>: with <b>Chrome/Edge</b> the\n"
+                    " <b>💾 Save reviewed SRT</b> creates <code>name-reviewed-date.srt</code>: with <b>Chrome/Edge</b> the\n"
                     " Save dialog opens and <b>remembers the folder</b> (pick the videos folder the first time);\n"
                     " with <b>Safari</b> the file goes to Downloads.",
             "ROWS_H": "SRT lines",
@@ -1763,7 +1845,7 @@ _QC_I18N = {
             "srtError": "Could not save:",
             "hintApp": "Edit the text in the boxes, click an <b>alternative reading</b> to use it,\n"
                        " check/uncheck the lines to include. Changes are saved next to the report.<br>\n"
-                       " <b>💾 Save reviewed SRT</b> creates <code>name-revisionato-date.srt</code> next to the video.",
+                       " <b>💾 Save reviewed SRT</b> creates <code>name-reviewed-date.srt</code> next to the video.",
             "confirmReset": "Undo all the changes made in this report?",
             "noneDropped": "None.", "noneGaps": "None.",
             "gapNoSub": "s without subs",
@@ -1804,12 +1886,17 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
     Inside the SubVision app (WKWebView with the "subvision" message
     handler) the SRT and the editor state go to the app through the bridge
     and the saved state comes back injected as window.__subvisionState.
-    ui_lang ("it" | "en") picks the language of the report texts.
+    The report carries the texts of BOTH languages and picks one when it
+    opens: window.__subvisionLang ("it" | "en", set by the app) or else the
+    browser language; window.__subvisionSetLang(lang) switches it live.
+    ui_lang ("it" | "en") only sets the initial <html lang> and the texts
+    shown before the script runs (kept for signature compatibility).
     """
     import json
 
-    tr = _QC_I18N.get(ui_lang) or _QC_I18N["it"]
-    flag_tr = tr["flags"]
+    if ui_lang not in _QC_I18N:
+        ui_lang = "it"
+    tr = _QC_I18N[ui_lang]
 
     def row_cls(s: SegInfo) -> str:
         if s.conf < 0.5 or s.agree < 0.5:
@@ -1826,7 +1913,7 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
             "start": round(s.start, 3), "end": round(s.end, 3),
             "text": s.text, "top": s.top, "conf": round(s.conf, 3),
             "agree": round(s.agree, 3), "alts": s.alts,
-            "flags": [flag_tr.get(f, f) for f in s.flags],
+            "flags": list(s.flags),            # codes: translated by the script
             "thumb": s.thumb, "dropped": is_dropped,
             "cls": "bad" if is_dropped else row_cls(s),
         })
@@ -1838,23 +1925,30 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
     }
     warn_rows = sum(1 for s in segs
                     if s.conf < p.qc_conf_warn or s.agree < p.qc_agree_warn or s.flags)
-    summary = tr["summary"].format(
-        srt=_esc(srt_name), rows=len(segs), warn=warn_rows,
-        dropped=len(dropped), gaps=len(gaps), frames=stats.frames,
-        ocr=stats.ocr_calls, refined=stats.refined,
-        elapsed=fmt_hms(stats.elapsed))
-    footer = tr["footer"].format(version=__version__, url=REPO_URL,
-                                 host=REPO_URL.split("://", 1)[-1])
+    texts = {}
+    for lang, ltr in _QC_I18N.items():
+        texts[lang] = {
+            "html": ltr["html"], "js": ltr["js"], "flags": ltr["flags"],
+            "summary": ltr["summary"].format(
+                srt=_esc(srt_name), rows=len(segs), warn=warn_rows,
+                dropped=len(dropped), gaps=len(gaps), frames=stats.frames,
+                ocr=stats.ocr_calls, refined=stats.refined,
+                elapsed=fmt_hms(stats.elapsed)),
+            "footer": ltr["footer"].format(version=__version__, url=REPO_URL,
+                                           host=REPO_URL.split("://", 1)[-1]),
+        }
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    jstr = json.dumps(tr["js"], ensure_ascii=False).replace("</", "<\\/")
-    html = _QC_TEMPLATE.replace("__LANG__", ui_lang).replace("__JSTR__", jstr)
+    i18n = json.dumps(texts, ensure_ascii=False).replace("</", "<\\/")
+    html = _QC_TEMPLATE.replace("__LANG__", ui_lang)
     for key, val in tr["html"].items():
         html = html.replace(f"__T_{key}__", val)
     html = (html
             .replace("__VIDEO__", _esc(video_name))
-            .replace("__SUMMARY__", summary)
-            .replace("__FOOTER__", footer)
-            .replace("__DATA__", payload))
+            .replace("__SUMMARY__", texts[ui_lang]["summary"])
+            .replace("__FOOTER__", texts[ui_lang]["footer"]))
+    # the two JSON blocks in one pass: their content is never re-scanned
+    blocks = {"__DATA__": payload, "__I18N__": i18n}
+    html = re.sub(r"__(?:DATA|I18N)__", lambda m: blocks[m.group(0)], html)
     path.write_text(html, encoding="utf-8")
 
 
@@ -2027,8 +2121,9 @@ def process_video(video: str, out_path: str, p: OcrParams,
     Full pipeline. progress_cb(ProgressEvent) with step in STEPS and band in
     BANDS; log_cb(LogEvent) with the codes listed on LogEvent. Returns
     (tuple_segments, stats); stats.qc_path holds the path of the review
-    report (if generated). ui_lang ("it" | "en") is only the language of the
-    review-report texts. Raises EngineError("vision_unavailable") when
+    report (if generated). ui_lang ("it" | "en") is only the initial
+    language of the review report (which carries both and follows the app
+    or the browser language when opened). Raises EngineError("vision_unavailable") when
     Apple Vision (ocrmac) cannot be imported, EngineError("probe_failed")
     when ffprobe cannot read the video.
     `stop`: cooperative stop event. When set, the pipeline raises Stopped
@@ -2089,7 +2184,7 @@ def process_video(video: str, out_path: str, p: OcrParams,
                 "elapsed": stats.elapsed}))
 
         if p.qc_report:
-            qc = Path(out_path).with_suffix(".revisione.html")
+            qc = Path(out_path).with_suffix(".review.html")
             try:
                 write_qc_html(qc, Path(video).name, Path(out_path).name,
                               [s for s in all_segs if s.text],
@@ -2120,7 +2215,7 @@ def load_ignore(path: Path) -> List[str]:
 
 def load_corrections(path: Path) -> List[Tuple[str, str]]:
     """
-    Loads correzioni.txt: one rule per line in the format
+    Loads corrections.txt: one rule per line in the format
         wrong => right
     Empty lines and comments (#) are ignored. Longer rules apply first
     (prevents a short rule from "breaking" a more specific one).

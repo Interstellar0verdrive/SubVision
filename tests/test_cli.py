@@ -50,7 +50,7 @@ def test_extract_then_fix(demo_ita: Path, ffmpeg_bin: str, tmp_path: Path):
     assert res.returncode == 0, res.stderr
     srt = clip.with_suffix(".srt")
     assert srt.exists() and len(core.parse_srt(srt)) == FAST_PROFILE_LINES
-    assert res.stdout.splitlines() == [str(srt), str(clip.with_suffix(".revisione.html"))]
+    assert res.stdout.splitlines() == [str(srt), str(clip.with_suffix(".review.html"))]
     assert "[1/1] " + clip.name in res.stderr
     assert "extract · bottom:" in res.stderr and "ocr · bottom:" in res.stderr
     assert f"done: {FAST_PROFILE_LINES} lines" in res.stderr

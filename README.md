@@ -98,11 +98,12 @@ streamlit run app.py
 ```
 
 Put your videos in `./videos` (`.mkv .mp4 .mov .avi .m4v .webm`); the `.srt`,
-the `.revisione.html` review report and a `.log` are saved next to each video.
+the `.review.html` review report and a `.log` are saved next to each video.
 
 The interface is available in **English and Italian** (selector at the top of
-the sidebar; the choice is remembered across launches). The review report is
-generated in the selected UI language.
+the sidebar; the choice is remembered across launches). The review report
+carries both languages: it opens in the language of your browser (in the
+app, in the app's language, and it follows it when you switch).
 
 ## The 5 accuracy weapons
 
@@ -137,7 +138,7 @@ generated in the selected UI language.
 | Line-wrap width | 42 | balanced 2-3 line wrapping, professional subtitling style |
 | Hamming skip | 0 | skip OCR of near-identical frames (1 = ~25% faster, measured safe) |
 | ignore.txt | ON | phrases to discard (watermarks, fansub logos) |
-| correzioni.txt | ON | automatic `wrong => right` replacements for recurring typos |
+| corrections.txt | ON | automatic `wrong => right` replacements for recurring typos |
 
 Every option in the GUI has a **(?)** tooltip with a full explanation.
 
@@ -156,8 +157,8 @@ python3 -c "import ocr_core as C; \
 
 `OcrParams()` with no arguments = maximum-accuracy defaults. Fast profile:
 `OcrParams(fps=6, skip_hamming=1, multi_variant=False, top_band=False,
-refine_timing=False)`. `process_video(..., ui_lang="en")` controls the review
-report language.
+refine_timing=False)`. `process_video(..., ui_lang="en")` only sets the
+initial language of the review report (which carries both languages).
 
 ## Credits / Acknowledgements
 

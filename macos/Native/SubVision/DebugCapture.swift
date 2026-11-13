@@ -263,7 +263,7 @@ enum DebugCapture {
             guard args.count > 1 else { return "usage: alert-show already <paths>" }
             model.add(args[1].split(separator: ",").map { URL(fileURLWithPath: String($0)) })
         case "import":
-            let a = SVAlert(icon: AlertIconName.info, tone: .accent, title: model.t("app.alerts.import_title", ["name": "correzioni.txt"]),
+            let a = SVAlert(icon: AlertIconName.info, tone: .accent, title: model.t("app.alerts.import_title", ["name": "corrections.txt"]),
                             text: model.tn("app.alerts.import_text", 4))
             a.button(model.t("app.alerts.import_add"), role: .primary)
             a.button(model.t("app.alerts.import_replace"))

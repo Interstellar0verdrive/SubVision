@@ -162,7 +162,7 @@ def test_hello(sidecar: Sidecar, work: dict):
     assert h["state_folder"] == str(work["state"])
     # the state folder exists with its subfolders and the two lists
     assert (work["state"] / "tmp" / "preview").is_dir()
-    assert (work["state"] / "ignore.txt").is_file() and (work["state"] / "correzioni.txt").is_file()
+    assert (work["state"] / "ignore.txt").is_file() and (work["state"] / "corrections.txt").is_file()
 
 
 def test_non_json_line_is_ignored(sidecar: Sidecar):
@@ -383,9 +383,14 @@ def test_preview_frames_busy_then_done(sidecar: Sidecar, work: dict):
     with_text = [f for f in frames if f["has_text"]]
     assert len(with_text) >= 10
     assert all(Path(f["path"]).is_file() for f in frames)
+    assert all(f["has_text"] == bool(f["bands"]) and "band" not in f for f in frames)
+    assert all(f["bands"] in (["bottom"], ["bottom", "top"], ["top"], []) for f in frames)
     assert str(work["state"] / "tmp" / "preview") in frames[0]["path"]
     progress = [d for e, d in sidecar.events[since:] if e == "preview.progress"]
     assert progress and progress[-1]["done"] == 20
+    assert set(progress[-1]) == {"done", "total", "found", "found_top"}
+    assert progress[-1]["found"] == len(with_text)
+    assert progress[-1]["found_top"] == sum("top" in f["bands"] for f in frames)
     work["frame"] = with_text[0]["path"]
 
 

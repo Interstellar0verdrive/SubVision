@@ -84,7 +84,8 @@ struct DropArea: View {
     var title: String
     var orText: String?
     var buttonTitle: String
-    var shortcut: String
+    /// The tooltip of the button, with its shortcut ("Choose videos to process · ⌘O"): no glyph in the button (design note 62).
+    var help: String
     var footnote: String?
     var footnoteMono = false
     var onOpen: () -> Void
@@ -99,13 +100,9 @@ struct DropArea: View {
             Text(title).svFont(14, .semibold).foregroundStyle(targeted ? SV.primaryText : SV.text)
             HStack(spacing: 6) {
                 if let orText { Text(orText).svFont(13).foregroundStyle(SV.text2) }
-                Button(action: onOpen) {
-                    HStack(spacing: 6) {
-                        Text(buttonTitle)
-                        Text(shortcut).svFont(10, mono: true).opacity(0.7)
-                    }
-                }
-                .svButton(.primary, .regular)
+                Button(action: onOpen) { Text(buttonTitle) }
+                    .svButton(.primary, .regular)
+                    .help(help)
             }
             if let footnote {
                 if footnoteMono {
@@ -137,7 +134,7 @@ struct ProcessEmptyView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 6)
             DropArea(symbol: "film", title: model.t("app.process.empty.drop"), orText: model.t("app.process.empty.or_open"),
-                     buttonTitle: model.t("app.process.open"), shortcut: "⌘O",
+                     buttonTitle: model.t("app.process.open"), help: model.t("app.process.open_help"),
                      footnote: model.t("app.process.empty.formats"), footnoteMono: true,
                      onOpen: { model.openVideos() }, onDrop: { model.add($0) })
                 .padding(.top, 18)
@@ -162,7 +159,7 @@ struct PreviewEmptyView: View {
             .fixedSize(horizontal: false, vertical: true)
             DropArea(symbol: "viewfinder", title: model.t("app.preview.empty_title"),
                      orText: model.t("app.process.empty.drop") + model.t("app.common.list_separator") + model.t("app.process.empty.or_open"),
-                     buttonTitle: model.t("app.process.open"), shortcut: "⌘O",
+                     buttonTitle: model.t("app.process.open"), help: model.t("app.process.open_help"),
                      footnote: model.t("app.preview.empty_drop_text"),
                      onOpen: { model.openVideos() }, onDrop: { model.add($0) })
                 .padding(.top, 18)
@@ -189,7 +186,7 @@ struct FixEmptyView: View {
                     .padding(.bottom, 14)
             }
             DropArea(symbol: "text.badge.checkmark", title: model.t("app.fix.drop"), orText: model.t("app.process.empty.or_open"),
-                     buttonTitle: model.t("app.fix.open"), shortcut: "⇧⌘O",
+                     buttonTitle: model.t("app.fix.open"), help: model.t("app.fix.open_help"),
                      footnote: model.t("app.fix.why"),
                      onOpen: { model.openSRTPanel() }, onDrop: { model.receiveFixDrop($0) })
         }

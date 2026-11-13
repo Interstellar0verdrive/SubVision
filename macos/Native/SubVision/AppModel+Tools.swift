@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // The tools: the first-launch window's decisions (D12), the warm-up after a
-// macOS update, Download Again and "My own…" ffmpeg of Settings › Tools, the
-// lists of Settings › Lists.
+// macOS update, Download Again, Homebrew's or "A folder of mine…" ffmpeg of
+// Settings › Tools, the lists of Settings › Lists.
 
 import AppKit
 import SVShell
@@ -24,6 +24,13 @@ struct CustomFFmpeg: Equatable {
         if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue { return url }
         return url.deletingLastPathComponent()
     }
+}
+
+/// ffmpeg and ffprobe in Homebrew's folder (design note 54).
+struct HomebrewFFmpeg: Equatable, Sendable {
+    var folder: String
+    var version: String
+    var ffmpegPath: String { (folder as NSString).appendingPathComponent("ffmpeg") }
 }
 
 extension AppModel {
@@ -71,17 +78,54 @@ extension AppModel {
         await useOwnFFmpeg(custom.path)
     }
 
-    /// Settings › Tools › My own…: the executable or its folder; ffprobe must be next to it.
+    /// Settings › Tools › A folder of mine…: a folder with both `ffmpeg` and `ffprobe` (design note 54).
     func chooseOwnFFmpeg() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
-        panel.canChooseFiles = true
+        panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.showsHiddenFiles = true
-        panel.message = t("app.settings.ffmpeg_own")
-        panel.directoryURL = URL(fileURLWithPath: customFFmpeg?.folder.path ?? "/opt/homebrew/bin")
+        panel.message = t("app.settings.ffmpeg_panel")
+        panel.prompt = t("app.settings.ffmpeg_panel_btn")
+        let start = customFFmpeg?.folder.path
+            ?? Self.homebrewFolders.first { FileManager.default.fileExists(atPath: $0) } ?? NSHomeDirectory()
+        panel.directoryURL = URL(fileURLWithPath: start)
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task { await useOwnFFmpeg(url.path) }
+        let missing = ["ffmpeg", "ffprobe"].filter {
+            !FileManager.default.isExecutableFile(atPath: url.appendingPathComponent($0).path)
+        }
+        if !missing.isEmpty {
+            // Told now, and nothing changes: the tools in use stay as they were.
+            Alerts.error(self, title: t("app.settings.ffmpeg_missing_title"),
+                         text: t("app.settings.ffmpeg_missing_text", ["folder": url.path, "tools": missing.joined(separator: " · ")]))
+            return
+        }
+        Task { await useOwnFFmpeg(url.appendingPathComponent("ffmpeg").path) }
+    }
+
+    /// Where Homebrew puts its tools (Apple silicon, then Intel).
+    nonisolated static let homebrewFolders = ["/opt/homebrew/bin", "/usr/local/bin"]
+
+    /// Homebrew's ffmpeg, when its folder has ffprobe too: a ready item of the menu.
+    func findHomebrewFFmpeg() {
+        Task.detached(priority: .utility) {
+            var found: HomebrewFFmpeg?
+            for folder in Self.homebrewFolders {
+                let dir = URL(fileURLWithPath: folder)
+                let ffmpeg = dir.appendingPathComponent("ffmpeg"), ffprobe = dir.appendingPathComponent("ffprobe")
+                guard FileManager.default.isExecutableFile(atPath: ffmpeg.path),
+                      FileManager.default.isExecutableFile(atPath: ffprobe.path),
+                      let version = Self.toolVersion(ffmpeg) else { continue }
+                found = HomebrewFFmpeg(folder: folder, version: version)
+                break
+            }
+            await MainActor.run { [found] in self.homebrewFFmpeg = found }
+        }
+    }
+
+    /// Settings › Tools › "Homebrew · 8.0 (/opt/homebrew/bin)".
+    func useHomebrewFFmpeg(_ brew: HomebrewFFmpeg) {
+        Task { await useOwnFFmpeg(brew.ffmpegPath) }
     }
 
     func useOwnFFmpeg(_ path: String) async {

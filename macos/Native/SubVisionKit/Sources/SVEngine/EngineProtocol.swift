@@ -153,7 +153,7 @@ public struct ToolsUseReply: Decodable, Sendable, Equatable {
     public var custom: String?
 }
 
-/// `lists.status` and `lists.import`: `ignore.txt` and `correzioni.txt` in the state folder.
+/// `lists.status` and `lists.import`: `ignore.txt` and `corrections.txt` in the state folder.
 public struct ListsStatus: Decodable, Sendable, Equatable {
     public struct List: Decodable, Sendable, Equatable {
         public var path: String
@@ -333,18 +333,32 @@ public struct BatchDone: Decodable, Sendable, Equatable {
 public struct PreviewProgress: Decodable, Sendable, Equatable {
     public var done: Int
     public var total: Int
+    /// Frames with text in any band.
     public var found: Int
+    /// Frames with text in the signs band (`found_top`; nil from an engine without it).
+    public var foundTop: Int?
+
+    public init(done: Int, total: Int, found: Int, foundTop: Int? = nil) {
+        self.done = done
+        self.total = total
+        self.found = found
+        self.foundTop = foundTop
+    }
 }
 
 /// A whole frame in `<state>/tmp/preview/<hash>/`: the app draws the bands.
 public struct PreviewFrame: Decodable, Sendable, Equatable {
     public var path: String
-    /// bottom, top, or nil when no band has text.
-    public var band: String?
+    /// The bands with text, in this order: `bottom`, `top` (empty when none has text;
+    /// `top` only with the signs band on). Both when the frame has a line and a sign.
+    public var bands: [String]
     public var hasText: Bool
     public var width: Int
     public var height: Int
     public var ts: Double
+
+    public var hasDialogue: Bool { bands.contains("bottom") }
+    public var hasSigns: Bool { bands.contains("top") }
 }
 
 public struct PreviewDone: Decodable, Sendable, Equatable {

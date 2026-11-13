@@ -76,13 +76,13 @@ def test_output_paths_add_a_timestamp_when_the_srt_exists(tmp_path: Path):
     first = batch.output_paths(video)
     assert first["srt"] == tmp_path / "ep01.srt" and not first["existed"]
     assert first["log"] == tmp_path / "ep01.log"
-    assert first["report"] == tmp_path / "ep01.revisione.html"
+    assert first["report"] == tmp_path / "ep01.review.html"
     first["srt"].write_text("1\n")
     import datetime
     second = batch.output_paths(video, now=datetime.datetime(2026, 11, 12, 22, 30, 5))
     assert second["srt"] == tmp_path / "ep01_20261112_223005.srt" and second["existed"]
     assert second["log"] == tmp_path / "ep01_20261112_223005.log"
-    assert second["report"] == tmp_path / "ep01_20261112_223005.revisione.html"
+    assert second["report"] == tmp_path / "ep01_20261112_223005.review.html"
     assert batch.output_paths(video, qc_report=False)["report"] is None
 
 
@@ -327,7 +327,7 @@ def test_two_videos_then_a_second_run(two_clips: list[Path], tmp_path: Path):
         srt, log, report = Path(fd["srt"]), Path(fd["log"]), Path(fd["report"])
         assert srt == clip.with_suffix(".srt") == Path(started["srt"])
         assert log == clip.with_suffix(".log") == Path(started["log"])
-        assert report == clip.with_suffix(".revisione.html") == Path(started["report"])
+        assert report == clip.with_suffix(".review.html") == Path(started["report"])
         assert srt.exists() and log.exists() and report.exists()
         assert fd["segments"] == len(core.parse_srt(srt)) and not fd["empty"]
         assert set(fd["times"]) == {"extract:bottom", "group:bottom", "ocr:bottom"}
@@ -354,7 +354,7 @@ def test_two_videos_then_a_second_run(two_clips: list[Path], tmp_path: Path):
     st = rec2.of("batch.file.started")[0]
     assert re.fullmatch(r".*/sintel_ita_hardsub_demo_\d{8}_\d{6}\.srt", st["srt"]), st["srt"]
     assert st["log"] == st["srt"][:-4] + ".log"
-    assert st["report"] == st["srt"][:-4] + ".revisione.html"
+    assert st["report"] == st["srt"][:-4] + ".review.html"
     assert Path(st["srt"]).exists() and Path(st["log"]).exists() and Path(st["report"]).exists()
     assert two_clips[0].with_suffix(".srt").exists()          # the first one is untouched
     text = Path(st["log"]).read_text(encoding="utf-8")
@@ -375,7 +375,7 @@ def test_stop_scope_file_moves_on(two_clips: list[Path], tmp_path: Path):
     assert "batch.file.failed" not in names
     assert done["done"] == 1 and done["stopped"] == 1 and done["failed"] == 0 and done["skipped"] == 0
     assert not two_clips[0].with_suffix(".srt").exists()
-    assert not two_clips[0].with_suffix(".revisione.html").exists()
+    assert not two_clips[0].with_suffix(".review.html").exists()
     assert two_clips[1].with_suffix(".srt").exists()
     log0 = two_clips[0].with_suffix(".log").read_text(encoding="utf-8")
     assert "❌ interrotto" in log0 and "INTERROTTO dall'utente" in log0
@@ -490,7 +490,7 @@ def test_damaged_video_fails_in_the_middle_of_the_extraction(demo_ita: Path, ffm
     text = log.read_text(encoding="utf-8")
     assert f"ERROR: unknown ({f['text']})" in text and "RESULT" not in text
     assert not video.with_suffix(".srt").exists()
-    assert not video.with_suffix(".revisione.html").exists()
+    assert not video.with_suffix(".review.html").exists()
     assert not list((tmp_path / "tmp").glob("voc26_*"))
     # and the next video is processed as usual
     assert [d["idx"] for d in rec.of("batch.file.done")] == [1]

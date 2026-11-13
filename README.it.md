@@ -16,8 +16,9 @@ Perché Apple Vision invece di un LLM/VLM:
 - **Deterministico, 100% offline.**
 
 L'interfaccia è disponibile in **italiano e inglese** (selettore in cima alla
-sidebar; la scelta viene ricordata tra un avvio e l'altro). Anche il report di
-revisione viene generato nella lingua scelta.
+sidebar; la scelta viene ricordata tra un avvio e l'altro). Il report di
+revisione contiene entrambe le lingue: si apre nella lingua del browser
+(nell'app, in quella dell'app, e la segue quando la cambi).
 
 | Schermata principale | Anteprima con le bande |
 | --- | --- |
@@ -108,7 +109,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
    frame per cartelli/insegne/note del traduttore. Finiscono nell'SRT con tag
    `{\an8}` (posizione alta). Disattivala per le serie senza cartelli:
    dimezzi il tempo.
-5. **Report di revisione interattivo** (`.revisione.html` accanto all'SRT —
+5. **Report di revisione interattivo** (`.review.html` accanto all'SRT —
    *default: ON*) — non solo la mappa per la revisione: è un **editor**.
    Aprilo nel browser e:
    - ogni riga ha thumbnail, confidenza, accordo tra varianti;
@@ -120,7 +121,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
    - nei "buchi lunghi" puoi **aggiungere** una riga con tempi precompilati;
    - tempi editabili e tag `{\an8}` attivabile per riga (badge blu acceso
      "✓ CARTELLO" quando attivo);
-   - **💾 Salva SRT revisionato** crea `nome-revisionato-AAAAMMGG-HHMM.srt`:
+   - **💾 Salva SRT revisionato** crea `nome-reviewed-AAAAMMGG-HHMM.srt`:
      con Chrome/Edge si apre il dialogo Salva che **ricorda la cartella**
      (scegli la cartella dei video la prima volta); con Safari il file va in
      Download;
@@ -191,8 +192,8 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
   Neural Engine resta il collo di bottiglia, ~18 frame/s totali).
 - **Usa ignore.txt** — default: ON. Scarta le frasi in `ignore.txt` (una per
   riga, `#` = commento): watermark del fansub, loghi, scritte fisse.
-- **Usa correzioni.txt** — default: ON. Applica le sostituzioni di
-  `correzioni.txt` (formato: `sbagliato => giusto`, case-insensitive).
+- **Usa corrections.txt** — default: ON. Applica le sostituzioni di
+  `corrections.txt` (formato: `sbagliato => giusto`, case-insensitive).
   L'arma per i typo RICORRENTI che l'OCR non risolverà mai — i nomi propri su
   font impossibili: `Flamilion => Hamilton` sistema tutte le puntate della
   serie. Vale per pipeline, Test OCR e Sub fix.
@@ -200,7 +201,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 
 ## 🖥️ Le 3 schede
 
-- **Elabora** — batch OCR dei video selezionati → `.srt` + `.revisione.html`
+- **Elabora** — batch OCR dei video selezionati → `.srt` + `.review.html`
   + `.log` accanto al video. Avanzamento a STEP: per ogni file vedi l'elenco
   completo degli step già dall'inizio; lo step attivo mostra barra, conteggio,
   tempo trascorso, ETA e velocità live; quelli conclusi diventano righe verdi
@@ -213,7 +214,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
   per tarare bande e lingua PRIMA di lanciare una puntata intera.
 - **Sub fix** — pulizia di un `.srt` esistente SENZA rifare l'OCR. Per gli
   SRT esterni (vecchi file fatti con altri strumenti, file scaricati) o per
-  applicare retroattivamente nuove regole di `correzioni.txt` a puntate già
+  applicare retroattivamente nuove regole di `corrections.txt` a puntate già
   elaborate, in pochi secondi.
 
 ## 🧭 Flusso consigliato (per serie nuova)
@@ -222,7 +223,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 2. **Anteprima** → estrai i 20 frame → tara le bande (verde/azzurro)
 3. **Test OCR** su un frame con sottotitolo → verifica lingua e lettura
 4. **Elabora** (default massimi) → aspetta
-5. Apri il `.revisione.html` → sistemi le righe evidenziate → 💾 Salva SRT
+5. Apri il `.review.html` → sistemi le righe evidenziate → 💾 Salva SRT
    revisionato
 6. Per le puntate successive della stessa serie: stesse impostazioni, lancia
    in batch anche più file insieme.
@@ -236,7 +237,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 4. Forward-fill + sanificazione (junk, ignore.txt, anti-rumore grafico).
 5. Segmenti dal testo per-frame con voto di segmento; merge dei fade.
 6. Raffinamento confini al framerate nativo (finestra ±1/fps per lato).
-7. Scrittura `.srt` (+ `{\an8}` per i cartelli) e report `.revisione.html`.
+7. Scrittura `.srt` (+ `{\an8}` per i cartelli) e report `.review.html`.
 
 ## 📁 File
 
@@ -249,8 +250,8 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 | `requirements.txt` | streamlit, pillow, numpy, ocrmac |
 | `run.command` | launcher macOS |
 | `ignore.txt` | frasi da ignorare |
-| `correzioni.txt` | sostituzioni automatiche `sbagliato => giusto` |
-| `videos/` | metti qui i video; qui compaiono `.srt` / `.revisione.html` / `.log` |
+| `corrections.txt` | sostituzioni automatiche `sbagliato => giusto` |
+| `videos/` | metti qui i video; qui compaiono `.srt` / `.review.html` / `.log` |
 
 ## 🧪 Uso headless (senza GUI)
 
@@ -263,7 +264,8 @@ python3 -c "import ocr_core as C; \
 `OcrParams()` senza argomenti = default di massima accuratezza. Profilo
 veloce: `OcrParams(fps=6, skip_hamming=1, multi_variant=False,
 top_band=False, refine_timing=False)`. Il parametro `ui_lang` di
-`process_video` ("it"/"en") sceglie la lingua del report di revisione.
+`process_video` ("it"/"en") sceglie solo la lingua iniziale del report di
+revisione (che contiene entrambe le lingue).
 
 ## 📝 Note
 

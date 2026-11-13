@@ -28,7 +28,7 @@ other, and reports through the sidecar events of the protocol (plan, table
   technical text, `error` the one-line summary that also goes in the log,
   `log` the path of the per-file log.
 - outputs go next to the video: `<name>.srt` (or `<name>_YYYYMMDD_HHMMSS.srt`
-  when it exists already), `<name>.revisione.html`, `<name>.log`.
+  when it exists already), `<name>.review.html`, `<name>.log`.
 
 The per-file log is the only text for the user that the engine writes,
 because it is a file next to the video: `lang` ("it" | "en") picks its
@@ -256,7 +256,7 @@ def output_paths(video: Path, qc_report: bool = True,
     return {
         "srt": srt,
         "log": srt.with_suffix(".log"),
-        "report": srt.with_suffix(".revisione.html") if qc_report else None,
+        "report": srt.with_suffix(".review.html") if qc_report else None,
         "existed": existed,
     }
 
@@ -312,8 +312,9 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
               ) -> Dict[str, Any]:
     """
     Processes `videos` in order. Returns the data of `batch.done`.
-    `lang` is the language of the per-file logs (and of the review reports,
-    unless `ui_lang` says otherwise). Raises EngineError("bad_params") before
+    `lang` is the language of the per-file logs (and the initial language of
+    the review reports, unless `ui_lang` says otherwise: the reports carry
+    both languages and follow the app or the browser language when opened). Raises EngineError("bad_params") before
     starting when the parameters are invalid (nothing is emitted).
     """
     validate_params(params)

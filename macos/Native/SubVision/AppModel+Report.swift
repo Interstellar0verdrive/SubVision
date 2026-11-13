@@ -23,8 +23,8 @@ struct ReportState {
 }
 
 extension VideoItem {
-    /// `<stem>.revisione.html` next to the video, as the engine writes it.
-    var reportURL: URL { url.deletingPathExtension().appendingPathExtension("revisione.html") }
+    /// `<stem>.review.html` next to the video, as the engine writes it.
+    var reportURL: URL { url.deletingPathExtension().appendingPathExtension("review.html") }
     var reportExists: Bool { FileManager.default.fileExists(atPath: reportURL.path) }
 }
 

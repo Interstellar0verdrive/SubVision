@@ -40,15 +40,18 @@ public struct ShellFooter {
     public var pythonVersion: String?
     public var checkingUpdates: Bool
     public var repositoryURL: URL
+    /// The mark next to "GitHub" (a template image of the app's catalog); nil shows `</>`.
+    public var repositoryMark: Image?
     public var checkUpdates: @MainActor () -> Void
 
     public init(appVersion: String, engineVersion: String? = nil, pythonVersion: String? = nil, checkingUpdates: Bool = false,
-                repositoryURL: URL, checkUpdates: @escaping @MainActor () -> Void) {
+                repositoryURL: URL, repositoryMark: Image? = nil, checkUpdates: @escaping @MainActor () -> Void) {
         self.appVersion = appVersion
         self.engineVersion = engineVersion
         self.pythonVersion = pythonVersion
         self.checkingUpdates = checkingUpdates
         self.repositoryURL = repositoryURL
+        self.repositoryMark = repositoryMark
         self.checkUpdates = checkUpdates
     }
 }
@@ -223,7 +226,11 @@ struct ShellFooterView: View {
             FooterLink(help: footer.repositoryURL.absoluteString.replacingOccurrences(of: "https://", with: ""),
                        action: { NSWorkspace.shared.open(footer.repositoryURL) }) {
                 HStack(spacing: 4) {
-                    Image(systemName: "chevron.left.forwardslash.chevron.right").svFont(10, .medium)
+                    if let mark = footer.repositoryMark {
+                        mark.resizable().renderingMode(.template).frame(width: 13, height: 13)
+                    } else {
+                        Image(systemName: "chevron.left.forwardslash.chevron.right").svFont(10, .medium)
+                    }
                     Text(texts.github).svFont(11)
                 }
             }

@@ -114,13 +114,9 @@ struct FixReadyView: View {
         HStack(alignment: .center, spacing: 12) {
             Spacer(minLength: 8)
             if model.fix.running { Spinner(size: 14) }
-            Button { model.runFix() } label: {
-                HStack(spacing: 6) {
-                    Label(model.t("app.fix.run"), systemImage: "play.fill")
-                    Text("⌘↩").svFont(10, mono: true).opacity(0.7)
-                }
-            }
+            Button { model.runFix() } label: { Label(model.t("app.fix.run"), systemImage: "play.fill") }
             .svButton(.primary, .regular)
+            .help(model.t("app.fix.run_help"))
             // ⌘↩ fires from here: AppKit keeps one menu item per key equivalent,
             // and Start (Process) holds ⌘↩ in the menu; with Start disabled the
             // key would do nothing on this page (design note 15, verified).
@@ -135,18 +131,14 @@ struct FixReadyView: View {
     }
 }
 
-/// "Open SRT… ⇧⌘O" at the title's level (every board of Sub fix).
+/// "Open SRT…" at the title's level (every board of Sub fix); ⇧⌘O in its tooltip.
 struct OpenSRTButton: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Button { model.openSRTPanel() } label: {
-            HStack(spacing: 6) {
-                Label(model.t("app.fix.open"), systemImage: "doc")
-                Text("⇧⌘O").svFont(10, mono: true).foregroundStyle(SV.text3)
-            }
-        }
-        .svButton(.secondary, .regular)
+        Button { model.openSRTPanel() } label: { Label(model.t("app.fix.open"), systemImage: "doc") }
+            .svButton(.secondary, .regular)
+            .help(model.t("app.fix.open_help"))
     }
 }
 

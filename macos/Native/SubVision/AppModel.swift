@@ -89,6 +89,8 @@ final class AppModel {
     /// Settings › Tools › Download Again, while it runs: bytes done of total.
     var redownload: (done: Int64, total: Int64)?
     var customFFmpeg: CustomFFmpeg?
+    /// Homebrew's ffmpeg and ffprobe, when both are there (Settings › Tools, design note 54).
+    var homebrewFFmpeg: HomebrewFFmpeg?
 
     @ObservationIgnored let defaults = UserDefaults.standard
     @ObservationIgnored var reopenMainWindow: @MainActor () -> Void = {}
@@ -109,7 +111,8 @@ final class AppModel {
         config = AppConfig.shell(localizer: localizer)
         engine = EngineClient(configuration: configuration)
         tools = ToolsSetupState(tools: config.tools, engine: engine)
-        inspectorOpen = defaults.bool(forKey: DefaultsKey.inspectorOpen)
+        // Open on the first launch (design note 50): the key is missing then.
+        inspectorOpen = defaults.object(forKey: DefaultsKey.inspectorOpen) as? Bool ?? true
         previewVideoID = defaults.string(forKey: DefaultsKey.previewVideo).flatMap(UUID.init)
         AppLog.shared = AppLog(subsystem: config.logSubsystem, file: configuration.stateFolder.appendingPathComponent("records/app.log"))
         log.info("SubVision \(config.appVersion) · code \(configuration.codeFolder.path) · state \(configuration.stateFolder.path)")
@@ -137,6 +140,8 @@ final class AppModel {
         texts = ShellTexts(localizer)
         defaults.set(localizer.language, forKey: DefaultsKey.language)
         followLanguage(localizer.language)
+        // The open reports follow too (design note 72).
+        for controller in report.windows.values { controller.session.bridge?.setLanguage(localizer.language) }
     }
 
     /// macOS names its own menu items (About, Services, Hide…) in the app's

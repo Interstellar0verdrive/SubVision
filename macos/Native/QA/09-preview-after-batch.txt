@@ -1,0 +1,62 @@
+# Design note 73: after a batch the Video menu of Preview offers every video
+# that was processed (state done), not only the ready ones, and Find 20
+# Frames works on them. Also the Process page after the batch and during it
+# (circles, steps with one numbers column, the line over the steps).
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
+@launch
+wait-ready 600
+? ^ready
+lang it
+params fast
+inspector-set langHint it-IT
+inspector close
+tab process
+add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4
+capture $OUT/process-new-list.png
+? process-new-list.png$
+start
+? status ready
+wait-step 0 ocr 300
+? ^ok
+capture $OUT/process-running.png
+? process-running.png$
+wait-batch 900
+? ^batch done · done 2 failed 0 stopped 0 skipped 0
+capture $OUT/process-finished-sheet.png
+? process-finished-sheet.png$
+summary-seen
+capture $OUT/process-done.png
+? process-done.png$
+preview-menu
+? sintel_ita_hardsub_demo\.mp4 on
+? sintel_eng_hardsub_demo\.mp4 on
+?! off
+preview-select 1
+? ^ok · sintel_eng_hardsub_demo\.mp4$
+preview-menu
+? ✓ sintel_eng_hardsub_demo\.mp4 on
+preview-select 0
+? ^ok · sintel_ita_hardsub_demo\.mp4$
+find-frames
+? ^ok · searching
+wait-frames 300
+? ^20 frames · 1[5-9] with text · 0 with signs
+capture $OUT/preview-ita.png
+? preview-ita.png$
+# Design note 72: the report follows the app's language at open and when it changes,
+# in place (an edit in a text box survives the switch); 71: its English names.
+! test -s "$WORK/sintel_ita_hardsub_demo.review.html" && test ! -e "$WORK/sintel_ita_hardsub_demo.revisione.html"
+report-open $WORK/sintel_ita_hardsub_demo.review.html
+report-js document.documentElement.lang + ' · ' + document.title
+? ^it · Revisione
+report-run document.querySelector('textarea').value = 'edited by QA'; return 'ok';
+? ok
+lang en
+report-js document.documentElement.lang + ' · ' + document.title + ' · ' + document.querySelector('textarea').value
+? ^en · Review.* · edited by QA$
+lang it
+report-js document.documentElement.lang + ' · ' + document.title
+? ^it · Revisione
+report-close all
+params default
+inspector open

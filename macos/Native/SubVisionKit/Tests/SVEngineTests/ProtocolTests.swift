@@ -33,7 +33,7 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
         let done = try event("batch.file.done", #"""
             {"idx":0,"segments":12,"dropped":1,"refined":5,"elapsed":61.0,
              "times":{"extract:bottom":20.5,"ocr:bottom":40.5},"srt":"/v/ep01.srt",
-             "report":"/v/ep01.revisione.html","log":"/v/ep01.log","empty":false}
+             "report":"/v/ep01.review.html","log":"/v/ep01.log","empty":false}
             """#)
         guard case .batchFileDone(let d) = done else { Issue.record("\(done)"); return }
         #expect(d.times["extract:bottom"] == 20.5 && d.segments == 12 && !d.empty)
@@ -46,14 +46,18 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
     }
 
     @Test func previewEventsAndTest() throws {
+        #expect(try event("preview.progress", #"{"done":3,"total":20,"found":2,"found_top":1}"#)
+                == .previewProgress(PreviewProgress(done: 3, total: 20, found: 2, foundTop: 1)))
         #expect(try event("preview.progress", #"{"done":3,"total":20,"found":2}"#)
                 == .previewProgress(PreviewProgress(done: 3, total: 20, found: 2)))
         let done = try event("preview.done", #"""
-            {"frames":[{"path":"/s/tmp/preview/ab/000.jpg","band":"bottom","has_text":true,"width":1920,"height":1080,"ts":12.5},
-                       {"path":"/s/tmp/preview/ab/001.jpg","band":null,"has_text":false,"width":1920,"height":1080,"ts":40.0}]}
+            {"frames":[{"path":"/s/tmp/preview/ab/000.jpg","bands":["bottom","top"],"has_text":true,"width":1920,"height":1080,"ts":12.5},
+                       {"path":"/s/tmp/preview/ab/001.jpg","bands":[],"has_text":false,"width":1920,"height":1080,"ts":40.0},
+                       {"path":"/s/tmp/preview/ab/002.jpg","bands":["top"],"has_text":true,"width":1920,"height":1080,"ts":52.0}]}
             """#)
         guard case .previewDone(let p) = done else { Issue.record("\(done)"); return }
-        #expect(p.frames.map(\.hasText) == [true, false] && p.frames[1].band == nil)
+        #expect(p.frames.map(\.hasText) == [true, false, true] && p.frames[1].bands.isEmpty)
+        #expect(p.frames.map(\.hasDialogue) == [true, false, false] && p.frames.map(\.hasSigns) == [true, false, true])
         #expect(try event("preview.stopped", "{}") == .previewStopped)
         #expect(try event("preview.failed", #"{"error":"invalid_duration","message":"invalid_duration (path=/v)"}"#)
                 == .previewFailed(PreviewFailed(error: "invalid_duration", message: "invalid_duration (path=/v)")))
@@ -95,9 +99,9 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
     }
 
     @Test func otherReplies() throws {
-        let lists = try reply(#"{"ignore":{"path":"/s/ignore.txt","count":12},"corrections":{"path":"/s/correzioni.txt","count":4}}"#,
+        let lists = try reply(#"{"ignore":{"path":"/s/ignore.txt","count":12},"corrections":{"path":"/s/corrections.txt","count":4}}"#,
                               as: ListsStatus.self)
-        #expect(lists.ignore.count == 12 && lists.corrections.path == "/s/correzioni.txt")
+        #expect(lists.ignore.count == 12 && lists.corrections.path == "/s/corrections.txt")
         let probe = try reply(#"""
             {"videos":[{"path":"/v/a.mkv","duration":1440.5,"fps":23.976,"width":1920,"height":1080},
                        {"path":"/v/b.mkv","error":"probe_failed","message":"no video stream or duration"}]}

@@ -443,7 +443,8 @@ extension View {
 /// drawn inside 68 % of the box. Used by the file rows and the tools window.
 public struct StatusCircle: View {
     public enum State: Sendable, Equatable {
-        /// Ready or waiting: an empty ring.
+        /// Waiting in the batch: a dashed ring, so it does not read as a radio button
+        /// (a ready row shows no circle at all).
         case waiting
         /// Work going on: the spinner.
         case running
@@ -466,7 +467,7 @@ public struct StatusCircle: View {
         ZStack {
             switch state {
             case .waiting:
-                Circle().strokeBorder(SV.glassLine)
+                Circle().strokeBorder(SV.text3, style: StrokeStyle(lineWidth: 1.2, dash: [2.4, 2.6]))
             case .running:
                 Spinner(size: 16)
             case .done:
