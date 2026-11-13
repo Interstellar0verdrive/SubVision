@@ -12,6 +12,8 @@
 #   @state empty|base     the state folder: empty (a real first launch) or an APFS
 #                         clone of the base state (default)
 #   @keep-base            when this scenario passes, its state becomes the base
+#   @needs <file>         the scenario runs only when $MEDIA/<file> exists (videos of mine that
+#                         are not in the repository), else it is skipped
 #   @launch               starts the app (the lines before it prepare the folders)
 #   @quit                 quits the app and waits for it (done anyway at the end)
 #   ! <shell>             runs in bash in $WORK; a non-zero exit fails the scenario
@@ -19,12 +21,14 @@
 #   ? <regex>             the reply must match (grep -E)
 #   ?! <regex>            the reply must not match
 # Variables in commands and shell lines: $ROOT (the worktree), $DEMO (the demo
-# clips), $REF (the SRTs of the demo-assets release), $WORK, $STATE, $OUT.
+# clips), $REF (the SRTs of the demo-assets release), $MEDIA (the folder of the
+# @needs files), $WORK, $STATE, $OUT.
 #
 # Environment: SUBVISION_QA_APP (the Debug .app), SUBVISION_QA_BASE (the base
 # state; default ~/Library/Application Support/SubVision-qa-base),
 # SUBVISION_QA_REF (default: $ROOT/demo/ref, else the scratchpad copy),
-# SUBVISION_QA_OUT (where logs and captures go; default a temp folder).
+# SUBVISION_QA_OUT (where logs and captures go; default a temp folder),
+# SUBVISION_QA_MEDIA (the folder of the files that @needs names; unset skips those scenarios).
 # UserDefaults are shared with every other instance of the Debug app: each
 # scenario sets what it depends on (params, langHint, lang, size) and puts
 # the OCR parameters back to the defaults at its end.
@@ -38,6 +42,7 @@ APP="${SUBVISION_QA_APP:-$ROOT/build/dd/Build/Products/Debug/SubVision.app}"
 BASE="${SUBVISION_QA_BASE:-$HOME/Library/Application Support/SubVision-qa-base}"
 DEMO="$ROOT/demo"
 REF="${SUBVISION_QA_REF:-$DEMO/ref}"
+MEDIA="${SUBVISION_QA_MEDIA:-}"
 OUT_ROOT="${SUBVISION_QA_OUT:-$(mktemp -d /tmp/subvision-qa.XXXXXX)}"
 REPLY_TIMEOUT="${SUBVISION_QA_TIMEOUT:-1500}"   # seconds a reply may take (the commands have their own waits)
 
@@ -62,7 +67,7 @@ FAIL_REASON=""
 
 expand() {   # the scenario's variables in a line
     local s="$1"
-    s="${s//\$ROOT/$ROOT}"; s="${s//\$DEMO/$DEMO}"; s="${s//\$REF/$REF}"
+    s="${s//\$ROOT/$ROOT}"; s="${s//\$DEMO/$DEMO}"; s="${s//\$REF/$REF}"; s="${s//\$MEDIA/$MEDIA}"
     s="${s//\$WORK/$WORK}"; s="${s//\$STATE/$STATE}"; s="${s//\$OUT/$OUT}"
     printf '%s' "$s"
 }
@@ -125,12 +130,12 @@ run_scenario() {
     else
         mkdir -p "$STATE"
     fi
-    export ROOT DEMO REF WORK STATE OUT
+    export ROOT DEMO REF MEDIA WORK STATE OUT
     while IFS= read -r line || [[ -n "$line" ]]; do
         n=$((n + 1))
         [[ -z "${line// }" || "$line" == \#* ]] && continue
         case "$line" in
-            @state*|@keep-base) ;;
+            @state*|@keep-base|@needs*) ;;
             @launch) launch ;;
             @quit) quit_app ;;
             "?! "*)
@@ -165,10 +170,15 @@ run_scenario() {
     return 0
 }
 
-passed=0; failed=0; summary=()
+passed=0; failed=0; skipped=0; summary=()
 for f in "${scenarios[@]}"; do
     [[ -f "$f" ]] || { summary+=("MISSING $(basename "$f")"); failed=$((failed + 1)); continue; }
     name="$(basename "$f" .txt)"
+    needs="$(sed -n 's/^@needs //p' "$f" | head -1)"
+    if [[ -n "$needs" && ( -z "$MEDIA" || ! -f "$MEDIA/$needs" ) ]]; then
+        line="SKIP $name — needs $needs in SUBVISION_QA_MEDIA"
+        echo "$line"; summary+=("$line"); skipped=$((skipped + 1)); continue
+    fi
     start=$(date +%s)
     FAIL_REASON=""
     if run_scenario "$f"; then
@@ -183,5 +193,5 @@ for f in "${scenarios[@]}"; do
     echo "$line"; summary+=("$line")
 done
 echo
-echo "QA: $passed passed, $failed failed · logs in $OUT_ROOT"
+echo "QA: $passed passed, $failed failed, $skipped skipped · logs in $OUT_ROOT"
 (( failed == 0 ))
