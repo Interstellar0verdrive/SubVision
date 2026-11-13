@@ -252,7 +252,7 @@ enum DebugCapture {
             let b = model.batch
             let a = SVAlert(icon: AlertIconName.quit, tone: .yellow, title: model.t("app.alerts.quit_title"),
                             text: model.t("app.alerts.quit_text", ["name": b.name, "i": b.index, "n": b.total]))
-            a.button(model.t("app.alerts.quit_btn"), role: .destructiveSolid)
+            a.button(model.t("app.alerts.quit_btn"), role: .primary)
             a.button(model.t("app.common.cancel"))
             a.present(over: WindowSizer.main(model.config)) { _ in }
         case "close":

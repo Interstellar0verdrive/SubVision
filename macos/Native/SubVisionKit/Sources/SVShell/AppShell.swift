@@ -36,10 +36,16 @@ public final class ShellAppDelegate: NSObject, NSApplicationDelegate {
         let entries = dockMenu()
         guard !entries.isEmpty else { return nil }
         let menu = NSMenu()
+        menu.autoenablesItems = false
         for entry in entries {
             switch entry {
             case .separator: menu.addItem(.separator())
             case .item(let title, let run): menu.addItem(DockAction(title, run))
+            case .label(let title):
+                // Text only, dimmed like a disabled item (board O10).
+                let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                item.isEnabled = false
+                menu.addItem(item)
             }
         }
         return menu
@@ -59,6 +65,8 @@ public final class ShellAppDelegate: NSObject, NSApplicationDelegate {
 
 public enum DockMenuEntry {
     case item(String, @MainActor () -> Void)
+    /// A line that only says something (the file in progress): dimmed, not clickable.
+    case label(String)
     case separator
 }
 

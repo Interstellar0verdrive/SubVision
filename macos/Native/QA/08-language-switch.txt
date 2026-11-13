@@ -12,13 +12,13 @@ text app.review.title
 text app.menu.preview_window
 ? ^Preview$
 menu
-? \|Video\|.* · Open Videos…\|Open SRT…
+? \|Process\|.* · Choose Videos…\|Choose SRT…
 status
 ? lang en
 lang it
 text app.review.title
 ? ^Revisione$
 menu
-? \|Video\|.* · Apri video…\|Apri SRT…
+? \|Elabora\|.* · Scegli video…\|Scegli SRT…
 status
 ? lang it

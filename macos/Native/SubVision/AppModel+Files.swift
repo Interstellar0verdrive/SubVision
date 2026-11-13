@@ -304,6 +304,8 @@ extension AppModel {
         guard !removed.isEmpty else { return }
         videos.removeAll { ids.contains($0.id) }
         selection.subtract(ids)
+        // The note on skipped items talks about this list: an empty list drops it (design note 45).
+        if videos.isEmpty { skippedItems = [] }
         saveVideos()
         let undo = NSApp.keyWindow?.undoManager ?? NSApp.mainWindow?.undoManager
         undo?.registerUndo(withTarget: self) { model in
@@ -340,6 +342,18 @@ extension AppModel {
     var finishedVideos: [VideoItem] { videos.filter { $0.state.isFinished } }
 
     func selectAll() { selection = Set(videos.map(\.id)) }
+
+    /// Edit › Select All (⌘A): the rows of the Video page when the main window is in front and
+    /// no text is being edited; anywhere else the first responder's own Select All.
+    func selectAllInContext() {
+        let window = NSApp.keyWindow
+        let main = window?.identifier?.rawValue.hasPrefix(config.mainWindowID) == true
+        if main, tab == .process, !videos.isEmpty, !(window?.firstResponder is NSText) {
+            selectAll()
+        } else {
+            NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: nil, from: nil)
+        }
+    }
 
     func showInFinder(_ ids: Set<UUID>) {
         let urls = videos.filter { ids.contains($0.id) }.map(\.url)

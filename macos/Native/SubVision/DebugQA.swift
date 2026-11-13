@@ -39,6 +39,7 @@
 //   wait-ready <s>                 until the engine is ready and the tools window is gone (first launch: downloads)
 //   text <key>                     the catalogue's text for the app's language now
 //   menu                           the main menu's titles and the File menu's first items
+//   menu-dump <index>              one menu's items with their keys, dimmed and checked ones marked
 //   window-size                    the main window's size (the whole window, as `size` sets it), "760x640"
 //   row-text <idx>                 what the row of video idx says after its step (a failed row: the error text)
 //   alert-other · alert-other-press <n>   the non-modal alert that is not O1/O2 (O7, an error): title and buttons; press n
@@ -340,6 +341,25 @@ enum DebugQA {
             for item in items { if let m = item.submenu { m.delegate?.menuNeedsUpdate?(m); m.update() } }
             let file = items.count > 1 ? (items[1].submenu?.items.prefix(4).map(\.title) ?? []) : []
             return items.dropFirst().map(\.title).joined(separator: "|") + " · " + file.joined(separator: "|")
+        case "menu-dump":
+            // One menu of the bar (0 = the app's), as the person sees it when it opens:
+            // "title ⌘key" per item, "(off)" when dimmed, "✓" when checked, "—" for a separator.
+            let items = NSApp.mainMenu?.items ?? []
+            guard let i = Int(argument), items.indices.contains(i), let m = items[i].submenu else { return "bad menu" }
+            m.delegate?.menuNeedsUpdate?(m); m.update()
+            let lines = m.items.filter { !$0.isHidden }.map { item -> String in
+                if item.isSeparatorItem { return "—" }
+                var key = ""
+                if !item.keyEquivalent.isEmpty {
+                    let f = item.keyEquivalentModifierMask
+                    key = (f.contains(.control) ? "⌃" : "") + (f.contains(.option) ? "⌥" : "") + (f.contains(.shift) ? "⇧" : "")
+                        + (f.contains(.command) ? "⌘" : "")
+                    let k = item.keyEquivalent
+                    key += k == "\r" ? "↩" : k == "\u{8}" || k == "\u{7f}" ? "⌫" : k.uppercased()
+                }
+                return (item.state == .on ? "✓" : "") + item.title + (key.isEmpty ? "" : " " + key) + (item.isEnabled ? "" : " (off)")
+            }
+            return items[i].title + ": " + lines.joined(separator: " | ")
         case "window-size":
             guard let w = WindowSizer.main(model.config) else { return "no window" }
             let size = w.frame.size
