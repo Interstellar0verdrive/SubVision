@@ -72,6 +72,10 @@ final class AppModel {
     var previewVideoID: UUID? { didSet { defaults.set(previewVideoID?.uuidString, forKey: DefaultsKey.previewVideo) } }
     /// The SRT Sub fix works on (F5.3).
     var fixPath: URL?
+    // One property per page (F5.2–5.4), each with its own `AppModel+X.swift`.
+    var preview = PreviewState()
+    var fix = FixState()
+    var report = ReportState()
 
     // Settings
     var lists: ListsStatus?
@@ -300,10 +304,10 @@ final class AppModel {
             case .warmupDone(let w):
                 log.info("warmup done in \(w.seconds) s for \(w.languages)")
                 if hello?.vision == true { defaults.set(Self.macOSBuild, forKey: DefaultsKey.warmupBuild) }
-            case .batchFileStarted, .batchStep, .batchFileDone, .batchFileFailed, .batchFileStopped, .batchDone,
-                 .previewProgress, .previewDone, .previewStopped, .previewFailed:
-                // F5.1 and F5.2 take these over.
-                log.debug("event \(event.name)")
+            case .batchFileStarted, .batchStep, .batchFileDone, .batchFileFailed, .batchFileStopped, .batchDone:
+                handleBatch(message, name: event.name)
+            case .previewProgress, .previewDone, .previewStopped, .previewFailed:
+                handlePreview(message, name: event.name)
             case .other(let name):
                 log.debug("event \(name) (unknown)")
             }
@@ -370,15 +374,11 @@ final class AppModel {
         showAboutPanel(repositoryURL: config.repositoryURL, credits: t("app.menu.about_credits"))
     }
 
-    // MARK: - Batch (F5.1 fills these)
+    // MARK: - Batch (the rest is in AppModel+Run, F5.1)
 
     var canStart: Bool {
         status == .ready && !batch.running && hello?.vision == true && !readyVideos.isEmpty
     }
-
-    func startBatch() { log.info("batch.start: not in F4 (\(readyVideos.count) ready)") }
-    func stopCurrentFile() {}
-    func stopAll() {}
 
     // MARK: - Updates
 
