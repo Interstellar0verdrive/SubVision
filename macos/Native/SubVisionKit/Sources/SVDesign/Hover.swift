@@ -101,7 +101,9 @@ public struct PopupMenu<Label: View>: View {
     }
 
     private func show() {
-        guard let view = NSApp.keyWindow?.contentView ?? NSApp.mainWindow?.contentView else { return }
+        // The app's front window (an app not active has no key or main window: the first one that could be main).
+        let window = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.orderedWindows.first { $0.isVisible && $0.canBecomeMain }
+        guard let view = window?.contentView else { return }
         let handler = MenuHandler()
         let menu = NSMenu()
         menu.autoenablesItems = false

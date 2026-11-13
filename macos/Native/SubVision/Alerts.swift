@@ -9,6 +9,9 @@ import SVShell
 enum Alerts {
     enum ImportChoice { case append, replace }
 
+    /// The last non-modal alert that is not O1/O2 (O7, an error), while it is up: for `DebugQA`.
+    static weak var shown: SVAlertPresentation?
+
     /// O3: ⌘Q with a batch running. True quits.
     static func confirmQuit(_ model: AppModel) -> Bool {
         let b = model.batch
@@ -123,13 +126,14 @@ enum Alerts {
                         text: model.tn("app.alerts.lang_text", count))
         a.button(model.t("app.alerts.lang_btn"), role: .primary)
         a.button(model.t("app.common.cancel"), cancel: true)
-        if a.runModal() == 0 { model.showLanguageMenu() }
+        // Not modal (as O1/O2): nothing on the main actor waits behind it.
+        shown = a.present { if $0 == 0 { model.showLanguageMenu() } }
     }
 
     /// A plain error (red), OK.
     static func error(_ model: AppModel, title: String, text: String) {
         let a = SVAlert(icon: AlertIconName.error, tone: .red, title: title, text: text)
         a.button(model.t("app.common.ok"), role: .primary)
-        a.runModal()
+        shown = a.present { _ in }
     }
 }
