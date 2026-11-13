@@ -11,7 +11,7 @@ const { t, btn, note, icon, board, toggle, capseg, popup } = SV;
 const TABS = [['general', 'gear'], ['tools', 'wrench'], ['lists', 'list'], ['updates', 'refresh']];
 function swin(tab, body) {
   return `<div class="swin"><div class="swin-tb">${SV.lights()}<div class="ttl">${t('app.settings.tab.' + tab)}</div>
-    <div class="swin-tabs">${TABS.map(([k, ic]) => `<span class="stab ${k === tab ? 'on' : ''}">${icon(ic, 20)}${t('app.settings.tab.' + k)}</span>`).join('')}</div></div>
+    <div class="swin-tabs">${TABS.map(([k, ic]) => `<span class="stab ${k === tab ? 'on' : ''}">${icon(ic, 24)}${t('app.settings.tab.' + k)}</span>`).join('')}</div></div>
     <div class="swin-b">${body}</div></div>`;
 }
 const row = (title, desc, def, ctl, dis) => `<div class="srowk ${dis ? 'dis' : ''}"><div class="lt"><div class="a">${title}</div>${desc ? `<div class="d">${desc}</div>` : ''}${def ? `<div class="df">${t('app.settings.default', { value: def })}</div>` : ''}</div>${ctl}</div>`;
@@ -28,7 +28,7 @@ function tools(o = {}) {
   const own = o.own;
   const ff = row(t('app.settings.ffmpeg'), t('app.settings.ffmpeg_desc'), t('app.settings.ffmpeg_default'), popup(own ? t('app.settings.ffmpeg_own') : t('app.settings.ffmpeg_bundled', { version: '9.0.2' }), 250, lock), lock)
     + (own ? `<div class="srowk"><div class="lt"><div class="a">${t('app.settings.ffmpeg_path')}</div>
-         <div class="d" style="color:var(--redText)">${icon('err', 11)} ${t('app.settings.ffmpeg_fails', { error: 'dyld: Library not loaded: libx264.164.dylib' })}</div></div>
+         <div class="d" style="color:var(--redText)">${icon('err', 13)} ${t('app.settings.ffmpeg_fails', { error: 'dyld: Library not loaded: libx264.164.dylib' })}</div></div>
          <span style="display:flex;gap:8px">${SV.field('/usr/local/bin/ffmpeg', 200)}${btn(t('app.common.choose'), 'secondary', { size: 'sm' })}</span></div>`
       : row(t('app.settings.version'), t('app.settings.version_val', { ffmpeg: '9.0.2', ffprobe: '9.0.2' }), '', o.downloading ? `<span style="display:flex;gap:8px;align-items:center;width:220px">${SV.spin('s')}<span class="small" style="white-space:nowrap">${t('app.settings.downloading', { done: 31, total: 57 })}</span>${SV.bar(.54)}</span>` : btn(t('app.settings.download_again'), 'secondary', { dis: lock }), lock));
   const info = row(t('app.settings.engine'), '', '', `<span class="num small">${t('app.settings.engine_val', { version: '2.0.0', python: '3.13.12' })}</span>`) + row(t('app.settings.recognition'), '', '', `<span class="num small">${t('app.settings.recognition_val', { n: 33, livetext: t('app.common.on_state') })}</span>`);
@@ -36,7 +36,7 @@ function tools(o = {}) {
 }
 function lists(o = {}) {
   const r = (k, n) => `<div class="srowk"><div class="lt"><div class="a">${t('app.settings.' + k)}</div><div class="d">${t('app.settings.' + k + '_desc', { n })}</div></div>
-    <span style="display:flex;gap:6px">${btn(t('app.settings.edit'), 'secondary', { size: 'sm' })}${btn(t('app.settings.import'), 'secondary', { size: 'sm' })}<span class="iconbtn" style="width:24px;height:24px" title="${t('app.common.show_in_finder')}">${icon('folder', 14)}</span></span></div>`;
+    <span style="display:flex;gap:6px">${btn(t('app.settings.edit'), 'secondary', { size: 'sm' })}${btn(t('app.settings.import'), 'secondary', { size: 'sm' })}<span class="iconbtn" style="width:24px;height:24px" title="${t('app.common.show_in_finder')}">${icon('folder', 16)}</span></span></div>`;
   return swin('lists', group('', r('ignore', 12) + r('corr', 4)) + `<div class="small">${t('app.settings.lists_note')}</div>
     <div class="small num t3">~/Library/Application Support/SubVision</div>`);
 }

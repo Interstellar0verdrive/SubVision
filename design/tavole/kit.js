@@ -10,14 +10,14 @@
 
   const K = window.EK = {};
   K.openBtn = () => btn(t('app.process.open'), 'secondary', { icon: 'folder' });
-  K.inspBtn = on => `<span class="iconbtn ${on ? 'on' : ''}" title="⌥⌘I" style="margin-left:4px">${icon('inspector', 16)}</span>`;
+  K.inspBtn = on => `<span class="iconbtn ${on ? 'on' : ''}" title="⌥⌘I" style="margin-left:4px">${icon('inspector', 18)}</span>`;
   K.reportBtn = () => btn(t('app.process.row.open_report'), 'secondary', { size: 'sm', icon: 'doc' });
-  K.more = () => `<span class="iconbtn" style="width:22px;height:22px">${icon('dots', 14)}</span>`;
+  K.more = () => `<span class="iconbtn" style="width:22px;height:22px">${icon('dots', 16)}</span>`;
   K.list = (rows, head) => `<div class="list">${head ? `<div class="lhead"><span></span><span class="label">${t('app.process.list.name')}</span><span class="label r">${t('app.process.list.duration')}</span><span class="label r">${t('app.process.list.fps')}</span><span class="label r col-res">${t('app.process.list.size')}</span><span></span></div>` : ''}${rows.join('')}</div>`;
   const SIC = { done: ['done', 'check'], warn: ['warn', 'warn'], fail: ['fail', 'x'], bad: ['fail', 'x'], stop: ['stop', 'stop'], ready: ['wait', ''], wait: ['wait', ''] };
   /** One file row. r: st, name, dir, dur, fps, res, result, rcls, chips, acts, detail, dim */
   K.row = function (r) {
-    const ic = r.st === 'run' ? S.spin() : `<span class="sicon ${SIC[r.st][0]}">${SIC[r.st][1] ? icon(SIC[r.st][1], 10) : ''}</span>`;
+    const ic = r.st === 'run' ? S.spin() : `<span class="sicon ${SIC[r.st][0]}">${SIC[r.st][1] ? icon(SIC[r.st][1], 13) : ''}</span>`;
     const cls = { ready: 'ready', wait: 'ready', run: 'run', done: 'done', warn: 'warn', fail: 'fail', bad: 'bad', stop: 'stop' }[r.st];
     return `<div class="fr ${cls} ${r.dim ? 'dim' : ''}"><div class="frow">${ic}
       <div style="min-width:0"><div style="display:flex;gap:8px;align-items:center"><span class="fname">${r.name}</span>${r.chips || ''}</div>
@@ -37,7 +37,7 @@
       const label = step === 'ocr' ? t('app.steps.ocr', { n: o.n || 3 }) : t('app.steps.' + step);
       let iconH, barH, numH;
       if (st === 'done') {
-        iconH = `<span style="color:var(--greenText)">${icon('check', 12)}</span>`; barH = S.bar(1, 'green');
+        iconH = `<span style="color:var(--greenText)">${icon('check', 14)}</span>`; barH = S.bar(1, 'green');
         numH = sp[4] ? t('app.steps.done', { total: th(sp[2]), unit, t: sp[3], rate: dec(sp[4]), unit_s: unitS }) : t('app.steps.done_short', { total: th(sp[2]), unit, t: sp[3] });
       } else if (st === 'run') {
         iconH = S.spin('s'); barH = S.bar(sp[2]);
@@ -46,7 +46,7 @@
         iconH = `<span class="dot" style="background:transparent;border:1px solid var(--glassLine);width:9px;height:9px"></span>`; barH = S.bar(0);
         numH = sp[2] ? t('app.steps.waiting_est', { t: sp[2] }) : t('app.steps.waiting');
       } else if (st === 'fail') {
-        iconH = `<span style="color:var(--redText)">${icon('x', 12)}</span>`; barH = S.bar(0.35, 'red'); numH = t('app.steps.aborted');
+        iconH = `<span style="color:var(--redText)">${icon('x', 14)}</span>`; barH = S.bar(0.35, 'red'); numH = t('app.steps.aborted');
       } else {
         iconH = `<span class="dot" style="background:transparent;border:1px dashed var(--glassLine);width:9px;height:9px"></span>`; barH = S.bar(0, 'gray'); numH = t('app.steps.not_run');
       }
@@ -107,7 +107,7 @@
       const changedHere = G.items.some(it => ch[it.k]) || (G.g === 'sig' && o.signsOff);
       const right = `<span class="def ${changedHere && !o.locked ? '' : 'off'}">${t('app.common.defaults')}</span>`;
       const sigToggle = G.toggle ? `<span style="margin-left:6px">${S.toggle(!o.signsOff, o.locked)}</span>` : '';
-      const head = `<div class="grp-h"><span class="chev">${icon(isClosed ? 'chevR' : 'chevD', 11)}</span>${t('app.inspector.g.' + G.g)}${sigToggle}<span class="sp"></span>${right}</div>`;
+      const head = `<div class="grp-h"><span class="chev">${icon(isClosed ? 'chevR' : 'chevD', 13)}</span>${t('app.inspector.g.' + G.g)}${sigToggle}<span class="sp"></span>${right}</div>`;
       if (isClosed) return `<div class="grp">${head}</div>`;
       const items = G.items.map(it => {
         const c = ch[it.k];
@@ -135,7 +135,7 @@
       o.locked ? S.note('accent', '', t('app.inspector.locked')) : '',
       o.langMissing ? S.note('yellow', '', t('app.inspector.lang_missing', { lang: S.lang === 'en' ? 'Italian' : 'Italiano' })) : '',
     ].filter(Boolean).join('<div style="height:8px"></div>');
-    return `<div class="insp-h"><div class="t">${t('app.inspector.title')}<span class="sp"></span><span class="iconbtn" style="width:22px;height:22px">${icon('dots', 14)}</span><span class="iconbtn" style="width:22px;height:22px">${icon('x', 12)}</span></div>
+    return `<div class="insp-h"><div class="t">${t('app.inspector.title')}<span class="sp"></span><span class="iconbtn" style="width:22px;height:22px">${icon('dots', 16)}</span><span class="iconbtn" style="width:22px;height:22px">${icon('x', 14)}</span></div>
       <div class="s">${t('app.inspector.subtitle')}</div></div>
       <div class="insp-b">${notes ? `<div style="margin:10px 0 4px">${notes}</div>` : ''}${groups}</div>${o.extra || ''}`;
   };

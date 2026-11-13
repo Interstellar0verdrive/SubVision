@@ -41,7 +41,7 @@ const badge = kind => kind === 'sig' ? SV.chip(t('app.preview.badge_sig')) .repl
 const side = (sub, o = {}) => ({ tab: 'preview', subs: { process: t('app.sidebar.videos', { n: 3 }), preview: sub, fix: t('app.sidebar.no_srt'), ...(o.subs || {}) }, trail: o.trail, card: o.card });
 function viewer(W, o = {}) {
   return `<div style="display:flex;align-items:center;gap:14px;justify-content:center">
-      <span class="navbtn">${icon('chevL', 14)}</span>${frame({ w: W, dlg: o.dlg || [28, 96], sig: o.sig === null ? null : o.sig || [22, 100], handles: o.handles !== false, drag: o.drag, img: o.img, dim: o.dim })}<span class="navbtn">${icon('chevR', 14)}</span></div>
+      <span class="navbtn">${icon('chevL', 16)}</span>${frame({ w: W, dlg: o.dlg || [28, 96], sig: o.sig === null ? null : o.sig || [22, 100], handles: o.handles !== false, drag: o.drag, img: o.img, dim: o.dim })}<span class="navbtn">${icon('chevR', 16)}</span></div>
     <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:12px">
       <span class="num" style="font-size:12px;color:var(--text2)">${t('app.preview.frame_of', { i: o.i || 8, n: 20, ts: o.ts || '00:00:20' })}</span>${badge(o.badge || 'dlg')}</div>
     <div style="display:flex;justify-content:center;margin-top:10px">${strip((o.i || 8) - 1, { small: o.small })}</div>
@@ -91,11 +91,11 @@ function panel(kind, o = {}) {
     <div class="small" style="margin-top:6px">${t('app.preview.conf', { c: o.c, a: o.a })}</div>
     ${o.alts ? `<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span class="small">${t('app.preview.alts')}</span>${o.alts.map(a => SV.chip(a)).join('')}</div>` : ''}
     <div class="label" style="margin:10px 0 4px;display:flex;gap:6px;align-items:center">${t('app.preview.final')}<span class="q" style="width:14px;height:14px;border-radius:50%;border:1px solid var(--glassLine);display:inline-grid;place-items:center;font-size:9px">?</span></div>
-    <div class="textbox mono">${o.final}</div>${o.stale ? `<div class="small" style="color:var(--yellowText);margin-top:6px">${icon('warn', 11)} ${t('app.preview.stale')}</div>` : ''}</div>`;
+    <div class="textbox mono">${o.final}</div>${o.stale ? `<div class="small" style="color:var(--yellowText);margin-top:6px">${icon('warn', 13)} ${t('app.preview.stale')}</div>` : ''}</div>`;
 }
 board('A4', 'Prova OCR con i due pannelli', 'Sinistra: banda dialoghi con testo votato, confidenza e accordo, alternative e testo finale (con il fumetto). Destra: banda cartelli senza testo. Il pannello mentre legge e quello superato da parametri cambiati sono in A5.', [1360, 840], () => win({
   side: side(t('app.sidebar.prev_found', { n: 20, k: 15 })),
-  page: head({ again: true }) + `<div style="display:flex;align-items:center;gap:14px;justify-content:center"><span class="navbtn">${icon('chevL', 14)}</span>${frame({ w: 560, dlg: [28, 96], sig: [22, 100], handles: true })}<span class="navbtn">${icon('chevR', 14)}</span>
+  page: head({ again: true }) + `<div style="display:flex;align-items:center;gap:14px;justify-content:center"><span class="navbtn">${icon('chevL', 16)}</span>${frame({ w: 560, dlg: [28, 96], sig: [22, 100], handles: true })}<span class="navbtn">${icon('chevR', 16)}</span>
       <div style="display:flex;flex-direction:column;gap:8px;margin-left:12px"><span class="num" style="font-size:12px;color:var(--text2)">${t('app.preview.frame_of', { i: 8, n: 20, ts: '00:00:20' })}</span><span>${badge('dlg')}</span>${btn(t('app.preview.test'), 'secondary', { icon: 'search', kbd: '⌘T' })}</div></div>
     <div style="display:flex;gap:16px;margin-top:18px">
       ${panel('dlg', { text: 'Sei fortunato che il tuo sangue\nscorra ancora.', c: 94, a: 100, alts: ['Sei fortunato che il tuo sangue scorra ancora'], final: 'Sei fortunato che il tuo sangue\nscorra ancora.' })}
@@ -107,7 +107,7 @@ board('A5', 'Nessun testo e casi della prova', 'Nessuna delle 20 zone ha testo (
   side: side(t('app.sidebar.prev_found', { n: 20, k: 0 })),
   page: head({ again: true }) + note('yellow', '', t('app.preview.none_found'), SV.tint(t('app.process.show_inspector'))) + `<div style="height:18px"></div>
     <div style="display:flex;gap:24px;align-items:flex-start;justify-content:center">
-      <div><div style="display:flex;align-items:center;gap:14px"><span class="navbtn">${icon('chevL', 14)}</span>${frame({ w: 560, dlg: [5, 70], sig: null, handles: true, img: 'frame-ita-2.jpg' })}<span class="navbtn">${icon('chevR', 14)}</span></div>
+      <div><div style="display:flex;align-items:center;gap:14px"><span class="navbtn">${icon('chevL', 16)}</span>${frame({ w: 560, dlg: [5, 70], sig: null, handles: true, img: 'frame-ita-2.jpg' })}<span class="navbtn">${icon('chevR', 16)}</span></div>
         <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:12px"><span class="num" style="font-size:12px;color:var(--text2)">${t('app.preview.frame_of', { i: 14, n: 20, ts: '00:00:33' })}</span>${badge('none')}</div></div>
       <div style="display:flex;flex-direction:column;gap:12px;width:320px">${note('red', '', t('app.preview.bad_duration'))}
         <div class="frame" style="width:320px;height:136px;background:var(--surface);display:grid;place-items:center;color:var(--text3);font-size:12px">${icon('preview', 22)}&nbsp;${t('app.preview.unavailable')}</div></div></div>

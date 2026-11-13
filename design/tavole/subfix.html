@@ -22,7 +22,7 @@ function options(o = {}) {
   return `<div class="label" style="margin:20px 0 6px 2px">${t('app.fix.options')}</div><div class="sbox">
     ${row('merge', true)}${row('no_subs', true)}${row('flash', o.flash !== false)}
     <div class="srowk ${o.flash === false ? 'dis' : ''}"><div class="lt"><div class="a">${t('app.fix.min')}</div></div>${SV.stepper(SV.dec('0.2') + ' s', 70)}</div></div>
-    <div class="small" style="margin-top:10px;display:flex;gap:10px;align-items:baseline">${icon('info', 12)}<span>${t('app.fix.shared', { gap: SV.dec('0.6'), wrap: 42, lang: SV.lang === 'en' ? 'Italian' : 'Italiano' })} ${SV.link(t('app.fix.show_params'))}</span></div>`;
+    <div class="small" style="margin-top:10px;display:flex;gap:10px;align-items:baseline">${icon('info', 14)}<span>${t('app.fix.shared', { gap: SV.dec('0.6'), wrap: 42, lang: SV.lang === 'en' ? 'Italian' : 'Italiano' })} ${SV.link(t('app.fix.show_params'))}</span></div>`;
 }
 const runBar = (dis, spinning) => `<div class="bottombar"><span class="sp"></span>${spinning ? SV.spin() : ''}${btn(t('app.fix.run'), 'primary', { icon: 'play', kbd: '⌘↩', dis })}</div>`;
 

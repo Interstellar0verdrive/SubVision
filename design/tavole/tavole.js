@@ -92,6 +92,9 @@
     'a-error': '<path d="M13 4h14l9 9v14l-9 9H13l-9-9V13z"/><path d="M20 12v10M20 27v.2"/>',
     'a-list': '<rect x="7" y="4" width="26" height="32" rx="3"/><path d="M13 13h14M13 19h14M13 25h9"/><path d="M28 30l4 4"/>',
   };
+  /** Sizes: the stand-ins draw inside ~78 % of their box, so a box is ~1.3× the SF symbol point size
+   *  of SVDesign (sidebar tab 14 pt → 20, gear 13 → 18, top bar segment 12 → 15, button 12/11/10 → 15/13/12,
+   *  note 14 → 18, row status 10 → 13); alert icons fill their 40 pt box. Note-design ?37. */
   S.icon = function (name, size = 14, cls = '') {
     const big = name.startsWith('a-');
     const vb = big ? 40 : 16;
@@ -101,26 +104,26 @@
 
   // ---------- small components
   S.btn = (label, role = 'secondary', o = {}) =>
-    `<span class="btn ${role} ${o.size || ''} ${o.full ? 'full' : ''} ${o.dis ? 'dis' : ''}">${o.icon ? icon(o.icon, o.size === 'sm' ? 10 : 11) : ''}${label}${o.kbd ? `<span class="kbd">${o.kbd}</span>` : ''}</span>`;
+    `<span class="btn ${role} ${o.size || ''} ${o.full ? 'full' : ''} ${o.dis ? 'dis' : ''}">${o.icon ? icon(o.icon, o.size === 'sm' ? 12 : o.size === 'lg' ? 15 : 13) : ''}${label}${o.kbd ? `<span class="kbd">${o.kbd}</span>` : ''}</span>`;
   S.chip = (text, tone = '') => `<span class="chip ${tone}">${text}</span>`;
   S.dot = (tone = '') => `<span class="dot ${tone}"></span>`;
-  S.link = (text, tone = '', ic) => `<span class="ulink ${tone}">${ic ? icon(ic, 10) + ' ' : ''}${text}</span>`;
+  S.link = (text, tone = '', ic) => `<span class="ulink ${tone}">${ic ? icon(ic, 12) + ' ' : ''}${text}</span>`;
   S.spin = (sz = '') => `<span class="spin ${sz}"></span>`;
   S.bar = (f, tone = '', thick) => `<span class="bar ${tone} ${thick ? 'thick' : ''}"><i style="width:${Math.round(f * 1000) / 10}%"></i></span>`;
   S.toggle = (on, dis) => `<span class="toggle ${on ? 'on' : ''} ${dis ? 'dis' : ''}"></span>`;
   S.capseg = (opts, sel) => `<span class="capseg">${opts.map((o, i) => `<span class="${i === sel ? 'on' : ''}">${o}</span>`).join('')}</span>`;
-  S.popup = (label, w = 0, dis) => `<span class="popup ${dis ? 'dis' : ''}" ${w ? `style="width:${w}px"` : ''}><span>${label}</span><span class="chev">${icon('updown', 10)}</span></span>`;
+  S.popup = (label, w = 0, dis) => `<span class="popup ${dis ? 'dis' : ''}" ${w ? `style="width:${w}px"` : ''}><span>${label}</span><span class="chev">${icon('updown', 12)}</span></span>`;
   S.field = (text, w = 0, dis) => `<span class="field ${dis ? 'dis' : ''}" ${w ? `style="width:${w}px"` : ''}>${text}</span>`;
   S.stepper = (text, w = 64, dis) => `<span class="stepper ${dis ? 'dis' : ''}">${S.field(text, w)}<span class="arrows"><i>▲</i><i>▼</i></span></span>`;
   S.slider = (f, o = {}) => {
     const ticks = o.ticks ? o.ticks.map(x => `<span class="tick" style="left:${x * 100}%"></span>`).join('') : '';
     return `<span class="slider ${o.dis ? 'dis' : ''}"><span class="tr"></span><span class="fi" style="width:calc(${f} * (100% - 16px) + 8px)"></span>${ticks}<span class="kn" style="left:calc(${f} * (100% - 16px) + 8px)"></span></span>`;
   };
-  S.checkbox = on => `<span class="checkbox ${on ? 'on' : ''}">${on ? icon('check', 10) : ''}</span>`;
+  S.checkbox = on => `<span class="checkbox ${on ? 'on' : ''}">${on ? icon('check', 11) : ''}</span>`;
   const NOTE_IC = { accent: 'info', neutral: 'info', green: 'ok', yellow: 'warn', red: 'err' };
   /** NoteView: tint, line, 8 pt corners; icon, title, text and buttons in the status colour. */
   S.note = (tone, title, text, actions = '') =>
-    `<div class="note ${tone}"><span class="ic">${icon(NOTE_IC[tone], 15)}</span><div class="bd">${title ? `<b>${title}</b><br>` : ''}${text || ''}</div>${actions ? `<div class="ac">${actions}</div>` : ''}</div>`;
+    `<div class="note ${tone}"><span class="ic">${icon(NOTE_IC[tone], 18)}</span><div class="bd">${title ? `<b>${title}</b><br>` : ''}${text || ''}</div>${actions ? `<div class="ac">${actions}</div>` : ''}</div>`;
   S.tint = label => `<span class="tint">${label}</span>`;
   S.lights = off => `<span class="lights ${off ? 'off' : ''}"><i></i><i></i><i></i></span>`;
 
@@ -136,30 +139,30 @@
     const subs = o.subs || {};
     const tabs = TABS.map(x => {
       const tr = (o.trail || {})[x.id];
-      const trail = tr === 'busy' ? S.spin() : tr === 'done' ? `<span class="tr">${icon('check', 12)}</span>` : '';
-      return `<div class="tab ${o.tab === x.id ? 'sel' : ''}"><span class="tile">${icon(x.ic, 15)}</span><div style="min-width:0"><div class="t1">${t(x.key)}</div><div class="t2">${subs[x.id] || ''}</div></div>${trail ? `<span style="margin-left:auto;display:flex">${trail}</span>` : ''}</div>`;
+      const trail = tr === 'busy' ? S.spin() : tr === 'done' ? `<span class="tr">${icon('check', 14)}</span>` : '';
+      return `<div class="tab ${o.tab === x.id ? 'sel' : ''}"><span class="tile">${icon(x.ic, 20)}</span><div style="min-width:0"><div class="t1">${t(x.key)}</div><div class="t2">${subs[x.id] || ''}</div></div>${trail ? `<span style="margin-left:auto;display:flex">${trail}</span>` : ''}</div>`;
     }).join('');
-    const foot = `<div class="foot"><span class="num">${t('app.sidebar.version', { version: '2.0.0' })}</span>${o.checking ? S.spin('s') : icon('refresh', 11)}<span class="sp"></span>${icon('github', 13)}<span>${t('app.sidebar.github_short')}</span></div>`;
-    return `<div class="side"><div class="toprow">${S.lights(o.inactive)}<span class="iconbtn">${icon('gear', 15)}</span></div><div style="display:flex;flex-direction:column;gap:2px">${tabs}</div><div class="grow"></div>${o.card || ''}${foot}</div>`;
+    const foot = `<div class="foot"><span class="num">${t('app.sidebar.version', { version: '2.0.0' })}</span>${o.checking ? S.spin('s') : icon('refresh', 14)}<span class="sp"></span>${icon('github', 16)}<span>${t('app.sidebar.github_short')}</span></div>`;
+    return `<div class="side"><div class="toprow">${S.lights(o.inactive)}<span class="iconbtn">${icon('gear', 18)}</span></div><div style="display:flex;flex-direction:column;gap:2px">${tabs}</div><div class="grow"></div>${o.card || ''}${foot}</div>`;
   };
   /** ActivityCard (DS4): kind with spinner or symbol, a line, a bar, buttons. */
   S.activity = (kind, line, frac, buttons = '', o = {}) =>
     `<div style="background:var(--soft);border:1px solid var(--softLine);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px">
-      <div style="display:flex;gap:6px;align-items:center;color:var(--primaryText);font-size:11px;font-weight:600">${o.symbol ? icon(o.symbol, 11) : S.spin('s')}${kind}</div>
+      <div style="display:flex;gap:6px;align-items:center;color:var(--primaryText);font-size:11px;font-weight:600">${o.symbol ? icon(o.symbol, 13) : S.spin('s')}${kind}</div>
       <div style="font-size:12px;line-height:1.45">${line}</div>${frac != null ? S.bar(frac) : ''}${o.foot ? `<div style="font-size:11px;color:var(--text2)">${o.foot}</div>` : ''}
       ${buttons ? `<div style="display:flex;gap:6px;margin-top:4px">${buttons}</div>` : ''}</div>`;
   S.updateCard = v =>
     `<div style="background:var(--yellowBg);border:1px solid var(--yellowLine);border-radius:10px;padding:10px 12px;color:var(--yellowText);display:flex;flex-direction:column;gap:6px">
-      <div style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:600">${icon('arrowcircle', 12)}${t('app.sidebar.update', { version: v })}</div>
+      <div style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:600">${icon('arrowcircle', 14)}${t('app.sidebar.update', { version: v })}</div>
       <div style="display:flex;align-items:baseline">${S.link(t('app.sidebar.whats_new'), 'yellow')}<span style="flex:1"></span>${S.btn(t('app.common.download'), 'notice', { size: 'sm' })}</div></div>`;
   /** Top bar of the narrow window (board N1 of AnimeUp). */
   S.topbar = function (o = {}) {
     const segs = TABS.map(x => {
       const sel = o.tab === x.id;
       const busy = (o.busy || []).includes(x.id);
-      return `<span class="tseg ${sel ? 'sel' : ''}">${busy ? S.spin('s') : icon(x.ic, 12)}${t(x.key)}${x.id === 'process' && o.count ? `<span class="cnt">${o.count}</span>` : ''}</span>`;
+      return `<span class="tseg ${sel ? 'sel' : ''}">${busy ? S.spin('s') : icon(x.ic, 15)}${t(x.key)}${x.id === 'process' && o.count ? `<span class="cnt">${o.count}</span>` : ''}</span>`;
     }).join('');
-    return `<div class="topbar"><div class="l">${S.lights()}${o.canSidebar ? `<span class="iconbtn">${icon('sidebar', 15)}</span>` : ''}</div><span class="tsegs">${segs}</span><div class="r">${o.inspector ? `<span class="iconbtn ${o.inspectorOn ? 'on' : ''}">${icon('inspector', 15)}</span>` : ''}<span class="iconbtn">${icon('gear', 15)}</span></div></div>`;
+    return `<div class="topbar"><div class="l">${S.lights()}${o.canSidebar ? `<span class="iconbtn">${icon('sidebar', 18)}</span>` : ''}</div><span class="tsegs">${segs}</span><div class="r">${o.inspector ? `<span class="iconbtn ${o.inspectorOn ? 'on' : ''}">${icon('inspector', 18)}</span>` : ''}<span class="iconbtn">${icon('gear', 18)}</span></div></div>`;
   };
   /** The main window. o: w,h, side (opts) | topbar (opts), page (html), insp (html), inspOver, overlay (html) */
   S.win = function (o) {

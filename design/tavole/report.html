@@ -47,9 +47,9 @@ function reportWin(o = {}) {
       ${LINES.map((l, i) => `<div class="rep-row ${l[5] ? 'warn' : ''}"><span>${SV.checkbox(true)}</span><span class="n">${i + 1}</span><span class="tc">${l[0]}<br>${l[1]}</span>
         <img src="img/frame-ita${i === 1 ? '-2' : ''}.jpg" alt=""><div class="tx"><div class="ta">${l[2].replace('\n', '<br>')}</div>${l[5] ? `<div style="margin-top:5px;display:flex;gap:5px">${SV.chip('Un drago, giovane!')}${SV.chip('Un drag0, giovane.')}</div>` : ''}</div>
         <span class="cf" style="color:${l[3] < 80 ? 'var(--yellowText)' : 'var(--greenText)'}">${l[3]} %</span></div>`).join('')}</div></div>`;
-  return `<div class="win plain" style="width:1100px;height:780px"><div class="wtitle">${SV.lights()}<span style="width:8px"></span>${icon('doc', 14)}<span class="nm">sintel_ita_hardsub_demo.revisione.html</span><span class="sp"></span>
+  return `<div class="win plain" style="width:1100px;height:780px"><div class="wtitle">${SV.lights()}<span style="width:8px"></span>${icon('doc', 16)}<span class="nm">sintel_ita_hardsub_demo.revisione.html</span><span class="sp"></span>
       ${btn(t('app.common.show_in_finder'), 'secondary', { size: 'sm', icon: 'folder', dis: o.gone })}${btn(t('app.report.open_browser'), 'secondary', { size: 'sm', icon: 'ext', dis: o.gone })}</div>${content}
-    ${o.toast ? `<div class="toast">${icon('ok', 14).replace('<svg', '<svg style="color:var(--greenText)"')}${t('app.report.saved', { name: 'sintel_ita_hardsub_demo-revisionato-20261112-2214.srt' })}${btn(t('app.common.show_in_finder'), 'secondary', { size: 'sm' })}</div>` : ''}
+    ${o.toast ? `<div class="toast">${icon('ok', 16).replace('<svg', '<svg style="color:var(--greenText)"')}${t('app.report.saved', { name: 'sintel_ita_hardsub_demo-revisionato-20261112-2214.srt' })}${btn(t('app.common.show_in_finder'), 'secondary', { size: 'sm' })}</div>` : ''}
     ${o.overlay || ''}</div>`;
 }
 board('R1', 'Report aperto', 'Finestra a sé col titolo del file, Mostra nel Finder e Apri nel browser in alto; dentro il report di oggi (contatore, unisci duplicati, Ripristina, Salva SRT revisionato, righe con miniature, riga gialla da ricontrollare con le alternative).', [1100, 780], () => reportWin());

@@ -30,7 +30,7 @@ board('E0', 'Elabora vuota', 'Nessun video: tre passi e area di trascinamento. A
 board('E1', 'Elabora con video, pronto', 'Tre video pronti, uno con l’SRT già presente, un file illeggibile, nota degli elementi saltati. Inspector chiuso.', [1360, 840], () => win({
   side: { tab: 'process', subs: { process: t('app.sidebar.videos', { n: 3 }), preview: 'Show S01E04 [1080p].mkv', fix: t('app.sidebar.no_srt') } },
   page: pageHead(t('app.process.title'), t('app.process.intro'), K.openBtn() + K.inspBtn(false)) +
-    note('yellow', t('app.process.note.skipped', { n: 2 }), 'cover.jpg, notes.txt', `<span style="color:var(--yellowText)">${icon('x', 12)}</span>`) +
+    note('yellow', t('app.process.note.skipped', { n: 2 }), 'cover.jpg, notes.txt', `<span style="color:var(--yellowText)">${icon('x', 14)}</span>`) +
     `<div style="height:14px"></div>` +
     K.list([
       K.row({ st: 'ready', name: 'Show S01E04 [1080p].mkv', dir: '~/Movies/Show/Season 1', dur: '23:40', fps: '23.976', res: '1920×1080' }),
@@ -38,7 +38,7 @@ board('E1', 'Elabora con video, pronto', 'Tre video pronti, uno con l’SRT già
       K.row({ st: 'ready', name: 'sintel_ita_hardsub_demo.mp4', dir: '~/Downloads', dur: '0:55', fps: '24', res: '1280×544' }),
       K.row({ st: 'bad', name: 'Show S01E06 (broken).mkv', dir: '~/Movies/Show/Season 1', dur: '—', fps: '—', res: '—', result: t('app.process.row.unreadable'), rcls: 'fail', dim: true }),
     ], true) +
-    `<div class="drop" style="flex-direction:row;padding:12px;margin-top:10px;font-size:12px">${icon('plus', 12)} ${t('app.process.list.drop_more')}</div>` +
+    `<div class="drop" style="flex-direction:row;padding:12px;margin-top:10px;font-size:12px">${icon('plus', 14)} ${t('app.process.list.drop_more')}</div>` +
     K.bottom(`<span class="sum">${t('app.process.bar.ready', { n: 3, t: '48 min' })}</span><span class="small" style="max-width:520px">${t('app.process.bar.outputs')}</span><span class="sp"></span>${btn(t('app.process.bar.start'), 'primary', { icon: 'play', kbd: '⌘↩' })}`),
 }));
 
@@ -130,7 +130,7 @@ function finSheet(mixed) {
     <div style="font-weight:700;font-size:16px">${mixed ? SV.tj(t('app.process.finished.title', { n: 1 }), t('app.process.bar.no_subs', { n: 1 }), t('app.process.bar.failed', { n: 1 })) : t('app.process.finished.title', { n: 3 })}</div>
     <div class="small" style="margin:4px 0 14px">${t('app.process.finished.text')} ${t('app.process.finished.took', { t: '3 h 04 min' })}</div>
     <div class="list">${rows.map(r => `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line)">
-      <span class="sicon ${r[0]}">${icon(ic[r[0]], 10)}</span><div style="flex:1;min-width:0"><div class="fname">${r[1]}</div><div class="fres ${r[0] === 'done' ? 'ok' : r[0]}">${r[2]}</div></div>
+      <span class="sicon ${r[0]}">${icon(ic[r[0]], 13)}</span><div style="flex:1;min-width:0"><div class="fname">${r[1]}</div><div class="fres ${r[0] === 'done' ? 'ok' : r[0]}">${r[2]}</div></div>
       ${r[3] ? btn(t('app.process.row.open_report'), 'secondary', { size: 'sm' }) : btn(t('app.process.row.open_log'), 'secondary', { size: 'sm' })}</div>`).join('')}</div>
     <div style="display:flex;gap:8px;margin-top:16px"><span class="sp" style="flex:1"></span>${btn(t('app.process.finished.show_all'), 'secondary')}${btn(t('app.common.ok'), 'primary')}</div></div>`;
 }
