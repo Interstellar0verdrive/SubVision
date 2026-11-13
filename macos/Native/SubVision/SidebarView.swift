@@ -14,7 +14,7 @@ extension AppModel {
          ShellTab(id: Tab.preview.rawValue, symbol: Tab.preview.symbol, title: t("app.sidebar.tab.preview"),
                   subtitle: previewSubtitle),
          ShellTab(id: Tab.fix.rawValue, symbol: Tab.fix.symbol, title: t("app.sidebar.tab.fix"),
-                  subtitle: fixSubtitle)]
+                  subtitle: fixSubtitle, done: fixDone)]
     }
 
     /// The videos the sidebar counts: the unreadable ones are left out (board E1).
@@ -32,10 +32,6 @@ extension AppModel {
         guard let video = previewVideo else { return t("app.sidebar.no_videos") }
         if batch.running { return t("app.sidebar.prev_readonly") }
         return video.name
-    }
-
-    var fixSubtitle: String {
-        fixPath?.lastPathComponent ?? t("app.sidebar.no_srt")
     }
 }
 

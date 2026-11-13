@@ -29,7 +29,7 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button(model.t("app.menu.open_videos")) { model.openVideos() }
                 .keyboardShortcut("o", modifiers: .command)
-            Button(model.t("app.menu.open_srt")) { model.tab = .fix }
+            Button(model.t("app.menu.open_srt")) { model.openSRTPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             Button(model.t("app.menu.open_a_report")) {}
                 .keyboardShortcut("o", modifiers: [.command, .option])
@@ -86,9 +86,9 @@ struct AppCommands: Commands {
             Button(model.t("app.menu.next_frame")) {}.keyboardShortcut(.rightArrow, modifiers: .command).disabled(true)
             Divider()
             // F5.3: active only on the Sub fix page, where Start is not (design note 15).
-            Button(model.t("app.menu.run_fix")) {}
+            Button(model.t("app.menu.run_fix")) { model.runFix() }
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(true)
+                .disabled(!model.canRunFix || model.tab != .fix)
         }
         CommandGroup(after: .windowArrangement) {
             Button(model.t("app.menu.main_window")) { openWindow(id: model.config.mainWindowID) }
