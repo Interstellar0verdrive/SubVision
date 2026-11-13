@@ -45,7 +45,8 @@ struct PreviewView: View {
 
     private var page: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PageTop(title: model.t("app.preview.title"), intro: showsIntro ? model.t("app.preview.intro") : nil) {
+            PageTop(title: model.t("app.preview.title"), intro: showsIntro ? model.t("app.preview.intro") : nil,
+                    introBelow: model.inspectorOpen) {
                 PreviewVideoMenu()
                 if !model.isSearchingFrames {
                     findButton
@@ -220,7 +221,9 @@ struct FrameViewer: View {
             strip(small: small).padding(.top, 10)
             Text(model.t("app.preview.summary", ["n": result.frames.count, "k": result.found, "m": result.frames.count - result.found]))
                 .svSmall().padding(.top, 6)
-            tryButton(primary: true).padding(.top, 16)
+            // At the foot of the page, as on board A3 (note 22).
+            Spacer(minLength: 16)
+            tryButton(primary: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .focusable()

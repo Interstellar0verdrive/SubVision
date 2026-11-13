@@ -1,0 +1,8 @@
+# ffmpeg removed by hand from the state folder: at launch the tools window
+# opens with that row alone (no runtime, no other download, no preparation),
+# downloads it and goes away.
+! rm -f "$STATE/bin/ffmpeg"
+@launch
+wait-ready 600
+? ^ready · status ready · vision true · tools notNeeded · rows ffmpeg=done ·
+! test -x "$STATE/bin/ffmpeg" && test -x "$STATE/bin/ffprobe"

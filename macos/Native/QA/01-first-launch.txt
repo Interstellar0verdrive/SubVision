@@ -1,0 +1,12 @@
+# First launch from an empty state folder: the tools window downloads the
+# runtime (uv, Python, packages), ffmpeg and ffprobe and prepares Vision, then
+# the main window. This state becomes the base the other scenarios clone.
+@state empty
+@keep-base
+@launch
+wait-ready 1500
+? ^ready · status ready · vision true · tools notNeeded · rows python=done,ffmpeg=done,ffprobe=done,warmup=done ·
+! test -x "$STATE/bin/uv" && test -x "$STATE/bin/ffmpeg" && test -x "$STATE/bin/ffprobe" && test -d "$STATE/.venv"
+lang it
+text app.process.title
+? ^Elabora$

@@ -1,0 +1,24 @@
+# The interface language changed while the app runs: pages and menus follow at
+# once, and back.
+@launch
+wait-ready 600
+? ^ready
+lang it
+text app.process.title
+? ^Elabora$
+lang en
+text app.process.title
+? ^Process$
+text app.preview.title
+? ^Preview$
+menu
+? \|Process\|.* · Open Videos…\|Open SRT…
+status
+? lang en
+lang it
+text app.process.title
+? ^Elabora$
+menu
+? \|Elabora\|.* · Apri video…\|Apri SRT…
+status
+? lang it

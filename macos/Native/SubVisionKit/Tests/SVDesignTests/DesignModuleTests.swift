@@ -88,3 +88,26 @@ private func galleryDirectory() -> URL {
     }
     return FileManager.default.temporaryDirectory.appendingPathComponent("svdesign-gallery")
 }
+
+/// `present` does not block: a press closes the alert and answers once; `close()` does not answer.
+@MainActor @Test func alertPresentedWithoutModalLoop() {
+    _ = NSApplication.shared
+    func alert() -> SVAlert {
+        let a = SVAlert(icon: AlertIconName.stopFile, tone: .red, title: "Stop?", text: "Nothing is left half done.", iconSource: .symbols)
+        a.button("Stop", role: .destructiveSolid)
+        a.button("Continue", cancel: true)
+        return a
+    }
+    var answers: [Int] = []
+    let first = alert().present { answers.append($0) }
+    #expect(first.isOpen && answers.isEmpty)
+    first.press(5)                       // no such button
+    #expect(first.isOpen)
+    first.press(1)
+    #expect(!first.isOpen && answers == [1])
+    first.press(0)                       // closed already
+    #expect(answers == [1])
+    let second = alert().present { answers.append($0) }
+    second.close()
+    #expect(!second.isOpen && answers == [1])
+}

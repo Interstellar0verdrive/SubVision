@@ -28,6 +28,11 @@ final class ReportSession {
     private(set) var bridge: ReportBridge?
     /// The export just done (R2): the toast's name, until it fades.
     private(set) var toast: URL?
+    /// The review state (`<name>.revisione.json`) could not be written: the
+    /// yellow notice at the bottom, once per run of failures (closing it keeps
+    /// it closed until a write goes through and another fails).
+    private(set) var stateWarning = false
+    @ObservationIgnored private var stateFailing = false
     /// The last export, for the debug commands.
     private(set) var lastExport: URL?
     unowned let model: AppModel
@@ -70,6 +75,7 @@ final class ReportSession {
             }
         }
         bridge.askWhereToSave = { [weak self] name in self?.askWhereToSave(name) }
+        bridge.onStateWrite = { [weak self] ok in self?.stateWritten(ok) }
         self.bridge = bridge
         model.log.info("report open \(file.url.lastPathComponent) (\(file.kind == .bridged ? "2.0" : "1.x"))")
         bridge.load()
@@ -85,6 +91,19 @@ final class ReportSession {
             self?.toast = nil
         }
     }
+
+    /// A write of the review state went through or not (the notice of `stateWarning`).
+    private func stateWritten(_ ok: Bool) {
+        if ok {
+            stateFailing = false
+            stateWarning = false
+        } else if !stateFailing {
+            stateFailing = true
+            stateWarning = true
+        }
+    }
+
+    func hideStateWarning() { stateWarning = false }
 
     func hideToast() {
         toastTask?.cancel()
@@ -197,39 +216,78 @@ struct ReportView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .bottom) {
-            if let toast = session.toast {
-                ReportToast(text: model.t("app.report.saved", ["name": toast.lastPathComponent]),
-                            button: model.t("app.common.show_in_finder")) {
-                    NSWorkspace.shared.activateFileViewerSelecting([toast])
+            VStack(spacing: 8) {
+                if session.stateWarning {
+                    ReportToast(text: model.t("app.report.state_failed"), tone: .yellow, symbol: "exclamationmark.triangle",
+                                closeHelp: model.t("app.common.dismiss")) { session.hideStateWarning() }
+                        .help(model.t("app.report.state_failed_help", ["name": session.bridge?.file.stateURL.lastPathComponent ?? ""]))
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .padding(.bottom, 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                if let toast = session.toast {
+                    ReportToast(text: model.t("app.report.saved", ["name": toast.lastPathComponent]),
+                                button: model.t("app.common.show_in_finder")) {
+                        NSWorkspace.shared.activateFileViewerSelecting([toast])
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
+            .padding(.bottom, 20)
         }
         .animation(.easeOut(duration: 0.25), value: session.toast)
+        .animation(.easeOut(duration: 0.25), value: session.stateWarning)
     }
 }
 
-/// R2: the pill at the bottom, a green tick, the text and Show in Finder.
+/// The pill at the bottom of the report window. R2: a green tick, the text
+/// and Show in Finder. In yellow, with a close button: the notice that the
+/// review state is not being saved.
 struct ReportToast: View {
     var text: String
-    var button: String
+    var tone: SVTone = .green
+    var symbol = "checkmark.circle"
+    /// The text button on the right (R2), or nil for a small close button.
+    var button: String?
+    var closeHelp = ""
     var action: () -> Void
+
+    init(text: String, button: String, action: @escaping () -> Void) {
+        self.text = text
+        self.button = button
+        self.action = action
+    }
+
+    init(text: String, tone: SVTone, symbol: String, closeHelp: String, close: @escaping () -> Void) {
+        self.text = text
+        self.tone = tone
+        self.symbol = symbol
+        self.closeHelp = closeHelp
+        self.action = close
+    }
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "checkmark.circle")
+            Image(systemName: symbol)
                 .svFont(14)
-                .foregroundStyle(SV.greenText)
+                .foregroundStyle(tone.text)
             Text(verbatim: text)
                 .svFont(12.5)
                 .foregroundStyle(SV.text)
                 .lineLimit(1)
-            Button(button, action: action).svButton(.secondary, .small)
+            if let button {
+                Button(button, action: action).svButton(.secondary, .small)
+            } else {
+                Button(action: action) {
+                    Image(systemName: "xmark").svFont(10, .semibold).foregroundStyle(SV.text2)
+                        .frame(width: 22, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(closeHelp)
+                .accessibilityLabel(closeHelp)
+            }
         }
         .padding(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 8))
         .background(Capsule().fill(SV.alert))
-        .overlay(Capsule().strokeBorder(SV.glassLine, lineWidth: 1))
+        .overlay(Capsule().strokeBorder(button == nil ? tone.line : SV.glassLine, lineWidth: 1))
         .shadow(color: SV.shadow.opacity(0.4), radius: 16, y: 12)
     }
 }

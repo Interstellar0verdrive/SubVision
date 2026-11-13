@@ -100,7 +100,8 @@ enum SrtPeek {
 }
 
 extension AppModel {
-    var canRunFix: Bool { fixPath != nil && status == .ready && !fix.running }
+    /// Off for an SRT the app read no timed block from (the red note is up already).
+    var canRunFix: Bool { fixPath != nil && (fix.lines ?? 0) > 0 && status == .ready && !fix.running }
 
     /// The sidebar's Sub fix line: the file, "Created · 618 lines", "No valid segments".
     var fixSubtitle: String {
@@ -127,6 +128,9 @@ extension AppModel {
         let peek = SrtPeek.read(url)
         fix.lines = peek?.lines
         fix.duration = peek?.duration
+        // No timed block at all: the engine would refuse it too (`bad_srt`). Say it now,
+        // with the line where the parse gives up, and keep Run off (note 26).
+        if (peek?.lines ?? 0) == 0 { fix.outcome = .unreadable(line: SrtPeek.firstTextLine(url)) }
         tab = .fix
         log.info("sub fix: \(url.path) (\(peek?.lines ?? 0) lines)")
     }
@@ -162,10 +166,16 @@ extension AppModel {
                                     "lang": languageName(p.langHint)])
     }
 
-    /// "Italiano" for `it-IT`, in the app's language; the code when macOS has no name for it.
+    /// An OCR language by name, in the app's language: "Italiano" for `it-IT`
+    /// when Vision's list has one variant of that language, the whole name
+    /// ("Portoghese (Brasile)", "Cinese semplificato") when it has several;
+    /// the code when macOS has no name for it.
     func languageName(_ code: String) -> String {
-        let base = code.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? code
-        guard let name = localizer.locale.localizedString(forLanguageCode: base) else { return code }
+        func base(_ c: String) -> String { (c.split(whereSeparator: { $0 == "-" || $0 == "_" }).first.map(String.init) ?? c).lowercased() }
+        let variants = Set((hello?.languages ?? []).filter { base($0) == base(code) }.map { $0.lowercased() }).union([code.lowercased()])
+        let locale = localizer.locale
+        let name = variants.count > 1 ? locale.localizedString(forIdentifier: code) : locale.localizedString(forLanguageCode: base(code))
+        guard let name, !name.isEmpty else { return code }
         return name.prefix(1).uppercased() + name.dropFirst()
     }
 
@@ -199,15 +209,17 @@ extension AppModel {
         }
     }
 
-    /// The engine's error as the page shows it. The client keeps only the
-    /// code of a remote error, so the line of `bad_srt` is found again here
-    /// the way the engine finds it (the first line with text).
+    /// The engine's error as the page shows it, with the line of `bad_srt`
+    /// and the path of `not_found` the engine sends (`RemoteErrorInfo`). An
+    /// engine that does not send them: the line is found again here the way
+    /// the engine finds it (the first line with text), the path is the source.
     private func fixOutcome(for error: Error, source: URL) -> FixOutcome {
+        let info = (error as? EngineError)?.remoteInfo
         switch (error as? EngineError)?.remoteCode {
         case "no_valid_segments": return .noValidSegments
-        case "bad_srt": return .unreadable(line: SrtPeek.firstTextLine(source))
-        case "not_found": return .notFound(path: source.path)
-        default: return .failed(message: String(describing: error))
+        case "bad_srt": return .unreadable(line: info?.line ?? SrtPeek.firstTextLine(source))
+        case "not_found": return .notFound(path: info?.path ?? source.path)
+        default: return .failed(message: info?.detail ?? String(describing: error))
         }
     }
 

@@ -127,7 +127,7 @@ extension AppModel {
                 }
             } catch {
                 log.error("preview.frames: \(error)")
-                preview.search = .failed(code: (error as? EngineError)?.remoteCode ?? "unknown", message: String(describing: error))
+                preview.search = .failed(code: (error as? EngineError)?.remoteCode ?? "unknown", message: Self.errorDetail(error))
                 preview.searching = nil
             }
         }
@@ -170,6 +170,12 @@ extension AppModel {
         default:
             log.debug("event \(name) (not for preview)")
         }
+    }
+
+    /// The engine's own `detail` of an error (`RemoteErrorInfo`), else the error as it describes itself.
+    static func errorDetail(_ error: Error) -> String {
+        if let detail = (error as? EngineError)?.remoteInfo?.detail, !detail.isEmpty { return detail }
+        return String(describing: error)
     }
 
     /// `app.errors.<code>` with what the engine said; unknown codes fall back to `unknown`.
@@ -239,7 +245,7 @@ extension AppModel {
             } catch {
                 guard preview.testFrame == frame.path, isReadingOCR else { return }
                 log.error("preview.test: \(error)")
-                preview.test = .failed(code: (error as? EngineError)?.remoteCode ?? "unknown", message: String(describing: error))
+                preview.test = .failed(code: (error as? EngineError)?.remoteCode ?? "unknown", message: Self.errorDetail(error))
             }
         }
     }

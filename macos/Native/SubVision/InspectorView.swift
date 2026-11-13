@@ -31,6 +31,8 @@ struct InspectorView: View {
     @AppStorage(OcrKey.workers) private var workers: Int = ocrDefaults.workers
     @AppStorage(OcrKey.useIgnore) private var useIgnore = true
     @AppStorage(OcrKey.useCorrections) private var useCorrections = true
+    /// The request (`AppModel.languageMenuRequest`) the language menu opens for.
+    @State private var languageMenuOpen = 0
 
     /// Locked during the batch (I3): the values it started with are in use.
     private var locked: Bool { model.batch.running }
@@ -43,19 +45,26 @@ struct InspectorView: View {
                 .padding(.top, 28)
                 .padding(.bottom, 14)
             Rectangle().fill(SV.line).frame(height: 1)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    notes
-                    ocrGroup
-                    dialogueGroup
-                    signsGroup
-                    segmentsGroup
-                    advancedGroup
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        notes.id("top")
+                        ocrGroup
+                        dialogueGroup
+                        signsGroup
+                        segmentsGroup
+                        advancedGroup
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 20)
+                .scrollClipDisabled()
+                // "Choose the Language" (O7): the menu is at the top; it opens once it is in place.
+                .onChange(of: model.languageMenuRequest) { _, request in
+                    proxy.scrollTo("top", anchor: .top)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { languageMenuOpen = request }
+                }
             }
-            .scrollClipDisabled()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(SV.bg)
@@ -125,7 +134,7 @@ struct InspectorView: View {
             InspectorRow(title: model.t("app.inspector.lang"), help: model.t("app.inspector.help.lang"),
                          defaultText: model.t("app.inspector.default_only", ["value": languageName(o.langHint)]),
                          changed: lang != o.langHint, stacked: true) {
-                PopupMenu({ languageItems }) {
+                PopupMenu({ languageItems }, openRequest: languageMenuOpen) {
                     HStack(spacing: 6) {
                         Text(languageName(lang)).svFont(12.5).foregroundStyle(languageMissing ? SV.yellowText : SV.text).lineLimit(1)
                         Text(lang).svFont(11, mono: true).foregroundStyle(SV.text3)
@@ -171,10 +180,8 @@ struct InspectorView: View {
         return items
     }
 
-    private func languageName(_ code: String) -> String {
-        let name = Locale(identifier: model.language).localizedString(forIdentifier: code) ?? code
-        return name.prefix(1).uppercased() + name.dropFirst()
-    }
+    /// "Italiano" when Vision has one variant of the language, the whole name when it has several (the code is next to it).
+    private func languageName(_ code: String) -> String { model.languageName(code) }
 
     // MARK: - Bands
 

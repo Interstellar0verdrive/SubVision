@@ -166,7 +166,13 @@ enum DebugSnapshot {
         model.videos[1].state = .noSubs
         model.videos[1].segments = 0; model.videos[1].elapsed = 5520; model.videos[1].finished = Date()
         model.videos[2].state = .failed
+        // As the engine sends it since F6: the code, the short text for the row, the detail and the log.
         model.videos[2].error = "unknown (OCRError: Vision request failed (-1) · frame 000412.jpg)"
+        model.videos[2].failCode = "unknown"
+        model.videos[2].failText = "Vision request failed (-1)"
+        model.videos[2].failDetail = "OCRError: Vision request failed (-1) · frame 000412.jpg"
+        model.videos[2].failPath = model.videos[2].path
+        model.videos[2].logPath = model.videos[2].url.deletingPathExtension().appendingPathExtension("log").path
         model.videos[2].atStep = "ocr:bottom"
         model.videos[2].plan = ["extract:bottom", "group:bottom", "ocr:bottom", "refine:bottom"]
         model.videos[2].times = ["extract:bottom": 1, "group:bottom": 0.4, "ocr:bottom": 3]
@@ -194,6 +200,7 @@ enum DebugSnapshot {
         model.videos[0].state = .done; model.videos[0].atStep = nil
         model.videos[1].state = .noSubs
         model.videos[2].state = .failed; model.videos[2].atStep = "ocr:bottom"; model.videos[2].error = "unknown (OCRError: Vision request failed (-1))"
+        model.videos[2].failCode = "unknown"; model.videos[2].failText = "Vision request failed (-1)"
         model.run.summary = BatchSummary(ids: ids, done: 2, failed: 1, stopped: 0, skipped: 0, elapsed: 11040, when: Date(), seen: true)
         SVShell.DebugSnapshot.render(FinishedSheet().environment(model), width: 520, schemes: schemes, "\(base)-E6.png")
         for i in 0..<3 { model.videos[i].resetOutcome() }

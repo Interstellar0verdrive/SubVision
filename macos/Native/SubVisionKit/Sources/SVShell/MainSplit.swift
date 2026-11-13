@@ -128,12 +128,20 @@ public struct MainSplit<SidebarExtra: View, TopBarTrailing: View, Page: View>: V
             .onChange(of: narrow, initial: true) { _, now in layoutChanged(now, inline) }
             .onChange(of: inline, initial: true) { _, now in layoutChanged(narrow, now) }
         }
+        // The minimum is the whole window's (the narrow board is 760x640, top bar included), but
+        // SwiftUI adds the hidden title bar's height to the content's minimum: take it off here.
+        .frame(minWidth: chrome.minWindow.width, minHeight: chrome.minWindow.height - Self.titleBarHeight)
         .background(SV.bg)
         .ignoresSafeArea()
         .background(WindowChrome(anchor: lightsAnchor, minSize: chrome.minWindow, sizeOverride: sizeOverride, onClose: onClose))
         .onPreferenceChange(TrafficLightsAnchor.self) { lightsAnchor = $0 }
         .animation(.easeOut(duration: 0.2), value: sidebarChoice)
-        .frame(minWidth: chrome.minWindow.width, minHeight: chrome.minWindow.height)
+    }
+
+    /// The height of a standard title bar, which the window adds to the content's minimum.
+    private static var titleBarHeight: CGFloat {
+        let content = NSRect(x: 0, y: 0, width: 100, height: 100)
+        return max(0, NSWindow.frameRect(forContentRect: content, styleMask: [.titled]).height - content.height)
     }
 
     private var pageBody: some View {

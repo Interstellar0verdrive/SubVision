@@ -4,7 +4,7 @@
 // `DebugQA.watchCommands`). One command per line; the reply goes to `<file>.out`.
 //
 //   tab process|preview|fix · add <path>[,<path>…] · remove-all · select-all
-//   sidebar · inspector · lang en|it · theme system|light|dark
+//   sidebar · inspector [open|close] · lang en|it · theme system|light|dark
 //   size <w>x<h> · windowid · capture <path> · settings · quit
 //   Preview (F5.2): preview-select, find-frames, stop-frames, wait-frames, frame, band-set,
 //   drag-handle, try-ocr, wait-ocr, preview-state (see the block below)
@@ -14,6 +14,31 @@
 //   report-export · report-confirm yes|no|ask · report-elsewhere <path>|cancel|ask
 //   report-windows · report-capture <path>
 //   report-close (the front report window; all with "all")
+//   report-lock on|off             the front report's folder read-only (chmod 555) or writable again (755):
+//                                  with it locked, a change in the report cannot be saved (the yellow notice)
+//                                  and an export asks where else to save
+//   report-state                   whether the "changes are not being saved" notice is up, and the last state write
+//   report-alert                   the alert of the report that is up (the overwrite question, a confirm()): title, window
+//   report-alert-press <n>         presses its button n (0 = Replace / OK, 1 = Cancel)
+//   engine-event <name> <json>     an engine event fed by hand to the batch's own handler, e.g.
+//                                  engine-event batch.file.failed {"idx":0,"error":"unknown (X: y)","at_step":"ocr:bottom","code":"unknown","text":"y","detail":"X: y","log":"/path/name.log"}
+//   The stop alerts (F6; O1 and O2 are not modal, the commands keep running under them):
+//   stop-file-ask · stop-all-ask   what the Stop / Stop All buttons do: the alert opens, the reply does not wait for it
+//   alert-state                    "none", or "file <idx> <name> · window <id> · buttons Stop|Continue" / "all · …"
+//   alert-press <n>                presses button n of the open alert (0 = Stop / Stop All, 1 = Continue)
+//   alert-key return|esc           the key, sent to the alert's panel as a real key event
+//   stop-file [<idx>]              batch.stop for one file, no alert: with <idx> (the batch index, 0-based) the
+//                                  engine stops it only if it is still the one in progress, else "not_running";
+//                                  without it, the file in progress whatever it is. Replies with the engine's answer.
+//   F6 · the QA scenarios (macos/Native/QA):
+//   status                         engine status, Vision, tools phase and rows, window, language, tab
+//   wait-ready <s>                 until the engine is ready and the tools window is gone (first launch: downloads)
+//   text <key>                     the catalogue's text for the app's language now
+//   menu                           the main menu's titles and the File menu's first items
+//   window-size                    the main window's size (the whole window, as `size` sets it), "760x640"
+//   row-text <idx>                 what the row of video idx says after its step (a failed row: the error text)
+//   alert-other · alert-other-press <n>   the non-modal alert that is not O1/O2 (O7, an error): title and buttons; press n
+//   lang-menu                      waits for the inspector's language menu to open, reads its items and closes it
 
 #if DEBUG
 import AppKit
@@ -47,7 +72,11 @@ enum DebugQA {
         case "sidebar":
             model.toggleSidebar()
         case "inspector":
-            model.toggleInspector()
+            switch argument {
+            case "open": model.inspectorOpen = true
+            case "close": model.inspectorOpen = false
+            default: model.toggleInspector()
+            }
         case "lang":
             model.setLanguage(argument)
         case "theme":
@@ -55,7 +84,12 @@ enum DebugQA {
         case "size":
             let dims = argument.split(separator: "x").compactMap { Double($0) }
             guard dims.count == 2, let window = WindowSizer.main(model.config) else { return "bad size" }
-            window.setContentSize(NSSize(width: dims[0], height: dims[1]))
+            // The whole window, as the boards measure it and as the app sizes it (`WindowSizer`):
+            // the top bar is inside the content (full-size content view).
+            var frame = window.frame
+            frame.origin.y += frame.height - dims[1]
+            frame.size = NSSize(width: dims[0], height: dims[1])
+            window.setFrame(frame, display: true)
         case "windowid":
             return WindowSizer.main(model.config).map { "\($0.windowNumber)" } ?? "no window"
         case "settingswindow":
@@ -113,9 +147,45 @@ enum DebugQA {
             model.startBatch()
             _ = await wait(10) { model.batch.running && model.runningVideo != nil }
         case "stop-file":
-            await model.stop(all: false)
+            if argument.isEmpty { return "batch.stop file: " + (await model.stop(all: false)) }
+            guard let idx = Int(argument) else { return "bad index" }
+            return "batch.stop file \(idx): " + (await model.stop(all: false, file: idx)) + " · running \(runningIndex(model).map(String.init) ?? "-")"
         case "stop-all":
             await model.stop(all: true)
+        case "engine-event":
+            let p = argument.split(separator: " ", maxSplits: 1).map(String.init)
+            guard p.count == 2 else { return "usage: engine-event <name> <json>" }
+            do {
+                let message = try EngineEvent(name: p[0], data: Data(p[1].utf8)).message()
+                model.handleBatch(message, name: p[0])
+            } catch {
+                return "bad event: \(error)"
+            }
+        case "stop-file-ask", "stop-all-ask":
+            guard model.batch.running else { return "no batch" }
+            if command == "stop-file-ask" { model.stopCurrentFile() } else { model.stopAll() }
+            _ = await wait(3) { model.stopAlert != nil }
+            return alertState(model)
+        case "alert-state":
+            return alertState(model)
+        case "alert-press":
+            guard let open = model.stopAlert, open.presentation.isOpen else { return "no alert" }
+            guard let n = Int(argument), open.presentation.alert.buttons.indices.contains(n) else { return "bad button" }
+            open.presentation.press(n)
+            return "pressed \(open.presentation.alert.buttons[n].title) · " + alertState(model)
+        case "alert-key":
+            guard let open = model.stopAlert, open.presentation.isOpen else { return "no alert" }
+            guard let code: UInt16 = ["return": 36, "esc": 53][argument] else { return "unknown key" }
+            let characters = argument == "return" ? "\r" : "\u{1b}"
+            guard let window = NSApp.window(withWindowNumber: open.presentation.windowNumber),
+                  let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                               windowNumber: window.windowNumber, context: nil, characters: characters,
+                                               charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
+            else { return "no event" }
+            window.makeKey()
+            window.sendEvent(event)
+            try? await Task.sleep(for: .milliseconds(200))
+            return "key \(argument) · " + alertState(model)
         case "wait-batch":
             let ok = await wait(Double(argument) ?? 600) { !model.batch.running && model.videos.allSatisfy { !$0.state.inBatch } }
             return ok ? "batch done · \(summaryLine(model))" : "timeout"
@@ -176,9 +246,32 @@ enum DebugQA {
         case "report-export":
             guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
             let before = front.session.lastExport
-            _ = try? await bridge.call("await exportSrt();")
-            _ = await wait(5) { front.session.lastExport != before }
+            // Not awaited: with the overwrite question up (`report-confirm ask`) the export waits for its answer.
+            Task { _ = try? await bridge.call("await exportSrt();") }
+            _ = await wait(5) { front.session.lastExport != before || bridge.pageAlert?.isOpen == true }
+            if bridge.pageAlert?.isOpen == true { return "asking: \(bridge.pageAlert?.alert.title ?? "")" }
             return front.session.lastExport.map(\.path) ?? "no export"
+        case "report-lock":
+            guard let front = model.report.front else { return "no report window" }
+            let folder = front.session.url.deletingLastPathComponent()
+            do {
+                try FileManager.default.setAttributes([.posixPermissions: argument == "on" ? 0o555 : 0o755], ofItemAtPath: folder.path)
+            } catch {
+                return "error: \(error)"
+            }
+            return "\(argument == "on" ? "read-only" : "writable") · \(folder.path)"
+        case "report-state":
+            guard let front = model.report.front else { return "no report window" }
+            let written = front.session.bridge?.lastStateWritten.map { "\(Int(Date().timeIntervalSince($0))) s ago" } ?? "never"
+            return "state warning \(front.session.stateWarning ? "shown" : "none") · last write \(written) · toast \(front.session.toast?.lastPathComponent ?? "none")"
+        case "report-alert", "report-alert-press":
+            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
+            guard let open = bridge.pageAlert, open.isOpen else { return "none" }
+            let state = "\(open.alert.title) · \(open.alert.texts.joined(separator: " ")) · window \(open.windowNumber) · buttons \(open.alert.buttons.map(\.title).joined(separator: "|"))"
+            guard command == "report-alert-press" else { return state }
+            guard let n = Int(argument), open.alert.buttons.indices.contains(n) else { return "bad button" }
+            open.press(n)
+            return "pressed \(open.alert.buttons[n].title)"
         case "report-confirm":
             ReportBridge.debugConfirm = argument == "yes" ? true : argument == "no" ? false : nil
         case "report-elsewhere":
@@ -193,6 +286,38 @@ enum DebugQA {
             guard let front = model.report.front else { return "no report window" }
             let written = await DebugSnapshot.captureReport(front, argument, schemes: SVShell.DebugSnapshot.schemes(model.config))
             return written.joined(separator: " ")
+        case "status":
+            return statusLine(model)
+        case "wait-ready":
+            let ok = await wait(Double(argument) ?? 900) { model.status == .ready && !model.tools.showsWindow && model.tools.phase == .notNeeded }
+            return (ok ? "ready · " : "timeout · ") + statusLine(model)
+        case "text":
+            return model.t(argument)
+        case "menu":
+            let items = NSApp.mainMenu?.items ?? []
+            // SwiftUI refreshes a menu's items when it opens: as if it were opened.
+            for item in items { if let m = item.submenu { m.delegate?.menuNeedsUpdate?(m); m.update() } }
+            let file = items.count > 1 ? (items[1].submenu?.items.prefix(4).map(\.title) ?? []) : []
+            return items.dropFirst().map(\.title).joined(separator: "|") + " · " + file.joined(separator: "|")
+        case "window-size":
+            guard let w = WindowSizer.main(model.config) else { return "no window" }
+            let size = w.frame.size
+            return "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
+                + " · min \(Int(w.minSize.width))x\(Int(w.minSize.height)) · content min \(Int(w.contentMinSize.width))x\(Int(w.contentMinSize.height))"
+        case "row-text":
+            guard let idx = Int(argument), model.videos.indices.contains(idx) else { return "bad index" }
+            let v = model.videos[idx]
+            return "\(v.state.rawValue) · \(model.failureText(v)) · detail \(v.errorDetail ?? "-")"
+        case "alert-other":
+            guard let a = Alerts.shown, a.isOpen else { return "none" }
+            return "\(a.alert.title) · buttons \(a.alert.buttons.map(\.title).joined(separator: "|"))"
+        case "alert-other-press":
+            guard let a = Alerts.shown, a.isOpen else { return "no alert" }
+            guard let n = Int(argument), a.alert.buttons.indices.contains(n) else { return "bad button" }
+            a.press(n)
+            return "pressed \(a.alert.buttons[n].title)"
+        case "lang-menu":
+            return await languageMenu(model)
         case "report-close":
             let targets = argument == "all" ? Array(model.report.windows.values) : [model.report.front].compactMap { $0 }
             guard !targets.isEmpty else { return "no report window" }
@@ -201,6 +326,54 @@ enum DebugQA {
             return "unknown"
         }
         return "ok · tab \(model.tab.rawValue) · \(model.videos.count) videos · status \(model.status)"
+    }
+
+    /// "status ready · vision true · tools notNeeded · rows - · window 1360x840 · lang it · tab process".
+    private static func statusLine(_ model: AppModel) -> String {
+        let rows = model.tools.rows.map { "\($0.tool.key)=\($0.state)" }.joined(separator: ",")
+        return "status \(model.status) · vision \(model.hello?.vision.description ?? "-") · tools \(model.tools.phase)"
+            + " · rows \(rows.isEmpty ? "-" : rows) · lang \(model.language) · tab \(model.tab.rawValue)"
+    }
+
+    /// The inspector's language menu (O7's "Choose the Language"): `popUp` runs its own
+    /// tracking loop, so a timer in the common modes reads the items and closes it.
+    private static func languageMenu(_ model: AppModel) async -> String {
+        var titles: [String]?
+        var ticks = 0
+        let timer = Timer(timeInterval: 0.1, repeats: true) { t in
+            MainActor.assumeIsolated {
+                ticks += 1
+                if PopupMenuTracking.open != nil {
+                    titles = PopupMenuTracking.titles
+                    PopupMenuTracking.cancel()
+                    t.invalidate()
+                } else if ticks > 50 {
+                    t.invalidate()
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        _ = await wait(6) { titles != nil || !timer.isValid }
+        guard let titles else { return "no menu" }
+        let checked = titles.first { $0.hasPrefix("✓ ") } ?? "-"
+        return "\(titles.count) items · checked \(checked) · first \(titles.prefix(3).joined(separator: "|"))"
+    }
+
+    /// The batch index (0-based) of the file in progress.
+    private static func runningIndex(_ model: AppModel) -> Int? {
+        model.runningVideo.flatMap { model.run.ids.firstIndex(of: $0.id) }
+    }
+
+    /// The stop alert that is up, the file it names and the file in progress now.
+    private static func alertState(_ model: AppModel) -> String {
+        guard let open = model.stopAlert, open.presentation.isOpen else { return "none" }
+        let what: String
+        switch open.kind {
+        case .file(let idx, let name): what = "file \(idx) \(name)"
+        case .all: what = "all"
+        }
+        return "\(what) · window \(open.presentation.windowNumber) · buttons \(open.presentation.alert.buttons.map(\.title).joined(separator: "|"))"
+            + " · running \(runningIndex(model).map(String.init) ?? "-")"
     }
 
     /// "done 2 failed 0 stopped 0 skipped 0 elapsed 12.3" of the last batch.

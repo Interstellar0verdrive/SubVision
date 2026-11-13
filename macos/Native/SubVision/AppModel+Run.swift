@@ -78,6 +78,8 @@ struct BatchRun: Equatable {
     var stoppedByUser = false
     var summary: BatchSummary?
     var showSummary = false
+    /// Rows that never started and went back to ready when the batch was stopped: they say "ready" (E5).
+    var readyAgain: Set<UUID> = []
     /// Finished rows opened to show their times and files (E3).
     var expanded: Set<UUID> = []
 
@@ -120,6 +122,19 @@ struct BatchRun: Equatable {
     }
 }
 
+/// The stop confirmation that is up (O1 or O2): one at a time, not modal.
+struct StopAlert {
+    enum Kind: Equatable {
+        /// O1, for the file at this index of the batch (`BatchRun.ids`).
+        case file(idx: Int, name: String)
+        /// O2.
+        case all
+    }
+
+    var kind: Kind
+    var presentation: SVAlertPresentation
+}
+
 extension AppModel {
     private var summaryFile: URL { configuration.stateFolder.appendingPathComponent("records/batch-summary.json") }
 
@@ -158,12 +173,12 @@ extension AppModel {
             } catch {
                 rollBackStart(ids)
                 log.error("batch.start failed: \(error)")
-                if let e = error as? EngineError, e.remoteCode == "bad_params", String(describing: e).contains("lang_hint") {
+                // `bad_params` names the field refused; an engine that does not say it yet has it in the text.
+                if let e = error as? EngineError, e.remoteCode == "bad_params",
+                   e.remoteInfo?.field == "lang_hint" || (e.remoteInfo?.field == nil && String(describing: e).contains("lang_hint")) {
                     Alerts.languageUnsupported(self, language: lang, count: hello?.languages.count ?? 0)
-                } else if let e = error as? EngineError, let code = e.remoteCode {
-                    Alerts.error(self, title: t("app.menu.start"), text: engineErrorText(code, detail: String(describing: e)))
                 } else {
-                    Alerts.error(self, title: t("app.menu.start"), text: String(describing: error))
+                    Alerts.error(self, title: t("app.menu.start"), text: engineErrorText(error))
                 }
             }
         }
@@ -173,8 +188,22 @@ extension AppModel {
         for i in videos.indices where ids.contains(videos[i].id) && videos[i].state.inBatch { videos[i].state = .ready }
         run = BatchRun()
         batch = BatchActivity()
+        closeStopAlert()
         saveVideos()
         updateDock()
+    }
+
+    /// An error of a request as the alerts and the notes say it: `app.errors.<code>`
+    /// with the engine's own `detail`, `tool`, `path` and `line` (`RemoteErrorInfo`);
+    /// what the caller knows fills the ones the engine left out.
+    func engineErrorText(_ error: Error, tool: String = "", path: String = "") -> String {
+        guard case .remote(let code, let message, let info)? = error as? EngineError else { return String(describing: error) }
+        var detail = info.detail ?? info.reason ?? (message == code ? "" : message)
+        if let field = info.field, let reason = info.reason, info.detail == nil { detail = "\(field): \(reason)" }
+        let values: [String: Any] = ["detail": detail, "tool": info.tool ?? tool, "path": info.path ?? path,
+                                     "line": info.line.map(String.init) ?? ""]
+        if localizer.has("app.errors.\(code)") { return t("app.errors.\(code)", values) }
+        return t("app.errors.unknown", ["detail": detail.isEmpty ? code : detail])
     }
 
     /// `app.errors.<code>` with what the message carries as `detail`.
@@ -190,39 +219,92 @@ extension AppModel {
     /// The video the batch works on.
     var runningVideo: VideoItem? { videos.first { $0.state == .running } }
 
-    /// Stop on the row or ⌥⌘. (O1): the file stops, the batch goes on.
+    /// Stop on the row or ⌥⌘. (O1): the file stops, the batch goes on. The
+    /// alert is not modal: the events keep coming under it, and the answer is
+    /// for the file it names (its batch index goes with `batch.stop`).
     func stopCurrentFile() {
-        guard batch.running, let video = runningVideo else { return }
-        afterClick { [self] in
-            guard Alerts.confirmStopFile(self, name: video.name) else { return }
-            Task { await stop(all: false) }
-        }
+        guard batch.running, let video = runningVideo, let idx = run.ids.firstIndex(of: video.id) else { return }
+        afterClick { [self] in askStop(.file(idx: idx, name: video.name)) }
     }
 
     /// Stop All (⌘., the sidebar card, the bottom bar, the Dock; O2).
     func stopAll() {
         guard batch.running else { return }
-        afterClick { [self] in
-            guard Alerts.confirmStopAll(self) else { return }
-            run.stoppedByUser = true
-            Task { await stop(all: true) }
+        afterClick { [self] in askStop(.all) }
+    }
+
+    /// O1 or O2, one at a time: with one up already, that one comes to the front.
+    private func askStop(_ kind: StopAlert.Kind) {
+        if let open = stopAlert, open.presentation.isOpen {
+            open.presentation.focus()
+            return
         }
+        // The click was queued: the file may be over by now, or the batch.
+        guard batch.running else { return }
+        if case .file(let idx, _) = kind {
+            guard let video = runningVideo, run.ids.firstIndex(of: video.id) == idx else { return }
+        }
+        let presentation = Alerts.confirmStop(self, kind) { [self] confirmed in
+            stopAlert = nil
+            guard confirmed else { return }
+            switch kind {
+            case .file(let idx, _): Task { await stop(all: false, file: idx) }
+            case .all: Task { await stop(all: true) }
+            }
+        }
+        stopAlert = StopAlert(kind: kind, presentation: presentation)
+    }
+
+    /// The file an open O1 names is over (or the batch, for O2 too): the alert goes by itself.
+    private func closeStopAlert(file idx: Int? = nil) {
+        guard let open = stopAlert else { return }
+        if let idx {
+            guard case .file(let asked, _) = open.kind, asked == idx else { return }
+        }
+        log.info("stop alert closed: \(idx.map { "file \($0) is over" } ?? "the batch is over")")
+        open.presentation.close()
+        stopAlert = nil
     }
 
     /// Without a confirmation (the quit alert said it already, the QA scenarios).
-    func stop(all: Bool) async {
+    /// `file` is the batch index the stop is meant for: when that file is not
+    /// the one in progress any more the engine answers `not_running` and
+    /// nothing stops. Returns the engine's answer, for the log and the QA.
+    @discardableResult
+    func stop(all: Bool, file: Int? = nil) async -> String {
         if all { run.stoppedByUser = true }
         do {
-            let reply = try await engine.batchStop(all: all)
-            log.info("batch.stop \(all ? "all" : "file"): \(reply.ok) \(reply.reason ?? "")")
+            let reply = try await engine.batchStop(all: all, file: file)
+            let what = all ? "all" : file.map { "file \($0)" } ?? "file"
+            let answer = reply.ok ? "ok" : (reply.reason ?? "refused")
+            log.info("batch.stop \(what): \(answer)")
+            return answer
         } catch {
             log.error("batch.stop failed: \(error)")
+            return "error: \(error)"
         }
     }
 
     // MARK: - Events
 
     /// The `batch.*` events, from the one consumer in `AppModel.listen()`.
+    /// What a failed row says after the step (E4): the sentence of a code the
+    /// catalogue knows, else the engine's short text as it is. Never the
+    /// "Something went wrong:" of `unknown`, never the exception's type name.
+    func failureText(_ video: VideoItem) -> String {
+        if let code = video.errorCode, code != "unknown", localizer.has("app.errors.\(code)") {
+            // The row takes the engine's short text; a long technical detail (a command line,
+            // stderr) stays in the box under the steps.
+            var short = video.failText ?? video.errorShort ?? ""
+            if video.failText == nil, short.count > 60 || short.contains("\n") { short = "" }
+            var sentence = t("app.errors.\(code)", ["detail": short, "tool": video.failTool ?? "",
+                                                    "path": video.failPath ?? video.path, "line": video.failLine.map(String.init) ?? ""])
+            if short.isEmpty { sentence = sentence.replacing(/\s*:\s*\.?\s*$/, with: ".") }
+            return sentence
+        }
+        return video.errorShort ?? video.error ?? ""
+    }
+
     func handleBatch(_ message: EngineMessage, name: String) {
         switch message {
         case .batchFileStarted(let f): fileStarted(f)
@@ -296,6 +378,7 @@ extension AppModel {
         }
         run.lastFileElapsed = d.elapsed
         saveVideos()
+        closeStopAlert(file: d.idx)
         let v = videos[i]
         notifyFile(v, body: d.empty ? t("app.notify.file_no_subs", ["name": v.name])
                    : tn("app.notify.file_done", d.segments, ["name": v.name]))
@@ -305,11 +388,19 @@ extension AppModel {
         guard let i = index(of: f.idx) else { return }
         videos[i].state = .failed
         videos[i].error = f.error
+        videos[i].failCode = f.code
+        videos[i].failText = f.text
+        videos[i].failDetail = f.detail
+        videos[i].failTool = f.tool
+        videos[i].failPath = f.path
+        videos[i].failLine = f.line
+        if let log = f.log, !log.isEmpty { videos[i].logPath = log }
         videos[i].atStep = f.atStep ?? run.currentStep?.id
         videos[i].finished = Date()
         videos[i].times = stepTimes()
         abortSteps(at: videos[i].atStep)
         saveVideos()
+        closeStopAlert(file: f.idx)
         let v = videos[i]
         log.error("file \(v.name) failed at \(v.atStep ?? "?"): \(f.error)")
         notifyFile(v, body: t("app.notify.file_failed", ["name": v.name, "step": stepLabel(v.atStep)]))
@@ -323,11 +414,16 @@ extension AppModel {
         videos[i].times = stepTimes()
         abortSteps(at: videos[i].atStep)
         saveVideos()
+        closeStopAlert(file: s.idx)
     }
 
     private func batchDone(_ d: BatchDone) {
+        closeStopAlert()
         // Rows never started (Stop All) are ready again (E5).
-        for i in videos.indices where videos[i].state.inBatch { videos[i].resetOutcome() }
+        for i in videos.indices where videos[i].state.inBatch {
+            videos[i].resetOutcome()
+            run.readyAgain.insert(videos[i].id)
+        }
         if let error = d.error { log.error("batch failed: \(error)") }
         log.info("batch.done: \(d.done) done, \(d.failed) failed, \(d.stopped) stopped, \(d.skipped) skipped in \(d.elapsed) s")
         let summary = BatchSummary(ids: run.ids, done: d.done, failed: d.failed, stopped: d.stopped, skipped: d.skipped,

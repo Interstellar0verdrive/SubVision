@@ -1,0 +1,24 @@
+# An OCR language Vision does not read here: Start opens O7 (not modal),
+# "Choose the Language" opens the inspector on its language menu.
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$WORK/"
+@launch
+wait-ready 600
+? ^ready
+lang it
+params fast
+inspector-set langHint xx-XX
+add $WORK/sintel_ita_hardsub_demo.mp4
+start
+alert-other
+? ^xx-XX .* · buttons Scegli la lingua\|Annulla$
+alert-other-press 0
+? ^pressed Scegli la lingua
+lang-menu
+? ^[0-9]+ items · checked - · first
+status
+? tab process
+states
+? ^sintel_ita_hardsub_demo.mp4=ready$
+inspector-set langHint it-IT
+params default
+inspector close

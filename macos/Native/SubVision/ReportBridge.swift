@@ -66,6 +66,8 @@ final class ReportBridge: NSObject {
     /// The export failed next to the original: asks the person for another place.
     /// Returns the URL chosen, nil to give up.
     var askWhereToSave: (String) -> URL? = { _ in nil }
+    /// Every write of the review state (`<name>.revisione.json`): true when it went through.
+    var onStateWrite: (Bool) -> Void = { _ in }
     var onNavigationFinished: () -> Void = {}
     var onNavigationFailed: (Error) -> Void = { _ in }
 
@@ -74,6 +76,8 @@ final class ReportBridge: NSObject {
     private(set) var lastStateWritten: Date?
     /// The downloads in flight, by identity, with their destination.
     private var downloads: [ObjectIdentifier: URL] = [:]
+    /// The alert of the page that is up (a `confirm()`, the overwrite question), for the debug commands.
+    private(set) var pageAlert: SVAlertPresentation?
 
     init(file: ReportFile, t: @escaping (String, [String: Any]) -> String) {
         self.file = file
@@ -90,6 +94,8 @@ final class ReportBridge: NSObject {
 
     /// Breaks the cycle with the content controller when the window closes.
     func detach() {
+        // An alert still up answers Cancel first: WebKit wants its completion handler called.
+        if let open = pageAlert, open.isOpen { open.press(open.alert.buttons.count - 1) }
         controller.removeAllScriptMessageHandlers()
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
@@ -200,26 +206,95 @@ final class ReportBridge: NSObject {
 
     // MARK: - Files
 
-    /// Writes `srt` as `name` next to the report, atomically. The name is the
-    /// report's own (`<srt stem>-revisionato-<date>.srt`), kept to its last component.
-    private func writeExport(name: String, srt: String) throws -> URL {
+    /// Where an export goes: `name` next to the report. The name is the report's
+    /// own (`<srt stem>-revisionato-<date>.srt`), kept to its last component.
+    private func exportTarget(_ name: String) -> URL {
         let clean = URL(fileURLWithPath: name).lastPathComponent
-        let target = file.folder.appendingPathComponent(clean.hasSuffix(".srt") ? clean : clean + ".srt")
+        return file.folder.appendingPathComponent(clean.hasSuffix(".srt") ? clean : clean + ".srt")
+    }
+
+    /// Writes `srt` there, atomically.
+    private func writeExport(name: String, srt: String) throws -> URL {
+        let target = exportTarget(name)
         try Data(srt.utf8).write(to: target, options: .atomic)
         return target
+    }
+
+    /// The export's name is there already (the date in it goes to the minute, so
+    /// a second save within the minute lands on the first): Replace or Cancel.
+    /// Not modal; `answer` gets true for Replace.
+    private func confirmReplace(_ target: URL, answer: @escaping @MainActor (Bool) -> Void) {
+        #if DEBUG
+        if let reply = Self.debugConfirm {
+            answer(reply)
+            return
+        }
+        #endif
+        let a = SVAlert(icon: AlertIconName.info, tone: .yellow, title: t("app.report.replace_title", [:]),
+                        text: t("app.report.replace_text", ["name": target.lastPathComponent]))
+        a.button(t("app.report.replace_btn", [:]), role: .primary)
+        a.button(t("app.common.cancel", [:]), cancel: true)
+        pageAlert = a.present(over: webView.window) { [weak self] index in
+            self?.pageAlert = nil
+            answer(index == 0)
+        }
+    }
+
+    /// A `confirm()` or `alert()` of the page as the app's alert: a short
+    /// question is the title; a long one goes under a title of the app's.
+    private func pageAlert(_ message: String, cancel: Bool, answer: @escaping @MainActor (Bool) -> Void) {
+        let short = message.count <= 72 && !message.contains("\n")
+        let a = SVAlert(icon: AlertIconName.info, tone: .accent, title: short ? message : t("app.report.confirm_title", [:]),
+                        text: short ? "" : message)
+        a.button(t("app.common.ok", [:]), role: .primary)
+        if cancel { a.button(t("app.common.cancel", [:]), cancel: true) }
+        pageAlert = a.present(over: webView.window) { [weak self] index in
+            self?.pageAlert = nil
+            answer(index == 0)
+        }
     }
 
     private func writeState(_ json: String) {
         do {
             try Data(json.utf8).write(to: file.stateURL, options: .atomic)
             lastStateWritten = Date()
+            onStateWrite(true)
         } catch {
             log.error("report state \(file.stateURL.lastPathComponent): \(error)")
+            onStateWrite(false)
         }
     }
 }
 
 // MARK: - Messages from the report
+
+extension ReportBridge {
+    /// Writes the export and answers the report; when the folder cannot be
+    /// written the window asks for another place (R3).
+    private func export(name: String, srt: String, replyHandler: @escaping (Any?, String?) -> Void) {
+        do {
+            let url = try writeExport(name: name, srt: srt)
+            log.info("report export \(url.lastPathComponent) (\(srt.utf8.count) bytes)")
+            replyHandler(["ok": true, "path": url.path, "name": url.lastPathComponent, "bytes": srt.utf8.count], nil)
+            onExport(.saved(url))
+        } catch {
+            log.error("report export \(name): \(error)")
+            onExport(.failed(name: name, error: String(describing: error)))
+            // R3: another place, chosen by the person; the report learns the outcome.
+            if let elsewhere = askWhereToSave(name) {
+                do {
+                    try Data(srt.utf8).write(to: elsewhere, options: .atomic)
+                    replyHandler(["ok": true, "path": elsewhere.path, "name": elsewhere.lastPathComponent, "bytes": srt.utf8.count], nil)
+                    onExport(.saved(elsewhere))
+                } catch {
+                    replyHandler(nil, t("app.report.save_failed", [:]))
+                }
+            } else {
+                replyHandler(nil, t("app.report.save_failed", [:]))
+            }
+        }
+    }
+}
 
 extension ReportBridge: WKScriptMessageHandlerWithReply {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
@@ -234,26 +309,18 @@ extension ReportBridge: WKScriptMessageHandlerWithReply {
                 replyHandler(nil, "bad export")
                 return
             }
-            do {
-                let url = try writeExport(name: name, srt: srt)
-                log.info("report export \(url.lastPathComponent) (\(srt.utf8.count) bytes)")
-                replyHandler(["ok": true, "path": url.path, "name": url.lastPathComponent, "bytes": srt.utf8.count], nil)
-                onExport(.saved(url))
-            } catch {
-                log.error("report export \(name): \(error)")
-                onExport(.failed(name: name, error: String(describing: error)))
-                // R3: another place, chosen by the person; the report learns the outcome.
-                if let elsewhere = askWhereToSave(name) {
-                    do {
-                        try Data(srt.utf8).write(to: elsewhere, options: .atomic)
-                        replyHandler(["ok": true, "path": elsewhere.path, "name": elsewhere.lastPathComponent, "bytes": srt.utf8.count], nil)
-                        onExport(.saved(elsewhere))
-                    } catch {
-                        replyHandler(nil, t("app.report.save_failed", [:]))
+            // The same name twice (two saves within the minute): ask before replacing.
+            if FileManager.default.fileExists(atPath: exportTarget(name).path) {
+                confirmReplace(exportTarget(name)) { [self] replace in
+                    if replace {
+                        export(name: name, srt: srt, replyHandler: replyHandler)
+                    } else {
+                        log.info("report export \(name): not replaced")
+                        replyHandler(nil, t("app.report.replace_cancelled", [:]))
                     }
-                } else {
-                    replyHandler(nil, t("app.report.save_failed", [:]))
                 }
+            } else {
+                export(name: name, srt: srt, replyHandler: replyHandler)
             }
         case "state":
             guard let json = body["json"] as? String else {
@@ -366,17 +433,12 @@ extension ReportBridge: WKUIDelegate {
             return
         }
         #endif
-        let a = SVAlert(icon: AlertIconName.info, tone: .accent, title: message, text: "")
-        a.button(t("app.common.ok", [:]), role: .primary)
-        a.button(t("app.common.cancel", [:]))
-        completionHandler(a.runModal() == 0)
+        // Not modal: WebKit waits for the completion handler, nothing else waits for the alert.
+        pageAlert(message, cancel: true) { completionHandler($0) }
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo,
                  completionHandler: @escaping () -> Void) {
-        let a = SVAlert(icon: AlertIconName.info, tone: .accent, title: message, text: "")
-        a.button(t("app.common.ok", [:]), role: .primary)
-        a.runModal()
-        completionHandler()
+        pageAlert(message, cancel: false) { _ in completionHandler() }
     }
 }

@@ -56,6 +56,8 @@ final class AppModel {
     var sidebarNarrow = false
     var sidebarShown = true
     var inspectorOpen: Bool { didSet { defaults.set(inspectorOpen, forKey: DefaultsKey.inspectorOpen) } }
+    /// Goes up by one to open the inspector's language menu (O7's "Choose the Language").
+    var languageMenuRequest = 0
     var checkingUpdates = false
     /// A newer release GitHub told about (the sidebar card, Settings › Updates).
     var updateAvailable: (version: String, url: URL)?
@@ -70,6 +72,8 @@ final class AppModel {
     var batch = BatchActivity()
     /// The batch in progress as the rows see it (F5.1, `AppModel+Run.swift`).
     var run = BatchRun()
+    /// O1 or O2 while it is up (`AppModel+Run.swift`).
+    @ObservationIgnored var stopAlert: StopAlert?
     /// The video Preview shows (F5.2), chosen from the list.
     var previewVideoID: UUID? { didSet { defaults.set(previewVideoID?.uuidString, forKey: DefaultsKey.previewVideo) } }
     /// The SRT Sub fix works on (F5.3).
@@ -338,9 +342,24 @@ final class AppModel {
 
     func toggleInspector() { inspectorOpen.toggle() }
 
+    /// O7's "Choose the Language": Process with the inspector open on the OCR
+    /// group, and the language menu opened once the inspector has slid in.
+    func showLanguageMenu() {
+        tab = .process
+        defaults.set(true, forKey: "inspector.group.ocr")
+        let wasOpen = inspectorOpen
+        inspectorOpen = true
+        Task {
+            try? await Task.sleep(for: .milliseconds(wasOpen ? 150 : 500))
+            guard inspectorOpen, tab == .process, !batch.running else { return }
+            languageMenuRequest += 1
+        }
+    }
+
     /// The red button closed the window; the batch goes on (O4, the first time).
     func windowClosed() {
         guard batch.running, !defaults.bool(forKey: DefaultsKey.closeNoticeOff) else { return }
+        // After the close has gone through: the alert must not hang on the window that is going.
         DispatchQueue.main.async { Alerts.closeNotice(self) }
     }
 

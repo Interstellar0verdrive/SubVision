@@ -10,23 +10,46 @@ struct PageTop<Trailing: View>: View {
     var title: String
     /// nil in a narrow window: the title alone (board N1).
     var intro: String?
+    /// The intro under the row of the title and the controls, at its full width:
+    /// for a page whose controls would squeeze it into a narrow column (Preview with the inspector, note 20).
+    var introBelow = false
     @ViewBuilder var trailing: () -> Trailing
     /// The intro wraps at the width of the boards' two lines.
     static var introWidth: CGFloat { 640 }
 
+    init(title: String, intro: String?, introBelow: Bool = false, @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.title = title
+        self.intro = intro
+        self.introBelow = introBelow
+        self.trailing = trailing
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
+        if introBelow {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).svPageTitle()
-                if let intro {
-                    Text(intro).svBody().fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: Self.introWidth, alignment: .leading)
+                HStack(alignment: .top, spacing: 16) {
+                    Text(title).svPageTitle().frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 10) { trailing() }
+                        .padding(.top, 2)
                 }
+                if let intro { introText(intro) }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 10) { trailing() }
-                .padding(.top, 2)
+        } else {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title).svPageTitle()
+                    if let intro { introText(intro) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 10) { trailing() }
+                    .padding(.top, 2)
+            }
         }
+    }
+
+    private func introText(_ intro: String) -> some View {
+        Text(intro).svBody().fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: Self.introWidth, alignment: .leading)
     }
 }
 

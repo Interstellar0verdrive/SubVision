@@ -61,8 +61,17 @@ struct VideoItem: Identifiable, Codable, Equatable {
     var srtPath: String?
     var reportPath: String?
     var logPath: String?
-    /// `batch.file.failed.error` (`code (k=v, …)` or `Type: message`).
+    /// `batch.file.failed.error` (`code (k=v, …)` or `Type: message`): the one line for the logs.
     var error: String?
+    /// The other fields of `batch.file.failed` (F6; nil from an engine that does not send them,
+    /// and in a list saved before): the stable code, the short text for the row, the technical
+    /// detail for the box under the steps, and what the code's sentence names.
+    var failCode: String?
+    var failText: String?
+    var failDetail: String?
+    var failTool: String?
+    var failPath: String?
+    var failLine: Int?
     /// `key:band` of the step it failed or stopped in.
     var atStep: String?
     /// When the outcome arrived.
@@ -102,14 +111,47 @@ struct VideoItem: Identifiable, Codable, Equatable {
         let candidate = reportPath.map { URL(fileURLWithPath: $0) } ?? reportURL
         return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
     }
-    /// The code of `error` (before the first space): `app.errors.<code>`.
-    var errorCode: String? { error?.split(separator: " ", maxSplits: 1).first.map(String.init) }
+    /// The engine's code of the failure (`app.errors.<code>`): the field, else the first word of `error`.
+    var errorCode: String? {
+        if let failCode, !failCode.isEmpty { return failCode }
+        guard let first = error?.split(separator: " ", maxSplits: 1).first, !first.hasSuffix(":") else { return nil }
+        return String(first)
+    }
+
+    /// The technical detail for the box under the steps (E4): the engine's
+    /// `detail`, else `error` without the `unknown (…)` or `code (detail=…)` wrapping.
+    var errorDetail: String? {
+        if let failDetail, !failDetail.isEmpty { return failDetail }
+        guard var text = error?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return nil }
+        if let open = text.firstIndex(of: "("), text.hasSuffix(")"), !text[..<open].contains(":"),
+           text[..<open].trimmingCharacters(in: .whitespaces).allSatisfy({ $0.isLetter || $0 == "_" }) {
+            text = String(text[text.index(after: open)...].dropLast())
+            if text.hasPrefix("detail=") { text = String(text.dropFirst("detail=".count)) }
+        }
+        return text
+    }
+
+    /// The short text for the row (E4): the engine's `text`, else the detail
+    /// without the exception's type name ("OCRError: ").
+    var errorShort: String? {
+        if let failText, !failText.isEmpty { return failText }
+        guard let detail = errorDetail else { return nil }
+        if let m = detail.firstMatch(of: /^[A-Za-z_][A-Za-z0-9_.]*:\s+(.+)$/.dotMatchesNewlines()) { return String(m.1) }
+        return detail
+    }
+
+    /// "~/Downloads/name.log": the log as the box of E4 writes it.
+    var logDisplayPath: String {
+        let path = outputLog.path, home = NSHomeDirectory()
+        return path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
+    }
 
     /// Drops the outcome: back to the next batch (Process Again, design note 9).
     mutating func resetOutcome() {
         state = .ready
         segments = nil; dropped = nil; refined = nil; elapsed = nil; times = nil; plan = nil
         srtPath = nil; reportPath = nil; logPath = nil; error = nil; atStep = nil; finished = nil
+        failCode = nil; failText = nil; failDetail = nil; failTool = nil; failPath = nil; failLine = nil
     }
 }
 
