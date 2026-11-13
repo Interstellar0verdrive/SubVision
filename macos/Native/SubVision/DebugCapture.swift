@@ -319,7 +319,7 @@ enum DebugCapture {
     private static func menuShot(_ which: String, _ path: String, _ model: AppModel) async -> String {
         var result = "no menu window"
         var ticks = 0
-        var opened: NSMenu?
+        nonisolated(unsafe) var opened: NSMenu?   // read and written on the main thread only (the timer runs there)
         let shoot = {
             let (menus, others) = ownWindows()
             guard !menus.isEmpty else { return }
