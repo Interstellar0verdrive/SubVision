@@ -1,0 +1,24 @@
+# A batch of the two demo clips with the fast profile: both done, 12 cues
+# each, and the Italian SRT identical byte for byte to the one of the
+# demo-assets release (plan 10.2.5: only the Italian clip, Vision is not
+# deterministic on the English one read as Italian).
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
+@launch
+wait-ready 600
+? ^ready
+lang it
+params fast
+inspector-set langHint it-IT
+tab process
+add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4
+states
+? ^sintel_ita_hardsub_demo.mp4=ready sintel_eng_hardsub_demo.mp4=ready$
+start
+? status ready
+wait-batch 900
+? ^batch done · done 2 failed 0 stopped 0 skipped 0
+states
+? ^sintel_ita_hardsub_demo.mp4=done:12 sintel_eng_hardsub_demo.mp4=done:12$
+! cmp "$WORK/sintel_ita_hardsub_demo.srt" "$REF/sintel_ita_hardsub_demo.srt"
+! test -s "$WORK/sintel_ita_hardsub_demo.revisione.html" && test -s "$WORK/sintel_ita_hardsub_demo.log" && test -s "$WORK/sintel_eng_hardsub_demo.srt"
+params default

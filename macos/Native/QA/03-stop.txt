@@ -1,0 +1,36 @@
+# Stop (O1) on the first file and Stop All (O2) on the second, through the
+# alerts the buttons open (not modal: the batch goes on under them), then a
+# stop meant for a file that is over ("not_running"). Afterwards no ffmpeg
+# and no engine of this state folder are left.
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" a.mp4 && cp "$DEMO/sintel_eng_hardsub_demo.mp4" b.mp4 && cp "$DEMO/sintel_ita_hardsub_demo.mp4" c.mp4
+@launch
+wait-ready 600
+? ^ready
+lang it
+params fast
+inspector-set langHint it-IT
+add $WORK/a.mp4,$WORK/b.mp4,$WORK/c.mp4
+start
+wait-step 0 ocr 180
+? ^ok
+stop-file-ask
+? ^file 0 a.mp4 · window [0-9]+ · buttons Ferma\|Continua · running 0
+alert-press 0
+? ^pressed Ferma · none
+wait-file 0 60
+? ^ok · a.mp4 stopped
+stop-file 0
+? not_running
+wait-step 1 extract 180
+? ^ok
+stop-all-ask
+? ^all · window [0-9]+ · buttons Ferma tutto\|Continua
+alert-key return
+? none
+wait-batch 120
+? ^batch done · done 0 failed 0 stopped 2 skipped 1
+states
+? ^a.mp4=stopped@[a-z]+:[a-z]+ b.mp4=stopped@[a-z]+:[a-z]+ c.mp4=ready$
+! sleep 2; ! pgrep -fl "$STATE/bin/ffmpeg"
+! test ! -e "$WORK/a.srt" && test ! -e "$WORK/b.srt"
+params default

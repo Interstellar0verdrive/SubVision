@@ -1,0 +1,25 @@
+# Two damaged copies of the Italian clip (recipes of tests/README.md): one
+# without its index, refused when it is added (unreadable), and one that the
+# probe accepts and ffmpeg gives up on in the middle of the extraction: a real
+# E4, with the step, the engine's short text (no "Something went wrong", no
+# type name), the detail and the per-file log.
+! SRC="$DEMO/sintel_ita_hardsub_demo.mp4"; tail -c +100001 "$SRC" > no-index.mp4 && { head -c 1000000 "$SRC"; head -c $(( $(stat -f%z "$SRC") - 1000000 )) /dev/zero; } > damaged.mp4
+@launch
+wait-ready 600
+? ^ready
+lang it
+params fast
+inspector-set langHint it-IT
+add $WORK/no-index.mp4,$WORK/damaged.mp4
+states
+? ^no-index.mp4=unreadable damaged.mp4=ready$
+start
+wait-batch 300
+? ^batch done · done 0 failed 1 stopped 0 skipped 0
+states
+? damaged.mp4=failed@extract:bottom
+row-text 1
+? ^failed · .*ffmpeg
+?! ^failed · [^·]*(Qualcosa è andato storto|Something went wrong|CalledProcessError)
+! test -s "$WORK/damaged.log" && test ! -e "$WORK/damaged.srt"
+params default

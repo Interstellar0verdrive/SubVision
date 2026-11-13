@@ -1,0 +1,31 @@
+# The window at the size of the narrow boards (N1, N2: 760x640), with a
+# video in the list and the inspector over the page, then back. The window
+# cannot go below 720x640 (the whole window, top bar included).
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$WORK/"
+@launch
+wait-ready 600
+? ^ready
+lang it
+params default
+add $WORK/sintel_ita_hardsub_demo.mp4
+size 700x600
+window-size
+? ^720x640 · min 720x640
+size 760x640
+window-size
+? ^760x640 · min 720x640
+tab process
+inspector close
+capture $OUT/N1.png
+? N1.png$
+inspector open
+capture $OUT/N2.png
+? N2.png$
+inspector close
+tab preview
+capture $OUT/N1-preview.png
+? N1-preview.png$
+tab process
+size 1360x840
+window-size
+? ^1360x840 
