@@ -317,6 +317,11 @@ public struct BatchFileFailed: Decodable, Sendable, Equatable {
     public var line: Int? = nil
     /// The per-file log, where the whole story is.
     public var log: String? = nil
+    /// A tool that exited with an error (11.3.4): its name, exit status and last complaint,
+    /// so the app words "ffmpeg exited with status 69: …" in its own language.
+    public var program: String? = nil
+    public var status: Int? = nil
+    public var reason: String? = nil
 }
 
 public struct BatchFileStopped: Decodable, Sendable, Equatable {

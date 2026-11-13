@@ -154,5 +154,9 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
         // batch.file.failed with the fields of protocol 2.0 final: code, text, detail, log.
         let failed = try reply(#"{"idx":0,"error":"unknown (OCRError: boom)","at_step":"ocr:bottom","code":"unknown","text":"boom","detail":"OCRError: boom","log":"/v/a.log"}"#, as: BatchFileFailed.self)
         #expect(failed.code == "unknown" && failed.text == "boom" && failed.log == "/v/a.log" && failed.atStep == "ocr:bottom" && failed.line == nil)
+        #expect(failed.program == nil && failed.status == nil && failed.reason == nil)
+        // A tool that exited with an error (11.3.4): the parts the app words in its own language.
+        let tool = try reply(#"{"idx":1,"error":"unknown (ffmpeg è uscito con il codice 69)","at_step":"extract:bottom","code":"unknown","text":"ffmpeg è uscito con il codice 69: Decode error rate 0.88","tool":"ffmpeg","program":"ffmpeg","status":69,"reason":"Decode error rate 0.88"}"#, as: BatchFileFailed.self)
+        #expect(tool.program == "ffmpeg" && tool.status == 69 && tool.reason == "Decode error rate 0.88" && tool.tool == "ffmpeg")
     }
 }

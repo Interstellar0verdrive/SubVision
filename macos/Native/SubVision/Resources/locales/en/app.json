@@ -74,6 +74,7 @@
   "app.errors.not_static": "This {tool} depends on other libraries: SubVision needs a self-contained build.",
   "app.errors.probe_failed": "I can’t read this video: {detail}.",
   "app.errors.report_failed": "The SRT is ready, but the review report couldn’t be written: {detail}.",
+  "app.errors.tool_exit": "{tool} exited with status {status}",
   "app.errors.unknown": "Something went wrong: {detail}",
   "app.errors.version": "{tool} answered with an unexpected version: {detail}.",
   "app.errors.vision_unavailable": "macOS text recognition isn’t answering.",

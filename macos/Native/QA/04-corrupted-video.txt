@@ -2,7 +2,7 @@
 # without its index, refused when it is added (unreadable), and one that the
 # probe accepts and ffmpeg gives up on in the middle of the extraction: a real
 # E4, with the step, the engine's short text (no "Something went wrong", no
-# type name), the detail and the per-file log.
+# type name, in the language of the app), the detail and the per-file log.
 ! SRC="$DEMO/sintel_ita_hardsub_demo.mp4"; tail -c +100001 "$SRC" > no-index.mp4 && { head -c 1000000 "$SRC"; head -c $(( $(stat -f%z "$SRC") - 1000000 )) /dev/zero; } > damaged.mp4
 @launch
 wait-ready 600
@@ -20,6 +20,8 @@ states
 ? damaged.mp4=failed@extract:bottom
 row-text 1
 ? ^failed · .*ffmpeg
+# 11.3.4: with the app in Italian the tool's exit is worded in Italian too
+? ffmpeg è uscito con il codice [0-9]+
 ?! ^failed · [^·]*(Qualcosa è andato storto|Something went wrong|CalledProcessError)
 ! test -s "$WORK/damaged.log" && test ! -e "$WORK/damaged.srt"
 params default

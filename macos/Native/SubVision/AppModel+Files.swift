@@ -72,6 +72,10 @@ struct VideoItem: Identifiable, Codable, Equatable {
     var failTool: String?
     var failPath: String?
     var failLine: Int?
+    /// A tool that exited with an error: name, exit status, last complaint (11.3.4).
+    var failProgram: String?
+    var failStatus: Int?
+    var failReason: String?
     /// `key:band` of the step it failed or stopped in.
     var atStep: String?
     /// The long gaps without subtitles of the report, `[start, end]` in seconds (Review, board C2-R1).
@@ -160,6 +164,7 @@ struct VideoItem: Identifiable, Codable, Equatable {
         srtPath = nil; reportPath = nil; logPath = nil; error = nil; atStep = nil; finished = nil
         gaps = nil; ocrLang = nil; ocrFPS = nil; gapWarn = nil
         failCode = nil; failText = nil; failDetail = nil; failTool = nil; failPath = nil; failLine = nil
+        failProgram = nil; failStatus = nil; failReason = nil
     }
 }
 
