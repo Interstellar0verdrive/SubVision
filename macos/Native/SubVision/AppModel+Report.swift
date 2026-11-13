@@ -48,6 +48,27 @@ extension AppModel {
         return controller
     }
 
+    /// Review (the row's button, ⌘R, the end-of-batch sheet, the Review page): the
+    /// file's review report in its window, "Review · <video>" (C2 boards).
+    func review(_ video: VideoItem) {
+        guard let report = video.outputReport else { return }
+        openReport(report)
+    }
+
+    /// The name a report window carries: the video of the list it belongs to, else the
+    /// report's own name without `_<date>.review.html`.
+    func reviewName(for report: URL) -> String {
+        let key = report.standardizedFileURL.path
+        if let video = videos.first(where: { $0.outputReport?.standardizedFileURL.path == key }) { return video.name }
+        var name = report.lastPathComponent
+        for suffix in [".review.html", ".revisione.html", ".html"] where name.hasSuffix(suffix) {
+            name = String(name.dropLast(suffix.count))
+            break
+        }
+        if let m = name.firstMatch(of: /^(.+)_\d{4}-\d{2}-\d{2}$/) { name = String(m.1) }
+        return name
+    }
+
     /// File › Open a Report… (⌥⌘O): the open panel, then `openReport`
     /// (also for the reports written by the 1.x).
     func openReportPanel() {

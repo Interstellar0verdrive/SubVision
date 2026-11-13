@@ -29,6 +29,7 @@ struct MainView: View {
                           sidebarExtra: { SidebarExtra() },
                           topBarTrailing: { TopBarTrailing() },
                           page: { Page() })
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { model.mainWindowWidth = $0 }
             }
         }
         .onAppear { model.reopenMainWindow = { openWindow(id: model.config.mainWindowID) } }
@@ -68,7 +69,8 @@ struct TopBarTrailing: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if model.tab != .fix {
+        // Only where the parameters lie over the page (under 1000 pt, board N1).
+        if model.tab == .process, model.inspectorOverlays {
             InspectorButton()
         }
     }

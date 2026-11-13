@@ -85,6 +85,7 @@ struct BatchRun: Equatable {
     /// The language and frames per second the batch started with: each file keeps them (Review).
     var lang: String?
     var fps: Double?
+    var gapWarn: Double?
 
     /// The step the engine works on (or the first not started).
     var currentStep: StepRun? {
@@ -161,6 +162,7 @@ extension AppModel {
         run = BatchRun(ids: ids)
         run.lang = lang
         run.fps = ocrParams.fps
+        run.gapWarn = ocrParams.qcGapWarn
         batch = BatchActivity(running: true, index: 1, total: ids.count, name: ready.first?.name ?? "")
         selection = []
         saveVideos()
@@ -379,6 +381,7 @@ extension AppModel {
         videos[i].gaps = d.gaps
         videos[i].ocrLang = run.lang
         videos[i].ocrFPS = run.fps
+        videos[i].gapWarn = run.gapWarn
         for j in run.steps.indices {
             run.steps[j].state = .done
             run.steps[j].ratio = 1
@@ -604,8 +607,10 @@ extension AppModel {
     /// One per file only in a batch of several files, and only with the window behind.
     private func notifyFile(_ video: VideoItem, body: String) {
         guard notifications, batch.total > 1, !NSApp.isActive else { return }
+        // A file done goes to Review (its row opened), one that failed to Video.
+        let review = video.state == .done || video.state == .noSubs
         notify(title: t("app.notify.file_title"), body: body, identifier: "file-\(video.id.uuidString)",
-               userInfo: ["page": Tab.process.rawValue])
+               userInfo: review ? ["page": Tab.review.rawValue, "video": video.id.uuidString] : ["page": Tab.process.rawValue])
     }
 
     /// Alerts opened by a button wait for the click to finish (a modal loop
