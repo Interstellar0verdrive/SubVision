@@ -32,6 +32,15 @@ progress is stopped, whichever it is; `scope: "all"` ignores `file`.
 Replies: `{"ok": true}`, `{"ok": false, "reason": "no_batch"}` when no
 batch is running.
 
+`preview.frames {video, params, n?, tries?}` starts the preview job
+(`{"started": true}`, or `{"started": false, "reason": "busy"}`); its
+events are `preview.progress {done, total, found, found_top}` after every
+zone, then `preview.done {frames}`, `preview.stopped {}` or
+`preview.failed {error, ...}`. Every frame is `{path, bands, has_text,
+width, height, ts}`: `bands` lists the bands with text, a subset of
+`["bottom", "top"]` in this order (`[]` = no text; "top" only when the
+signs band is on), `has_text` is `bands` non-empty (see preview.py).
+
 The events of a batch are described in batch.py; `batch.file.failed`
 carries `code`, `text` (short, for the row of the file), `detail`, `log`
 (the per-file log), `error`, `at_step` and `tool`/`path`/`line` when known.
