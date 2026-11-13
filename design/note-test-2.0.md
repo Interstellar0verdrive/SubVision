@@ -199,7 +199,7 @@ L'app è in `/Applications/SubVision.app` (build Release di F6, zip `SubVision-v
 - Revisione elenca tutti i video della lista fatti o senza sottotitoli, anche di sessioni passate finché restano nell’elenco; «Rivedi» è spento se il report non c’è (report spento nei parametri). «Elabora di nuovo» toglie il video da Revisione. Un clic sulla riga la seleziona e apre tempi, file e la nota dei buchi; ⌘R apre la revisione della riga selezionata (su Video della riga finita selezionata).
 - Buchi, lingua, fps e soglia dei buchi arrivano con `batch.file.done` (motore: campo `gaps`) e si salvano nella riga; i video elaborati prima di questa versione mostrano «—» nella colonna Buchi.
 - La finestra Anteprima parte da sola con «Trova 20 fotogrammi» quando il video non ha ancora fotogrammi (anche cambiando video dal menu); una finestra sola; ⌘Y apre l’Anteprima della riga selezionata, Finestra › Anteprima quella dell’ultimo video.
-- Il menu «Elabora» della barra dei menu si chiama «Video»; la scheda attività della barra laterale dice «Lotto in corso».
+- Il menu «Elabora» della barra dei menu resta «Elabora» («Process» in inglese), per scelta dell'utente (14/11); il menu File resta «File». La scheda attività della barra laterale dice «Lotto in corso».
 - La notifica di un file finito porta su Revisione con la riga aperta; quella del lotto su Video, dove c’è il foglio.
 - La sezione di Sub fix si chiama «Condivisi con Video» (la tavola dice «con Elabora», pagina che non c’è più).
 - La barra delle azioni sulla selezione compare solo fuori dal lotto: durante il lotto la barra in basso resta quella del lotto.
