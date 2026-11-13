@@ -1,6 +1,6 @@
-# Frasi da ignorare (una per riga). Vengono scartate se compaiono come output OCR.
-# Utile per loghi/watermark ricorrenti dei fansub, cartelli, ecc.
-# Esempi:
-# Traduzione a cura di
-# Sottotitoli:
-# www.esempio-fansub.it
+# Phrases to ignore (one per line). They are dropped when they come out of the OCR.
+# Useful for recurring fansub logos/watermarks, credits, etc.
+# Examples:
+# Translated by
+# Subtitles:
+# www.example-fansub.org

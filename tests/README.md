@@ -39,6 +39,12 @@ that need them skip when they are missing. ffmpeg/ffprobe come from `PATH` or
 `/opt/homebrew/bin`. The full run on the ita clip takes ~10 s from the second
 time; the very first Vision call on a Mac can take ~30 s.
 
+`SUBVISION_USER_FRAMES` names a folder with whole frames of a private video
+(`test1-no-text.jpg`, `test1-sign-and-dialogue.jpg`: frames 6 and 9 of 20 of
+the Preview on `_test-1.mkv`) for the quick-probe tests of `test_preview.py`;
+they skip when it is unset or a file is missing. Those frames never go in the
+repo.
+
 ## Damaged videos
 
 Two repeatable recipes on a demo clip (`damage_head` / `damage_tail` in

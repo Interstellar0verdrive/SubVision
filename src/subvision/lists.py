@@ -1,14 +1,15 @@
 """
 The two user lists of the engine, kept in the state folder:
 
-  ignore.txt      lines to discard when they come out of the OCR
-                  (fansub credits, watermarks, ...), one per line;
-  correzioni.txt  "wrong => right" replacements applied at the end.
+  ignore.txt       lines to discard when they come out of the OCR
+                   (fansub credits, watermarks, ...), one per line;
+  corrections.txt  "wrong => right" replacements applied at the end.
 
 Both are created on first use by copying `defaults/ignore.txt` and
-`defaults/correzioni.txt` of the engine (comments that explain the
+`defaults/corrections.txt` of the engine (comments that explain the
 format). The user edits them from Settings; "Import..." replaces one of
-them with a file of the 1.x installation.
+them with a file of the 1.x installation (whose corrections list was
+called `correzioni.txt`: it is imported like any other text file).
 """
 
 from __future__ import annotations
@@ -21,13 +22,13 @@ from subvision import core
 from subvision.paths import defaults_dir, state_dir
 
 KINDS = ("ignore", "corrections")
-FILE_NAMES = {"ignore": "ignore.txt", "corrections": "correzioni.txt"}
+FILE_NAMES = {"ignore": "ignore.txt", "corrections": "corrections.txt"}
 
 Lists = Tuple[List[str], List[Tuple[str, str]]]   # (ignore_lines, corrections)
 
 
 def path_of(kind: str, state: Optional[Path | str] = None) -> Path:
-    """`<state>/ignore.txt` or `<state>/correzioni.txt`."""
+    """`<state>/ignore.txt` or `<state>/corrections.txt`."""
     if kind not in FILE_NAMES:
         raise ValueError(f"unknown list kind: {kind!r}")
     root = Path(state) if state is not None else state_dir()

@@ -31,7 +31,7 @@ def test_engine_root_has_defaults() -> None:
     root = paths.engine_root()
     assert (root / "src" / "subvision" / "core.py").is_file()
     assert (paths.defaults_dir() / "ignore.txt").is_file()
-    assert (paths.defaults_dir() / "correzioni.txt").is_file()
+    assert (paths.defaults_dir() / "corrections.txt").is_file()
 
 
 def test_state_paths_ensure(state: Path) -> None:
@@ -48,7 +48,7 @@ def test_state_paths_ensure(state: Path) -> None:
 def test_lists_created_from_defaults(state: Path) -> None:
     st = lists.status()
     assert st["ignore"]["path"] == str(state / "ignore.txt")
-    assert st["corrections"]["path"] == str(state / "correzioni.txt")
+    assert st["corrections"]["path"] == str(state / "corrections.txt")
     for kind in lists.KINDS:
         p = Path(st[kind]["path"])
         assert p.is_file()
@@ -62,7 +62,7 @@ def test_counts_and_load(state: Path) -> None:
     lists.ensure()
     (state / "ignore.txt").write_text(
         "# comment\nTraduzione a cura di\n\nwww.esempio-fansub.it\n", encoding="utf-8")
-    (state / "correzioni.txt").write_text(
+    (state / "corrections.txt").write_text(
         "# comment\nFlamilion => Hamilton\nbad line without arrow\n l0ve => love \n",
         encoding="utf-8")
     st = lists.status()
@@ -96,4 +96,4 @@ def test_explicit_state_argument(tmp_path: Path, monkeypatch) -> None:
     other = tmp_path / "explicit"
     st = lists.status(other)
     assert Path(st["ignore"]["path"]).parent == other
-    assert lists.path_of("corrections", other) == other / "correzioni.txt"
+    assert lists.path_of("corrections", other) == other / "corrections.txt"

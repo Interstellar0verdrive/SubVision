@@ -1,0 +1,12 @@
+# Automatic corrections applied to the OCR text (case-insensitive).
+# Format: one rule per line
+#     wrong => right
+#
+# Perfect for RECURRING typos that the OCR will never fix on its own, such
+# as proper names in hard-to-read fonts. One rule fixes every episode of
+# the series.
+# Examples (uncomment/adapt):
+# Flamilion => Hamilton
+# Elamilion => Hamilton
+# Blamilion => Hamilton
+# tothe => to the

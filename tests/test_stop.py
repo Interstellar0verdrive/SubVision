@@ -77,7 +77,7 @@ def _assert_clean_stop(err, delay: float, out: Path, tmp_path: Path, clip: str):
     assert _ffmpeg_on(clip) == [], "ffmpeg still alive 0.3 s later"
     assert not list((tmp_path / "tmp").glob("voc26_*")), "workdir not removed"
     assert not out.exists(), "an SRT was written despite the stop"
-    assert not out.with_suffix(".revisione.html").exists()
+    assert not out.with_suffix(".review.html").exists()
 
 
 @pytest.fixture
@@ -176,7 +176,7 @@ def test_broken_report_keeps_the_srt(clip: Path, tmp_path: Path, monkeypatch):
                                      log_cb=logs.append, tmp_root=tmp_path / "tmp")
     assert len(segs) == FAST_PROFILE_LINES and out.exists()
     assert stats.qc_path == ""
-    assert not out.with_suffix(".revisione.html").exists()
+    assert not out.with_suffix(".review.html").exists()
     codes = [e.code for e in logs]
     assert codes[-2:] == ["srt_written", "report_failed"], codes
     assert "disk full" in logs[-1].args["error"]

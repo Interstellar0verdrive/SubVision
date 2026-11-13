@@ -106,7 +106,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_lists_options(ex)
     _add_tools_option(ex)
     ex.add_argument("--log-lang", choices=("en", "it"), default="en",
-                    help="language of the per-file log and of the review report")
+                    help="language of the per-file log and initial language of the "
+                         "review report (which carries both)")
 
     fx = sub.add_parser("fix", help="clean up an existing SRT (Sub fix)")
     fx.add_argument("srt", help="the .srt file")
@@ -254,8 +255,8 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     def emit(event: str, data: Dict[str, Any]) -> None:
         if event == "preview.progress":
-            print(f"\r    {data['done']}/{data['total']} frames, {data['found']} with text",
-                  end="", file=sys.stderr, flush=True)
+            print(f"\r    {data['done']}/{data['total']} frames, {data['found']} with text, "
+                  f"{data['found_top']} with signs", end="", file=sys.stderr, flush=True)
 
     try:
         frames = preview.find_frames(args.video, p, n=args.n, tries=args.tries, emit=emit,
@@ -265,8 +266,8 @@ def cmd_preview(args: argparse.Namespace) -> int:
         return 2
     print(file=sys.stderr)
     for f in frames:
-        flag = f["band"] or "-"
-        print(f"{f['ts']:8.3f}s  {flag:6s}  {f['path']}")
+        flag = "+".join(f["bands"]) or "-"
+        print(f"{f['ts']:8.3f}s  {flag:10s}  {f['path']}")
     print(f"{sum(1 for f in frames if f['has_text'])}/{len(frames)} frames with text",
           file=sys.stderr)
     return 0

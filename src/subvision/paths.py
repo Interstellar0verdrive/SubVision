@@ -6,7 +6,7 @@ passes `~/Library/Application Support/SubVision-dev`), otherwise
 `~/Library/Application Support/SubVision`. Inside it: `bin/` (uv, ffmpeg,
 ffprobe), `records/` (engine log), `tmp/` (work folders of the batch) and
 `tmp/preview/` (whole frames of the preview), plus `ignore.txt` and
-`correzioni.txt` (see lists.py).
+`corrections.txt` (see lists.py).
 
 Engine root: the folder that holds `src/` and `defaults/`. In the repo it
 is the checkout; in the app bundle `copy_engine.sh` copies `defaults/`
