@@ -28,7 +28,7 @@ tests/.fixtures/
 # --- pipeline output and user videos (never in the repo) ---
 *.srt
 *.log
-*.revisione.html
+*.review.html
 *.qc.html
 *.mkv
 *.mp4

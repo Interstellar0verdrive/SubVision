@@ -121,7 +121,7 @@ def test_process_video_fast_profile(demo_ita_copy: Path, ffmpeg_bin: str, tmp_pa
     assert len(segs) == FAST_PROFILE_LINES
     assert stats.segments == FAST_PROFILE_LINES
     assert stats.frames > 0 and stats.ocr_calls > 0
-    report = demo_ita_copy.with_suffix(".revisione.html")
+    report = demo_ita_copy.with_suffix(".review.html")
     assert report.exists() and stats.qc_path == str(report)
     # the workdir is removed after the run
     assert not list((tmp_path / "tmp").glob("voc26_*"))

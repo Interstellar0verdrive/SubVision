@@ -98,7 +98,7 @@ streamlit run app.py
 ```
 
 Put your videos in `./videos` (`.mkv .mp4 .mov .avi .m4v .webm`); the `.srt`,
-the `.revisione.html` review report and a `.log` are saved next to each video.
+the `.review.html` review report and a `.log` are saved next to each video.
 
 The interface is available in **English and Italian** (selector at the top of
 the sidebar; the choice is remembered across launches). The review report is

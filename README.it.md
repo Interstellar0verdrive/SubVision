@@ -108,7 +108,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
    frame per cartelli/insegne/note del traduttore. Finiscono nell'SRT con tag
    `{\an8}` (posizione alta). Disattivala per le serie senza cartelli:
    dimezzi il tempo.
-5. **Report di revisione interattivo** (`.revisione.html` accanto all'SRT —
+5. **Report di revisione interattivo** (`.review.html` accanto all'SRT —
    *default: ON*) — non solo la mappa per la revisione: è un **editor**.
    Aprilo nel browser e:
    - ogni riga ha thumbnail, confidenza, accordo tra varianti;
@@ -120,7 +120,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
    - nei "buchi lunghi" puoi **aggiungere** una riga con tempi precompilati;
    - tempi editabili e tag `{\an8}` attivabile per riga (badge blu acceso
      "✓ CARTELLO" quando attivo);
-   - **💾 Salva SRT revisionato** crea `nome-revisionato-AAAAMMGG-HHMM.srt`:
+   - **💾 Salva SRT revisionato** crea `nome-reviewed-AAAAMMGG-HHMM.srt`:
      con Chrome/Edge si apre il dialogo Salva che **ricorda la cartella**
      (scegli la cartella dei video la prima volta); con Safari il file va in
      Download;
@@ -200,7 +200,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 
 ## 🖥️ Le 3 schede
 
-- **Elabora** — batch OCR dei video selezionati → `.srt` + `.revisione.html`
+- **Elabora** — batch OCR dei video selezionati → `.srt` + `.review.html`
   + `.log` accanto al video. Avanzamento a STEP: per ogni file vedi l'elenco
   completo degli step già dall'inizio; lo step attivo mostra barra, conteggio,
   tempo trascorso, ETA e velocità live; quelli conclusi diventano righe verdi
@@ -222,7 +222,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 2. **Anteprima** → estrai i 20 frame → tara le bande (verde/azzurro)
 3. **Test OCR** su un frame con sottotitolo → verifica lingua e lettura
 4. **Elabora** (default massimi) → aspetta
-5. Apri il `.revisione.html` → sistemi le righe evidenziate → 💾 Salva SRT
+5. Apri il `.review.html` → sistemi le righe evidenziate → 💾 Salva SRT
    revisionato
 6. Per le puntate successive della stessa serie: stesse impostazioni, lancia
    in batch anche più file insieme.
@@ -236,7 +236,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 4. Forward-fill + sanificazione (junk, ignore.txt, anti-rumore grafico).
 5. Segmenti dal testo per-frame con voto di segmento; merge dei fade.
 6. Raffinamento confini al framerate nativo (finestra ±1/fps per lato).
-7. Scrittura `.srt` (+ `{\an8}` per i cartelli) e report `.revisione.html`.
+7. Scrittura `.srt` (+ `{\an8}` per i cartelli) e report `.review.html`.
 
 ## 📁 File
 
@@ -250,7 +250,7 @@ passa il mouse sopra per leggerla. Questo README ripete e approfondisce.
 | `run.command` | launcher macOS |
 | `ignore.txt` | frasi da ignorare |
 | `corrections.txt` | sostituzioni automatiche `sbagliato => giusto` |
-| `videos/` | metti qui i video; qui compaiono `.srt` / `.revisione.html` / `.log` |
+| `videos/` | metti qui i video; qui compaiono `.srt` / `.review.html` / `.log` |
 
 ## 🧪 Uso headless (senza GUI)
 

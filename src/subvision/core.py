@@ -18,7 +18,7 @@ minimize manual rework (skipped subtitles, imprecise timing, typos), so:
 3. TIMING REFINEMENT: the start/end boundaries are recomputed at the
    video's NATIVE frame rate (~1 frame precision, ~±20ms).
 4. Optional TOP BAND for translated signs/banners ({\\an8}).
-5. REVIEW REPORT (.revisione.html): every line carries its confidence,
+5. REVIEW REPORT (.review.html): every line carries its confidence,
    agreement between variants and a thumbnail; doubtful lines, dropped
    flashes and long gaps end up in an HTML report/editor for guided
    manual review.
@@ -1276,7 +1276,7 @@ const LSKEY = 'voc26_rev_' + DATA.srtName;
 const BRIDGE = (window.webkit && window.webkit.messageHandlers &&
                 window.webkit.messageHandlers.subvision) || null;
 // Initial state: the app injects the saved editor state as
-// window.__subvisionState (from <name>.revisione.json) and it takes
+// window.__subvisionState (from <name>.review.json) and it takes
 // precedence over localStorage; after "Reset all" the injected state is
 // ignored once (sessionStorage marker), until the app re-injects the new one.
 let saved = {};
@@ -1559,7 +1559,7 @@ function flash(msg, tip){
 async function exportSrt(){
   const out = buildSrt();
   if(out == null) return;
-  const fname = DATA.srtName.replace(/\.srt$/i,'') + '-revisionato-' + stamp() + '.srt';
+  const fname = DATA.srtName.replace(/\.srt$/i,'') + '-reviewed-' + stamp() + '.srt';
   const mi = window._lastMergeInfo || 0;
   const mergeNote = mi > 0 ? ' · ' + mi + ' ' + T.mergedDupes : '';
   // 1) SubVision app (WKWebView): the app writes the file next to the original.
@@ -1670,7 +1670,7 @@ _QC_I18N = {
             "LEG_ADDED": "riga aggiunta a mano",
             "HINT": "Modifica il testo nelle caselle, clicca una <b>lettura alternativa</b> per usarla,\n"
                     " spunta/de-spunta le righe da includere. Le modifiche restano salvate in questo browser.<br>\n"
-                    " <b>💾 Salva SRT revisionato</b> crea <code>nome-revisionato-data.srt</code>: con <b>Chrome/Edge</b> si apre\n"
+                    " <b>💾 Salva SRT revisionato</b> crea <code>nome-reviewed-data.srt</code>: con <b>Chrome/Edge</b> si apre\n"
                     " il dialogo Salva che <b>ricorda la cartella</b> (scegli la cartella dei video la prima volta);\n"
                     " con <b>Safari</b> il file va in Download.",
             "ROWS_H": "Righe SRT",
@@ -1697,7 +1697,7 @@ _QC_I18N = {
             "srtError": "Errore nel salvataggio:",
             "hintApp": "Modifica il testo nelle caselle, clicca una <b>lettura alternativa</b> per usarla,\n"
                        " spunta/de-spunta le righe da includere. Le modifiche vengono salvate accanto al report.<br>\n"
-                       " <b>💾 Salva SRT revisionato</b> crea <code>nome-revisionato-data.srt</code> accanto al video.",
+                       " <b>💾 Salva SRT revisionato</b> crea <code>nome-reviewed-data.srt</code> accanto al video.",
             "confirmReset": "Annullare tutte le modifiche fatte in questo report?",
             "noneDropped": "Nessuna.", "noneGaps": "Nessuno.",
             "gapNoSub": "s senza sub",
@@ -1736,7 +1736,7 @@ _QC_I18N = {
             "LEG_ADDED": "line added by hand",
             "HINT": "Edit the text in the boxes, click an <b>alternative reading</b> to use it,\n"
                     " check/uncheck the lines to include. Changes stay saved in this browser.<br>\n"
-                    " <b>💾 Save reviewed SRT</b> creates <code>name-revisionato-date.srt</code>: with <b>Chrome/Edge</b> the\n"
+                    " <b>💾 Save reviewed SRT</b> creates <code>name-reviewed-date.srt</code>: with <b>Chrome/Edge</b> the\n"
                     " Save dialog opens and <b>remembers the folder</b> (pick the videos folder the first time);\n"
                     " with <b>Safari</b> the file goes to Downloads.",
             "ROWS_H": "SRT lines",
@@ -1763,7 +1763,7 @@ _QC_I18N = {
             "srtError": "Could not save:",
             "hintApp": "Edit the text in the boxes, click an <b>alternative reading</b> to use it,\n"
                        " check/uncheck the lines to include. Changes are saved next to the report.<br>\n"
-                       " <b>💾 Save reviewed SRT</b> creates <code>name-revisionato-date.srt</code> next to the video.",
+                       " <b>💾 Save reviewed SRT</b> creates <code>name-reviewed-date.srt</code> next to the video.",
             "confirmReset": "Undo all the changes made in this report?",
             "noneDropped": "None.", "noneGaps": "None.",
             "gapNoSub": "s without subs",
@@ -2089,7 +2089,7 @@ def process_video(video: str, out_path: str, p: OcrParams,
                 "elapsed": stats.elapsed}))
 
         if p.qc_report:
-            qc = Path(out_path).with_suffix(".revisione.html")
+            qc = Path(out_path).with_suffix(".review.html")
             try:
                 write_qc_html(qc, Path(video).name, Path(out_path).name,
                               [s for s in all_segs if s.text],

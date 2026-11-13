@@ -28,7 +28,7 @@ other, and reports through the sidecar events of the protocol (plan, table
   technical text, `error` the one-line summary that also goes in the log,
   `log` the path of the per-file log.
 - outputs go next to the video: `<name>.srt` (or `<name>_YYYYMMDD_HHMMSS.srt`
-  when it exists already), `<name>.revisione.html`, `<name>.log`.
+  when it exists already), `<name>.review.html`, `<name>.log`.
 
 The per-file log is the only text for the user that the engine writes,
 because it is a file next to the video: `lang` ("it" | "en") picks its
@@ -256,7 +256,7 @@ def output_paths(video: Path, qc_report: bool = True,
     return {
         "srt": srt,
         "log": srt.with_suffix(".log"),
-        "report": srt.with_suffix(".revisione.html") if qc_report else None,
+        "report": srt.with_suffix(".review.html") if qc_report else None,
         "existed": existed,
     }
 

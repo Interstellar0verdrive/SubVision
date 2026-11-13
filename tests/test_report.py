@@ -29,7 +29,7 @@ def _fixed_report(tmp_path: Path, lang: str) -> str:
     ]
     gaps = [(10.0, 20.0, "FFF")]
     stats = RunStats(frames=330, ocr_calls=120, segments=3, dropped=2, refined=4, elapsed=12.3)
-    out = tmp_path / f"{lang}.revisione.html"
+    out = tmp_path / f"{lang}.review.html"
     core.write_qc_html(out, "video.mp4", "video.srt", segs, dropped, gaps, stats,
                        OcrParams(), ui_lang=lang)
     return out.read_text(encoding="utf-8")
