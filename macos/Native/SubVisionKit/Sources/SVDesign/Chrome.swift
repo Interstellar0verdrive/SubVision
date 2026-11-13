@@ -30,9 +30,10 @@ public struct SVChrome: Sendable, Equatable {
     public var minWindow = CGSize(width: 720, height: 640)
     /// Width the traffic lights take in the top row (three 14 pt buttons, 6 pt apart).
     public var lightsWidth: CGFloat = 54
-    /// The parameters inspector of Process and Preview (⌥⌘I).
-    public var inspectorWidth: CGFloat = 300
-    /// Below this window width the inspector opens over the page, from the right.
+    /// The parameters panel of Video and Preview (design boards C2-P1–P3, C2-V1).
+    public var inspectorWidth: CGFloat = 340
+    /// Below this window width the panel opens over the page, from the right (C2-N1);
+    /// at this width or more it is always beside the page (design note 50).
     public var inspectorOverlayBelow: CGFloat = 1000
 
     /// SubVision's measures (design boards DS4, E1, N1, N2).
@@ -44,7 +45,7 @@ public struct SVChrome: Sendable, Equatable {
                 page: EdgeInsets = EdgeInsets(top: 28, leading: 28, bottom: 28, trailing: 28),
                 collapseBelow: CGFloat = 1240, window: CGSize = CGSize(width: 1360, height: 840),
                 minWindow: CGSize = CGSize(width: 720, height: 640), lightsWidth: CGFloat = 54,
-                inspectorWidth: CGFloat = 300, inspectorOverlayBelow: CGFloat = 1000) {
+                inspectorWidth: CGFloat = 340, inspectorOverlayBelow: CGFloat = 1000) {
         self.sidebarWidth = sidebarWidth
         self.sidebarInset = sidebarInset
         self.sidebarPadding = sidebarPadding

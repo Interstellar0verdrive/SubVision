@@ -27,7 +27,7 @@ enum DebugSnapshot {
             try? await Task.sleep(for: .seconds(1.5))
             model.tab = .process
             await capture(model, "\(base)-process-empty.png", schemes: schemes)
-            model.tab = .preview
+            model.openPreview(nil)
             await capture(model, "\(base)-preview-empty.png", schemes: schemes)
             model.tab = .fix
             await capture(model, "\(base)-fix-empty.png", schemes: schemes)
@@ -41,7 +41,7 @@ enum DebugSnapshot {
                 try? await Task.sleep(for: .seconds(1))
                 model.selection = []
                 await capture(model, "\(base)-process-videos.png", schemes: schemes)
-                model.tab = .preview
+                model.openPreview(nil)
                 await capture(model, "\(base)-preview-videos.png", schemes: schemes)
                 model.tab = .process
             }
@@ -112,21 +112,20 @@ enum DebugSnapshot {
         }
         let ids = model.videos.prefix(3).map(\.id)
         model.resetOcrParams()
-        model.defaults.set(true, forKey: "inspector.group.ocr")
-        for g in ["dlg", "sig", "seg", "adv"] { model.defaults.set(true, forKey: "inspector.group.\(g)") }
+        model.defaults.set("read", forKey: "inspector.tab")
         model.selection = []
         // I1: the inspector open with the defaults, the list ready.
         model.inspectorOpen = true
         await settle()
         await capture(model, "\(base)-I1.png", schemes: schemes)
-        // I2: groups closed but Segments and Advanced, two values changed.
-        for g in ["ocr", "dlg", "sig"] { model.defaults.set(false, forKey: "inspector.group.\(g)") }
+        // I2: the Lines tab, two values changed (one of them in Reading: its tab gets the dot).
+        model.defaults.set("lines", forKey: "inspector.tab")
         model.defaults.set(1.0, forKey: OcrKey.mergeGap)
         model.defaults.set(1, forKey: OcrKey.skipHamming)
         await settle()
         await capture(model, "\(base)-I2.png", schemes: schemes)
         model.resetOcrParams()
-        for g in ["ocr", "dlg", "sig"] { model.defaults.set(true, forKey: "inspector.group.\(g)") }
+        model.defaults.set("read", forKey: "inspector.tab")
         // E2 / I3: file 2 of 3 with its steps, the first done, the third waiting; the inspector locked.
         model.videos[0].state = .done
         model.videos[0].segments = 312; model.videos[0].dropped = 9; model.videos[0].refined = 588; model.videos[0].elapsed = 5460
@@ -217,7 +216,7 @@ enum DebugSnapshot {
         guard let video = model.videos.first(where: { $0.state == .ready }) else { return }
         let window = WindowSizer.main(model.config)
         model.inspectorOpen = false
-        model.tab = .preview
+        model.openPreview(nil)
         model.selectPreviewVideo(video.id)
         try? await Task.sleep(for: .milliseconds(500))
         await capture(model, "\(base)-A1.png", schemes: schemes)
@@ -252,10 +251,10 @@ enum DebugSnapshot {
         model.preview.results[video.id] = silent
         model.preview.search = .failed(code: "invalid_duration", message: nil)
         let json = #"{"bands":{"bottom":{"text":"","conf":0,"agree":0,"alts":[],"final":"","ms":214,"variants":3,"empty":true},"top":{"text":"IL MERCATO","conf":0.71,"agree":0.67,"alts":["IL MERCAT0","LL MERCATO"],"final":"{\\an8}IL MERCATO","ms":96,"variants":3,"empty":false}}}"#
-        if let reply = try? EngineCoding.decoder.decode(OcrTestReply.self, from: Data(json.utf8)) {
-            model.preview.test = .done(reply, params: model.ocrParams, useIgnore: model.useIgnore, useCorrections: model.useCorrections)
-            model.preview.testFrame = model.previewFrame?.path
-            model.preview.stale = true
+        if let reply = try? EngineCoding.decoder.decode(OcrTestReply.self, from: Data(json.utf8)), let key = model.previewTestKey {
+            var params = model.ocrParams
+            params.minConfidence += 0.05  // older than the parameters: stale
+            model.preview.tests[key] = .done(reply, params: params)
         }
         try? await Task.sleep(for: .milliseconds(600))
         await capture(model, "\(base)-A5.png", schemes: schemes)

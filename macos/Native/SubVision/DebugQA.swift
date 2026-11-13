@@ -3,11 +3,12 @@
 // through the same model methods the buttons and menus call (the shell's
 // `DebugQA.watchCommands`). One command per line; the reply goes to `<file>.out`.
 //
-//   tab process|preview|fix · add <path>[,<path>…] · remove-all · select-all
+//   tab process|review|fix · add <path>[,<path>…] · remove-all · select-all
 //   sidebar · inspector [open|close] · lang en|it · theme system|light|dark
 //   size <w>x<h> · windowid · capture <path> · settings · quit
-//   Preview (F5.2): preview-select, find-frames, stop-frames, wait-frames, frame, band-set,
-//   drag-handle, try-ocr, wait-ocr, preview-state (see the block below)
+//   Preview (F5.2, its own window since C2): preview-open, preview-close, preview-size, preview-capture,
+//   preview-layout, preview-select, preview-menu, find-frames, stop-frames, wait-frames, frame, frames,
+//   frame-bands, band-set, drag-handle, try-ocr, wait-ocr, preview-state (see the block below)
 //   Sub fix (F5.3): fix-open <path> · fix-drop <path>[,<path>…] · fix-option merge|ignore|flash|minDuration <value>
 //   fix-run · wait-fix <s> · fix-state · fix-menu (the two ⌘↩ items and which one AppKit fires)
 //   report-open <path> · report-js <expression> · report-run <statements>
@@ -30,6 +31,9 @@
 //   stop-file [<idx>]              batch.stop for one file, no alert: with <idx> (the batch index, 0-based) the
 //                                  engine stops it only if it is still the one in progress, else "not_running";
 //                                  without it, the file in progress whatever it is. Replies with the engine's answer.
+//   C2 · Video, Review and the panel: inspector-tab read|bands|lines · params-reset (undoable) ·
+//   select <idx>[,<idx>…] (rows of Video; empty deselects) · bottom-bar · remove-selection ·
+//   review-state · review-select <idx> (opens the row of Review) · review <idx> (its report window's title)
 //   F6 · the QA scenarios (macos/Native/QA):
 //   status                         engine status, Vision, tools phase and rows, window, language, tab
 //   wait-ready <s>                 until the engine is ready and the tools window is gone (first launch: downloads)
@@ -138,7 +142,7 @@ enum DebugQA {
         // `wait-step <idx> <key> <s>` (the step reported progress), `states`,
         // `expand <idx>`, `process-again`, `clear-done`, `summary`, `summary-seen`,
         // `inspector-set <key> <value>` (an OcrKey with a number, true/false or text),
-        // `inspector-groups open|closed`).
+        // `inspector-tab read|bands|lines`).
         case "params":
             switch argument {
             case "fast": model.applyOcrParams(.fast)
@@ -226,10 +230,44 @@ enum DebugQA {
             else if let i = Int(p[1]) { model.defaults.set(i, forKey: key) }
             else if let d = Double(p[1]) { model.defaults.set(d, forKey: key) }
             else { model.defaults.set(p[1], forKey: key) }
-        case "inspector-groups":
-            for g in ["ocr", "dlg", "sig", "seg", "adv"] { model.defaults.set(argument == "open", forKey: "inspector.group.\(g)") }
+        case "inspector-tab":
+            // The parameters panel's tab (C2): read, bands or lines.
+            guard ["read", "bands", "lines"].contains(argument) else { return "bad tab" }
+            model.defaults.set(argument, forKey: "inspector.tab")
+        case "params-reset":
+            // "Ripristina" of the panel and View › Restore All Defaults (undoable).
+            model.resetAllParameters()
+            return model.ocrParams == OcrParams() ? "ok · defaults" : "not reset"
+        case "select":
+            // Rows of Video by index ("0,2"), as clicks would; empty deselects.
+            let ids = argument.split(separator: ",").compactMap { Int($0) }.filter { model.videos.indices.contains($0) }.map { model.videos[$0].id }
+            model.selection = Set(ids)
+            return bottomBar(model)
+        case "bottom-bar":
+            return bottomBar(model)
+        case "remove-selection":
+            guard model.canRemoveSelection else { return "cannot remove" }
+            model.removeSelection()
+            return "ok · \(model.videos.count) left"
+        case "review-state":
+            return reviewState(model)
+        case "review-select":
+            guard let idx = Int(argument), model.reviewVideos.indices.contains(idx) else { return "bad index" }
+            let video = model.reviewVideos[idx]
+            model.tab = .review
+            model.reviewSelection = video.id
+            model.run.expanded.insert(video.id)
+            return "ok · \(video.name)"
+        case "review":
+            guard let idx = Int(argument), model.reviewVideos.indices.contains(idx) else { return "bad index" }
+            let video = model.reviewVideos[idx]
+            guard video.outputReport != nil else { return "no report" }
+            model.review(video)
+            _ = await wait(20) { model.report.front?.session.phase == .ready }
+            return model.report.front?.window?.title ?? "no window"
         // F5.2 · Preview (the commands are in `preview(_:_:_:)` below).
-        case "preview-select", "preview-menu", "frames", "frame-bands", "find-frames", "stop-frames", "wait-frames", "frame", "band-set", "drag-handle",
+        case "preview-open", "preview-close", "preview-size", "preview-capture", "preview-layout",
+             "preview-select", "preview-menu", "frames", "frame-bands", "find-frames", "stop-frames", "wait-frames", "frame", "band-set", "drag-handle",
              "try-ocr", "wait-ocr", "preview-state":
             return await preview(command, argument, model)
         // F5.4: the report windows (ReportWindow.swift, ReportBridge.swift).
@@ -333,6 +371,26 @@ enum DebugQA {
     }
 
     /// "status ready · vision true · tools notNeeded · rows - · window 1360x840 · lang it · tab process".
+    /// The bottom bar of Video as it reads: "selection 2 · remove on" (design note 58),
+    /// "running …", or "ready N".
+    private static func bottomBar(_ model: AppModel) -> String {
+        if !model.batch.running, !model.selection.isEmpty {
+            return "selection \(model.selection.count) · \(model.tn("app.process.bar.selected", model.selection.count)) · remove \(model.canRemoveSelection ? "on" : "off")"
+        }
+        if model.batch.running { return "running \(model.batch.index) of \(model.batch.total)" }
+        return "ready \(model.readyVideos.count) · finished \(model.finishedVideos.count)"
+    }
+
+    /// The Review page: "review 2 · a.mp4 lines 12 dropped 0 gaps 1 lang it-IT fps 6 reviewed no · …".
+    private static func reviewState(_ model: AppModel) -> String {
+        let rows = model.reviewVideos.map { v in
+            "\(v.name) lines \(v.segments.map(String.init) ?? "-") dropped \(v.dropped.map(String.init) ?? "-")"
+                + " gaps \(v.gaps.map { String($0.count) } ?? "-") lang \(v.ocrLang ?? "-") fps \(v.ocrFPS.map { String(Int($0)) } ?? "-")"
+                + " report \(v.outputReport != nil ? "yes" : "no") reviewed \(model.hasReviewedSRT(v) ? "yes" : "no")"
+        }
+        return (["review \(rows.count)"] + rows).joined(separator: " · ") + " · sidebar \(model.reviewSubtitle)"
+    }
+
     private static func statusLine(_ model: AppModel) -> String {
         let rows = model.tools.rows.map { "\($0.tool.key)=\($0.state)" }.joined(separator: ",")
         return "status \(model.status) · vision \(model.hello?.vision.description ?? "-") · tools \(model.tools.phase)"
@@ -386,10 +444,21 @@ enum DebugQA {
         return "done \(s.done) failed \(s.failed) stopped \(s.stopped) skipped \(s.skipped) elapsed \(s.elapsed)"
     }
 
-    // MARK: - F5.2 · Preview
+    // MARK: - F5.2 · Preview (its own window, design note 80)
     //
-    //   preview-select <idx>           the list's video (0-based) in Preview, as its item in the Video menu
-    //                                  does (refused when that item is off)
+    //   preview-open [idx]             the Preview window, on the list's video idx (0-based) or on the one chosen
+    //                                  last, as the row's Preview button opens it; a video without frames starts
+    //                                  its search by itself ("ok · <name> · searching")
+    //   preview-close                  closes the Preview window
+    //   preview-size <w>x<h>           the Preview window's size (the whole window, as `size`)
+    //   preview-capture <path>         a PNG of the real Preview window (two, -dark and -light, with
+    //                                  SUBVISION_SNAPSHOT_SCHEME=both)
+    //   preview-layout                 one line: the window's size, the content area, the frame, the thumbnail
+    //                                  rows and their width, the summary, the two panels' heights, then
+    //                                  "fits" or "overflows" (from where the pieces were really drawn)
+    //   preview-select <idx>           the list's video (0-based), as its item in the window's Video menu
+    //                                  does (refused when that item is off; with the window open, a video
+    //                                  without frames starts its search)
     //   preview-menu                   the Video menu's items: "name on|off", the chosen one with ✓
     //   find-frames · stop-frames      Find 20 Frames / Stop
     //   wait-frames <s>                until the search ends (replies with the frames found)
@@ -404,16 +473,52 @@ enum DebugQA {
     //                                  NSEvents sent or posted to the window never reach a SwiftUI
     //                                  DragGesture (it reads the real pointer), so there is no mouse command.
     //   try-ocr · wait-ocr <s>         Try OCR / until it answers (replies with the texts)
-    //   preview-state                  the page's state and the band values in UserDefaults
+    //   preview-state                  the window, the search, the frame, the band values in UserDefaults,
+    //                                  the test of the frame on screen ("test done stale signs": the bands
+    //                                  whose panel says "Superato")
 
     private static func preview(_ command: String, _ argument: String, _ model: AppModel) async -> String {
         let args = argument.split(separator: " ").map(String.init)
         switch command {
+        case "preview-open":
+            var id: UUID?
+            if !argument.isEmpty {
+                guard let i = Int(argument), model.videos.indices.contains(i) else { return "bad index" }
+                guard model.canPreview(model.videos[i]) else { return "menu item off · \(model.videos[i].name)" }
+                id = model.videos[i].id
+            }
+            model.openPreview(id)
+            _ = await wait(5) { model.preview.window?.window?.isVisible == true }
+            try? await Task.sleep(for: .milliseconds(600))
+            guard model.preview.window != nil else { return "no preview window" }
+            return "ok · \(model.previewVideo?.name ?? "none")" + (model.isSearchingFrames ? " · searching" : "")
+        case "preview-close":
+            guard let controller = model.preview.window else { return "no preview window" }
+            controller.close()
+            return "ok"
+        case "preview-size":
+            let dims = argument.split(separator: "x").compactMap { Double($0) }
+            guard dims.count == 2, let window = model.preview.window?.window else { return dims.count == 2 ? "no preview window" : "bad size" }
+            // As a resize by hand would end: never below the window's minimum.
+            let min = PreviewWindowController.minSize
+            let size = NSSize(width: max(dims[0], min.width), height: max(dims[1], min.height))
+            var frame = window.frame
+            frame.origin.y += frame.height - size.height
+            frame.size = size
+            window.setFrame(frame, display: true)
+            try? await Task.sleep(for: .milliseconds(600))
+            return "ok · \(Int(window.frame.width))x\(Int(window.frame.height)) · min \(Int(min.width))x\(Int(min.height))"
+        case "preview-capture":
+            guard let controller = model.preview.window else { return "no preview window" }
+            try? await Task.sleep(for: .milliseconds(400))
+            let written = await controller.capture(argument, schemes: SVShell.DebugSnapshot.schemes(model.config))
+            return written.joined(separator: " ")
+        case "preview-layout":
+            return previewLayout(model)
         case "preview-select":
             guard let i = Int(argument), model.videos.indices.contains(i) else { return "bad index" }
             guard model.canPreview(model.videos[i]) else { return "menu item off · \(model.videos[i].name)" }
-            model.tab = .preview
-            model.selectPreviewVideo(model.videos[i].id)
+            model.choosePreviewVideo(model.videos[i].id)
             return "ok · \(model.videos[i].name)"
         case "preview-menu":
             return model.videos.map { v in
@@ -468,7 +573,7 @@ enum DebugQA {
             guard args.count == 4, let band = PreviewBand(rawValue: args[0]), let handle = BandHandle(rawValue: args[1]),
                   let dx = Double(args[2]), let dy = Double(args[3]) else { return "bad arguments" }
             let rect = model.preview.frameRect
-            guard rect.width > 0 else { return "no frame on screen" }
+            guard rect.width > 0, model.preview.window != nil else { return "no frame on screen" }
             let bandRect = BandGeometry.rect(band, height: BandValues.height(band), width: BandValues.width(band), in: rect.size)
             let start: CGPoint
             switch handle {
@@ -487,8 +592,8 @@ enum DebugQA {
         case "wait-ocr":
             let ended = await wait(Double(argument) ?? 120) { !model.isReadingOCR }
             guard ended else { return "timeout" }
-            switch model.preview.test {
-            case .done(let reply, _, _, _)?:
+            switch model.previewTest {
+            case .done(let reply, _)?:
                 let bottom = reply.bottom.map { "bottom \"\(oneLine($0.text))\" → \"\(oneLine($0.finalText))\" conf \($0.conf) agree \($0.agree) \(Int($0.ms)) ms" } ?? "bottom —"
                 let top = reply.top.map { " · top \"\(oneLine($0.text))\" → \"\(oneLine($0.finalText))\"" } ?? ""
                 return bottom + top
@@ -510,14 +615,64 @@ enum DebugQA {
     }
 
     private static func previewState(_ model: AppModel) -> String {
-        var parts = ["video \(model.previewVideo?.name ?? "none")", "search \(model.preview.search)"]
+        let window = model.preview.window?.window
+        var parts = ["window \(window?.isVisible == true ? "open" : "closed")\(model.preview.windowKey ? " key" : "")",
+                     "video \(model.previewVideo?.name ?? "none")", "search \(model.preview.search)"]
         if let r = model.previewResult { parts.append("frames \(r.frames.count) found \(r.found) index \(r.index + 1) bands \(model.previewFrame.map { $0.bands.isEmpty ? "none" : $0.bands.joined(separator: "+") } ?? "none")") }
         parts.append(bandValues())
-        parts.append("test \(model.preview.test == nil ? "none" : model.isReadingOCR ? "reading" : "done")" + (model.preview.stale ? " stale" : ""))
+        let stale = PreviewBand.allCases.filter { model.previewStale($0) }.map(\.rawValue)
+        let test: String
+        switch model.previewTest {
+        case nil: test = "none"
+        case .reading?: test = "reading"
+        case .done?: test = "done"
+        case .failed?: test = "failed"
+        }
+        parts.append("test \(test)" + (stale.isEmpty ? "" : " stale " + stale.joined(separator: "+")))
+        parts.append("tests \(model.preview.tests.count)")
         parts.append("batch \(model.batch.running)")
         let r = model.preview.frameRect
         parts.append("frame \(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))")
         return parts.joined(separator: " · ")
+    }
+
+    /// `preview-layout`: what was really drawn, and whether it all fits the content area
+    /// (the block inside it, the arrows too, the thumbnail rows as wide as the frame, the
+    /// two panels as tall as each other and at least `PreviewLayout.panelsMin`).
+    private static func previewLayout(_ model: AppModel) -> String {
+        guard let window = model.preview.window?.window else { return "no preview window" }
+        let rects = PreviewMetrics.rects
+        guard let content = rects["content"], let frame = rects["frame"] else { return "nothing drawn" }
+        func size(_ r: CGRect) -> String { "\(fmt(r.width))x\(fmt(r.height))" }
+        func inside(_ r: CGRect) -> Bool {
+            r.minX >= content.minX - 0.5 && r.maxX <= content.maxX + 0.5 && r.minY >= content.minY - 0.5 && r.maxY <= content.maxY + 0.5
+        }
+        var parts = ["window \(Int(window.frame.width))x\(Int(window.frame.height))", "content \(size(content))"]
+        var fits = inside(frame)
+        let framesShown = model.previewResult.map { !$0.frames.isEmpty } == true && !model.isSearchingFrames
+        if framesShown, let thumbs = rects["thumbs"], let summary = rects["summary"],
+           let dialogue = rects["panel.dialogue"], let signs = rects["panel.signs"] {
+            let layout = PreviewMetrics.layout
+            parts.append("frame \(size(frame))")
+            parts.append("thumbs \(PreviewLayout.rows)x\(PreviewLayout.columns) \(fmt(layout?.thumbWidth ?? 0))x\(fmt(layout?.thumbHeight ?? 0)) rows \(fmt(thumbs.width))")
+            parts.append("summary \(fmt(summary.width))")
+            parts.append("panels \(fmt(dialogue.height))/\(fmt(signs.height))")
+            let arrows = frame.minX - PreviewLayout.arrow >= content.minX - 0.5 && frame.maxX + PreviewLayout.arrow <= content.maxX + 0.5
+            let bottomGap = content.maxY - max(dialogue.maxY, signs.maxY)
+            parts.append("bottom \(fmt(bottomGap))")
+            fits = fits && arrows && [thumbs, summary, dialogue, signs].allSatisfy(inside)
+                && abs(thumbs.width - frame.width) < 0.5 && abs(dialogue.height - signs.height) < 0.5
+                && dialogue.height >= PreviewLayout.panelsMin - 1 && bottomGap >= PreviewLayout.bottom - 1
+                && abs(dialogue.minX - frame.minX) < 0.5 && abs(signs.maxX - frame.maxX) < 0.5
+        } else {
+            parts.append("placeholder \(size(frame))")
+        }
+        parts.append(fits ? "fits" : "overflows")
+        return parts.joined(separator: " · ")
+    }
+
+    private static func fmt(_ v: CGFloat) -> String {
+        v == v.rounded() ? "\(Int(v))" : String(format: "%.1f", v)
     }
 
     /// Everything Sub fix shows and sends, one line: path, options, the shared parameters, the outcome.

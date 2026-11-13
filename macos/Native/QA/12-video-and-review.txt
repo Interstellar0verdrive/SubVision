@@ -1,0 +1,72 @@
+# C2 (design notes 58, 60, 80; boards C2-V1–V5, C2-R1): the Video page with the
+# drop area under the list and the selection bar, a fast batch of two with the
+# end-of-batch sheet, the Review page (lines, dropped, gaps, language and fps of
+# each file, the sidebar's count) and the review window's title. Captures in
+# dark and light.
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
+@launch
+wait-ready 600
+? ^ready
+lang it
+theme dark
+size 1360x840
+params fast
+inspector-set langHint it-IT
+inspector-tab read
+tab review
+review-state
+? ^review 0 · sidebar Nessun video elaborato$
+capture $OUT/R-empty-dark.png
+? R-empty-dark.png$
+tab process
+add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4
+capture $OUT/V1-dark.png
+? V1-dark.png$
+theme light
+capture $OUT/V1-light.png
+? V1-light.png$
+theme dark
+select 0,1
+? ^selection 2 · 2 selezionati · remove on$
+capture $OUT/V2-dark.png
+? V2-dark.png$
+select
+? ^ready 2 · finished 0$
+start
+? status ready
+wait-step 0 ocr 300
+? ^ok
+capture $OUT/V3-dark.png
+? V3-dark.png$
+wait-batch 900
+? ^batch done · done 2 failed 0 stopped 0 skipped 0
+capture-all $OUT/V5-dark.png
+? V5-dark.png$
+summary-seen
+capture $OUT/V-done-dark.png
+? V-done-dark.png$
+review-state
+? ^review 2 · sintel_ita_hardsub_demo\.mp4 lines [0-9]+ dropped [0-9]+ gaps [0-9]+ lang it-IT fps 6 report yes reviewed no
+? sidebar 2 elaborati$
+review-select 0
+? ^ok · sintel_ita_hardsub_demo\.mp4$
+capture $OUT/R1-dark.png
+? R1-dark.png$
+theme light
+capture $OUT/R1-light.png
+? R1-light.png$
+theme dark
+review 0
+? ^Revisione · sintel_ita_hardsub_demo\.mp4$
+report-close all
+lang en
+review 1
+? ^Review · sintel_eng_hardsub_demo\.mp4$
+report-close all
+lang it
+# Process Again takes a file off Review.
+process-again
+review-state
+? ^review 0 
+params default
+inspector-tab read

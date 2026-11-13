@@ -36,12 +36,12 @@ struct AppCommands: Commands {
         }
         CommandGroup(after: .newItem) {
             Divider()
-            // F5.1: the finished row selected, when its report or log is on disk.
+            // Review (⌘R): the finished row selected on Video, the row selected on Review.
             Button(model.t("app.menu.open_report")) {
-                if let report = model.selectedFinished?.outputReport { model.openReport(report) }
+                if let video = model.reviewTarget { model.review(video) }
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(model.selectedFinished?.outputReport == nil || model.tab != .process)
+            .disabled(model.reviewTarget?.outputReport == nil)
             Button(model.t("app.menu.show_in_finder")) { model.showInFinder(model.selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(model.selection.isEmpty)
@@ -60,16 +60,19 @@ struct AppCommands: Commands {
                 .disabled(model.tab != .process || model.videos.isEmpty)
         }
         CommandGroup(before: .sidebar) {
-            Button(model.t("app.sidebar.tab.process")) { model.tab = .process }.keyboardShortcut("1", modifiers: .command)
-            Button(model.t("app.sidebar.tab.preview")) { model.tab = .preview }.keyboardShortcut("2", modifiers: .command)
-            Button(model.t("app.sidebar.tab.fix")) { model.tab = .fix }.keyboardShortcut("3", modifiers: .command)
+            Button(model.t("app.sidebar.tab.process")) { model.showPage(.process) }.keyboardShortcut("1", modifiers: .command)
+            Button(model.t("app.sidebar.tab.review")) { model.showPage(.review) }.keyboardShortcut("2", modifiers: .command)
+            Button(model.t("app.sidebar.tab.fix")) { model.showPage(.fix) }.keyboardShortcut("3", modifiers: .command)
             Divider()
             Button(model.t(model.sidebarShown ? "app.menu.hide_sidebar" : "app.menu.show_sidebar")) { model.toggleSidebar() }
                 .keyboardShortcut("s", modifiers: [.control, .command])
                 .disabled(model.sidebarNarrow)
+            // The panel is fixed beside a wide page (design note 50): only a narrow window shows and hides it.
             Button(model.t(model.inspectorOpen ? "app.menu.hide_inspector" : "app.menu.show_inspector")) { model.toggleInspector() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
-                .disabled(model.tab == .fix)
+                .disabled(model.tab != .process || !model.inspectorOverlays)
+            Button(model.t("app.menu.restore_defaults")) { model.resetAllParameters() }
+                .disabled(model.batch.running)
             Divider()
         }
         CommandMenu(model.t("app.menu.process")) {
@@ -83,18 +86,22 @@ struct AppCommands: Commands {
                 .keyboardShortcut(".", modifiers: .command)
                 .disabled(!model.batch.running)
             Divider()
-            // F5.2: Preview, only on its page.
+            // The Preview window (design note 80): on the row selected, else on the video shown last.
+            Button(model.t("app.menu.preview")) { model.openPreview(model.selectedSingle?.id) }
+                .keyboardShortcut("y", modifiers: .command)
+                .disabled(model.videos.isEmpty)
+            // In the Preview window, when it is the key window.
             Button(model.t("app.menu.find_frames")) { model.findFrames() }
-                .disabled(model.tab != .preview || !model.canFindFrames)
+                .disabled(!model.preview.windowKey || !model.canFindFrames)
             Button(model.t("app.menu.try_ocr")) { model.tryOCR() }
                 .keyboardShortcut("t", modifiers: .command)
-                .disabled(model.tab != .preview || !model.canTryOCR)
+                .disabled(!model.preview.windowKey || !model.canTryOCR)
             Button(model.t("app.menu.prev_frame")) { model.previousFrame() }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
-                .disabled(model.tab != .preview || !model.canBrowseFrames)
+                .disabled(!model.preview.windowKey || !model.canBrowseFrames)
             Button(model.t("app.menu.next_frame")) { model.nextFrame() }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
-                .disabled(model.tab != .preview || !model.canBrowseFrames)
+                .disabled(!model.preview.windowKey || !model.canBrowseFrames)
             Divider()
             // F5.3: active only on the Sub fix page, where Start is not (design note 15).
             Button(model.t("app.menu.run_fix")) { model.runFix() }
@@ -104,6 +111,8 @@ struct AppCommands: Commands {
         CommandGroup(after: .windowArrangement) {
             Button(model.t("app.menu.main_window")) { openWindow(id: model.config.mainWindowID) }
                 .keyboardShortcut("0", modifiers: .command)
+            Button(model.t("app.menu.preview_window")) { model.openPreview(nil) }
+                .disabled(model.videos.isEmpty)
         }
         CommandGroup(replacing: .help) {
             Button(model.t("app.menu.guide")) { NSWorkspace.shared.open(AppConfig.guideURL) }

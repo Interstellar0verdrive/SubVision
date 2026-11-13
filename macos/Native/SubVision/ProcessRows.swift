@@ -33,8 +33,16 @@ extension VideoItem {
 /// finished row, the context menu and ⌫ act on the selection.
 struct VideoRow: View {
     @Environment(AppModel.self) private var model
+    /// The widths of the number and action columns (`VideoList.widths`).
+    struct Widths: Equatable {
+        var duration: CGFloat
+        var fps: CGFloat
+        var size: CGFloat?
+        var actions: CGFloat
+    }
+
     var video: VideoItem
-    var widths: (duration: CGFloat, fps: CGFloat, size: CGFloat?, actions: CGFloat)
+    var widths: Widths
     /// Some row of the list has a state: every row keeps the circle's column (design note 63).
     var showsStatus = true
     @State private var hover = false
@@ -71,17 +79,21 @@ struct VideoRow: View {
                         Color.clear.frame(width: StatusCircle.size, height: StatusCircle.size)
                     }
                 }
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(video.name).svFont(12.5).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
+                        Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
                         if video.state == .ready, video.srtExists {
                             StatusChip(model.t("app.process.row.srt_exists"))
                                 .help(model.t("app.process.row.srt_exists_help", ["name": renamedSRT]))
                         }
                     }
-                    // Without the size column (a narrow list) the resolution goes next to the folder (design note 59).
-                    Text(widths.size == nil ? [video.size, video.folder].compactMap { $0 }.joined(separator: model.t("app.common.list_separator")) : video.folder)
-                        .svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
+                    // Without the size column (a narrow list) the resolution follows the folder (`.fline`, design note 59).
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(video.folder).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
+                        if widths.size == nil, let size = video.size {
+                            Text("· \(size)").svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).fixedSize()
+                        }
+                    }
                     statusLine
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -102,7 +114,7 @@ struct VideoRow: View {
             if running || video.state == .failed {
                 if running {
                     // A light line between the row's head and its steps, from the text to the right edge (design note 65).
-                    Rectangle().fill(SV.line).frame(height: 1)
+                    Rectangle().fill(SV.detailLine).frame(height: 1)
                         .padding(.leading, textInset)
                         .padding(.trailing, -16)
                         .padding(.top, 2)
@@ -121,7 +133,8 @@ struct VideoRow: View {
         }
         .padding(.leading, 13)
         .padding(.trailing, 16)
-        .background(selected ? SV.sel : running ? SV.soft.opacity(0.6) : hover ? SV.hoverVeil : .clear)
+        // The selection a step softer than the sidebar's (design note 58, `.fr.selr`).
+        .background(selected ? SV.selSoft : running ? SV.soft : hover ? SV.hoverVeil : .clear)
         .overlay(alignment: .leading) { Rectangle().fill(edge).frame(width: 3) }
         .contentShape(Rectangle())
         .onHover { hover = $0 }
@@ -260,7 +273,7 @@ struct RowMenu: View {
         if video.state.isFinished {
             Divider()
             if video.state != .failed, video.state != .stopped {
-                Button(model.t("app.process.row.open_report")) { if let r = video.outputReport { model.openReport(r) } }
+                Button(model.t("app.process.row.review")) { model.review(video) }
                     .disabled(video.outputReport == nil)
                 Button(model.t("app.process.row.open_srt")) { model.openSRT(video) }
                     .disabled(!FileManager.default.fileExists(atPath: video.outputSRT.path))
@@ -274,9 +287,9 @@ struct RowMenu: View {
     }
 }
 
-/// The actions column (236 pt): Stop on the running row; Open Report and ⋯
-/// on a finished one; Open Log and Process Again on a failed one; Process
-/// Again on a stopped one.
+/// The actions column (`.acts` of the C2 boards): Preview on a row ready for the batch,
+/// Stop on the running one, Review and ⋯ on a finished one, Open Log and ⋯ on a failed
+/// one, Process Again on a stopped one; nothing while a row waits in the batch.
 struct RowActions: View {
     @Environment(AppModel.self) private var model
     var video: VideoItem
@@ -284,25 +297,25 @@ struct RowActions: View {
     var body: some View {
         HStack(spacing: 6) {
             switch video.state {
+            case .ready:
+                Button { model.openInPreview(video.id) } label: { Label(model.t("app.process.row.preview"), systemImage: "viewfinder") }
+                    .svButton(.secondary, .small)
+                    .disabled(!model.canPreview(video))
+                    .help(model.t("app.process.row.preview_help"))
             case .running:
                 Button { model.stopCurrentFile() } label: { Label(model.t("app.common.stop"), systemImage: "stop.fill") }
                     .svButton(.secondary, .small)
+                    .help(model.t("app.process.row.stop_help"))
             case .done, .noSubs:
-                Button { if let r = video.outputReport { model.openReport(r) } } label: {
-                    Label(model.t("app.process.row.open_report"), systemImage: "doc.text")
-                }
-                .svButton(.secondary, .small)
-                .disabled(video.outputReport == nil)
-                PopupMenu({ moreItems }) {
-                    Image(systemName: "ellipsis").svFont(13, .semibold).foregroundStyle(SV.text2)
-                        .frame(width: 24, height: 24).contentShape(Rectangle())
-                }
-                .help(model.t("app.process.row.more"))
-                .accessibilityLabel(model.t("app.process.row.more"))
+                Button { model.review(video) } label: { Label(model.t("app.process.row.review"), systemImage: "doc.text.magnifyingglass") }
+                    .svButton(.secondary, .small)
+                    .disabled(video.outputReport == nil)
+                    .help(model.t(video.outputReport == nil ? "app.process.row.review_none" : "app.process.row.review_help"))
+                more
             case .failed:
                 Button(model.t("app.process.row.open_log")) { model.openLog(video) }.svButton(.secondary, .small)
                     .disabled(!video.logExists)
-                Button(model.t("app.process.row.process_again")) { model.processAgain([video.id]) }.svButton(.secondary, .small)
+                more
             case .stopped:
                 Button(model.t("app.process.row.process_again")) { model.processAgain([video.id]) }.svButton(.secondary, .small)
             default:
@@ -311,13 +324,26 @@ struct RowActions: View {
         }
     }
 
+    private var more: some View {
+        PopupMenu({ moreItems }) {
+            Image(systemName: "ellipsis").svFont(13, .semibold).foregroundStyle(SV.text2)
+                .frame(width: 22, height: 22).contentShape(Rectangle())
+        }
+        .help(model.t("app.process.row.more"))
+        .accessibilityLabel(model.t("app.process.row.more"))
+    }
+
     private var moreItems: [SVMenuItem] {
-        [.item(model.t("app.common.show_in_finder")) { model.showInFinder([video.id]) },
-         .item(model.t("app.process.row.open_srt"), enabled: FileManager.default.fileExists(atPath: video.outputSRT.path)) { model.openSRT(video) },
-         .item(model.t("app.process.row.open_log"), enabled: video.logExists) { model.openLog(video) },
-         .separator,
-         .item(model.t("app.process.row.process_again")) { model.processAgain([video.id]) },
-         .item(model.t("app.process.row.remove")) { model.removeWithUndo([video.id]) }]
+        var items: [SVMenuItem] = [.item(model.t("app.common.show_in_finder")) { model.showInFinder([video.id]) }]
+        if video.state != .failed {
+            items.append(.item(model.t("app.process.row.open_srt"), enabled: FileManager.default.fileExists(atPath: video.outputSRT.path)) { model.openSRT(video) })
+            items.append(.item(model.t("app.process.row.open_log"), enabled: video.logExists) { model.openLog(video) })
+        }
+        items.append(.item(model.t("app.process.row.open_in_preview"), enabled: model.canPreview(video)) { model.openInPreview(video.id) })
+        items += [.separator,
+                  .item(model.t("app.process.row.process_again")) { model.processAgain([video.id]) },
+                  .item(model.t("app.process.row.remove")) { model.removeWithUndo([video.id]) }]
+        return items
     }
 }
 
@@ -576,18 +602,17 @@ struct FinishedDetail: View {
         HStack(alignment: .top, spacing: 18) {
             if let times = video.times, !times.isEmpty {
                 VStack(alignment: .leading, spacing: 5) {
-                    label(model.t("app.process.row.times"))
+                    // "TEMPI · DIALOGHI · CARTELLI": the bands in the order of the values (board C2-R1).
+                    label(([model.t("app.process.row.times")] + bands.map { model.bandName($0) }).joined(separator: model.t("app.common.list_separator")))
                     Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
                         ForEach(keys, id: \.self) { key in
                             GridRow {
                                 Text(model.stepName(key)).svFont(11.5).foregroundStyle(SV.text2).lineLimit(1).fixedSize()
-                                Text(bands.compactMap { times["\(key):\($0)"].map(Localizer.clock) }.joined(separator: model.t("app.common.list_separator")))
+                                Text(bands.compactMap { times["\(key):\($0)"].map(stepTime) }.joined(separator: model.t("app.common.list_separator")))
                                     .svFont(SVFont.smallNumbers).foregroundStyle(SV.textCode)
                             }
                         }
                     }
-                    Text(bands.map { model.bandName($0) }.joined(separator: model.t("app.common.list_separator")))
-                        .svFont(11).foregroundStyle(SV.text3).padding(.top, 2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -621,6 +646,11 @@ struct FinishedDetail: View {
 
     private func label(_ text: String) -> some View {
         Text(text.uppercased()).svFont(10.5, .semibold).foregroundStyle(SV.text3).tracking(0.3).padding(.bottom, 2)
+    }
+
+    /// "00:04", or "meno di 1 s" for a step under a second (as the steps say it, design note 64).
+    private func stepTime(_ seconds: Double) -> String {
+        seconds < 1 ? model.t("app.process.row.under_second") : Localizer.clock(seconds)
     }
 
     private func file(_ kind: String, _ url: URL, exists: Bool) -> some View {

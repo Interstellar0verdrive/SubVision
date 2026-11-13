@@ -44,6 +44,8 @@ final class ReportSession {
     #endif
 
     var name: String { url.lastPathComponent }
+    /// "Revisione · _test-1.mkv": the window's title and its title row (C2 boards).
+    var title: String { model.t("app.report.window_title", ["name": model.reviewName(for: url)]) }
 
     init(url: URL, model: AppModel) {
         self.url = url
@@ -158,10 +160,10 @@ struct ReportView: View {
         HStack(spacing: 12) {
             TrafficLightsSlot()
             HStack(spacing: 8) {
-                Image(systemName: "doc")
+                Image(systemName: "doc.text.magnifyingglass")
                     .svFont(13)
                     .foregroundStyle(SV.text2)
-                Text(verbatim: session.name)
+                Text(verbatim: session.title)
                     .svFont(13, .semibold)
                     .foregroundStyle(SV.text)
                     .lineLimit(1)
@@ -318,7 +320,7 @@ final class ReportWindowController: NSWindowController, NSWindowDelegate {
                               backing: .buffered, defer: false)
         super.init(window: window)
         window.isReleasedWhenClosed = false
-        window.title = session.name
+        window.title = session.title
         window.identifier = NSUserInterfaceItemIdentifier("report")
         window.minSize = Self.minSize
         window.delegate = self

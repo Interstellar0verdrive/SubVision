@@ -64,6 +64,8 @@ public enum SV {
     public static let glassLine = Color(dark: "rgba(255,255,255,.10)", light: "rgba(0,0,0,.12)")
     public static let line = Color(dark: "#26292E", light: "#E1E4E8")
     public static let boxLine = Color(dark: "rgba(255,255,255,.22)", light: "rgba(0,0,0,.25)")
+    /// The line between the head of a running row and its steps (white 12 % in dark).
+    public static let detailLine = Color(dark: "rgba(255,255,255,.12)", light: "rgba(0,0,0,.10)")
 
     // Text
     public static let text = Color(dark: "#E8EAED", light: "#16181B")
@@ -80,6 +82,12 @@ public enum SV {
     public static let primaryText = Color(dark: "#2AC9DE", light: "#206CA1")
     public static let focus = Color(dark: "rgba(42,201,222,.5)", light: "rgba(39,147,219,.45)")
     public static let sel = Color(dark: "rgba(42,201,222,.16)", light: "rgba(39,147,219,.14)")
+    /// A selected row of a list: a softer `sel`, so the rows under it still read (design note 58).
+    public static let selSoft = Color(dark: "rgba(42,201,222,.10)", light: "rgba(39,147,219,.09)")
+    /// The system's controls (switches, slider fills, the highlight of the menus): the deep cyan of the
+    /// `AccentColor` asset in dark, so white reads on it (4.9 : 1, design note 53); the app's own
+    /// components keep `primary`. Light: the same blue as `primary`.
+    public static let sysAccent = Color(dark: "#0E7C8C", light: "#0275B6")
     public static let soft = Color(dark: "rgba(42,201,222,.07)", light: "rgba(39,147,219,.07)")
     public static let softLine = Color(dark: "rgba(42,201,222,.28)", light: "rgba(39,147,219,.28)")
     public static let track = Color(dark: "#2A2E34", light: "#DADDE2")

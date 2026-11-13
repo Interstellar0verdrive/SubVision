@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-// The end-of-batch sheet (design board E6): the outcomes in the title, one
-// row per file of the batch with Open Report or Open Log, Show SRTs in
-// Finder, OK. It stays "unseen" until closed: the notification's click and
+// The end-of-batch sheet (design boards E6, C2-V5): the outcomes in the title,
+// one row per file of the batch with Review or Open Log; Show SRTs in Finder
+// on the left, Close and Go to Review (the default) on the right. It stays "unseen" until closed: the notification's click and
 // the next launch bring it back (`AppModel.loadSummary`). The shape follows
 // the FinishedSheet of the native macOS app of AnimeUp (by the same author).
 
@@ -29,7 +29,7 @@ struct FinishedSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).svFont(15, .semibold).foregroundStyle(SV.text)
+            Text(title).svFont(16, .bold).foregroundStyle(SV.text)
             // No "the batch took 2 min" (design note 69): each row says how long its file took.
             Text(model.t("app.process.finished.text"))
                 .svSmall().fixedSize(horizontal: false, vertical: true)
@@ -41,11 +41,20 @@ struct FinishedSheet: View {
             }
             .svBox(RoundedRectangle(cornerRadius: SV.Radius.card), fill: SV.surface, line: SV.line, padding: EdgeInsets())
             HStack(spacing: 8) {
-                Spacer()
                 if rows.contains(where: { $0.state == .done }) {
-                    Button(model.t("app.process.finished.show_all")) { model.showSummarySRTs() }.svButton(.secondary, .regular)
+                    Button { model.showSummarySRTs() } label: {
+                        Label(model.t("app.process.finished.show_all"), systemImage: "macwindow")
+                    }
+                    .svButton(.secondary, .regular)
                 }
-                Button(model.t("app.common.ok")) { model.markSummarySeen() }
+                Spacer()
+                Button(model.t("app.common.close")) { model.markSummarySeen() }
+                    .svButton(.secondary, .regular)
+                    .keyboardShortcut(.cancelAction)
+                Button {
+                    model.markSummarySeen()
+                    model.tab = .review
+                } label: { Label(model.t("app.process.finished.go_review"), systemImage: "doc.text.magnifyingglass") }
                     .svButton(.primary, .regular)
                     .keyboardShortcut(.defaultAction)
             }
@@ -92,9 +101,12 @@ struct SummaryRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if video.state == .done || video.state == .noSubs {
-                Button(model.t("app.process.finished.show_report")) { if let r = video.outputReport { model.openReport(r) } }
-                    .svButton(.secondary, .small)
-                    .disabled(video.outputReport == nil)
+                Button { model.review(video) } label: {
+                    Label(model.t("app.process.row.review"), systemImage: "doc.text.magnifyingglass")
+                }
+                .svButton(.secondary, .small)
+                .disabled(video.outputReport == nil)
+                .help(model.t("app.process.row.review_help"))
             } else {
                 Button(model.t("app.process.row.open_log")) { model.openLog(video) }
                     .svButton(.secondary, .small)

@@ -9,14 +9,18 @@ import Observation
 import SVShell
 import SwiftUI
 
+/// The pages of the sidebar (design note 80): Video (the list, the parameters, Start),
+/// Review (the videos processed), then Sub fix among the tools. Preview is a window of
+/// its own (`PreviewWindow.swift`). `process` keeps its raw value: the notifications
+/// and the QA scenarios name the pages by it.
 enum Tab: String, CaseIterable, Identifiable {
-    case process, preview, fix
+    case process, review, fix
     var id: String { rawValue }
 
     var symbol: String {
         switch self {
         case .process: "captions.bubble"
-        case .preview: "viewfinder"
+        case .review: "doc.text.magnifyingglass"
         case .fix: "text.badge.checkmark"
         }
     }
@@ -55,6 +59,8 @@ final class AppModel {
     /// The window is narrower than `SVChrome.collapseBelow`: no sidebar, the top bar instead.
     var sidebarNarrow = false
     var sidebarShown = true
+    /// The main window's width (the parameters lie over the page below 1000 pt).
+    var mainWindowWidth: CGFloat = 1360
     var inspectorOpen: Bool { didSet { defaults.set(inspectorOpen, forKey: DefaultsKey.inspectorOpen) } }
     /// Goes up by one to open the inspector's language menu (O7's "Choose the Language").
     var languageMenuRequest = 0
@@ -67,6 +73,8 @@ final class AppModel {
     // Process (F4.4)
     var videos: [VideoItem] = []
     var selection: Set<UUID> = []
+    /// The row selected on the Review page (⌘R reviews it).
+    var reviewSelection: UUID?
     /// Items dropped that are not videos: the yellow note over the list, until closed.
     var skippedItems: [String] = []
     var batch = BatchActivity()
@@ -203,6 +211,11 @@ final class AppModel {
             guard let self else { return }
             reopenMainWindow()
             if let page = info["page"], let tab = Tab(rawValue: page) { self.tab = tab }
+            // A file's notification opens its row on Review.
+            if let id = info["video"].flatMap(UUID.init) {
+                self.reviewSelection = id
+                self.run.expanded.insert(id)
+            }
         }
         tools.warmupLanguages = [ocrLanguage]
         tools.prepareIfFirstLaunch(stateFolder: configuration.stateFolder)
@@ -347,11 +360,32 @@ final class AppModel {
 
     func toggleInspector() { inspectorOpen.toggle() }
 
+    /// The main window is narrow enough for the parameters to lie over the page (below 1000 pt):
+    /// only then they can be shown and hidden (design note 50).
+    var inspectorOverlays: Bool { config.chrome.inspectorOverlays(windowWidth: mainWindowWidth) }
+
+    /// View › Video, Review, Sub fix (⌘1–⌘3): the main window, on that page.
+    func showPage(_ page: Tab) {
+        tab = page
+        reopenMainWindow()
+    }
+
+    /// The one row selected on Video, if one.
+    var selectedSingle: VideoItem? {
+        guard selection.count == 1, let id = selection.first else { return nil }
+        return videos.first { $0.id == id }
+    }
+
+    /// What Review (⌘R) opens: the row selected on Review, else the finished row selected on Video.
+    var reviewTarget: VideoItem? {
+        tab == .review ? selectedReview : (tab == .process ? selectedFinished : nil)
+    }
+
     /// O7's "Choose the Language": Process with the inspector open on the OCR
     /// group, and the language menu opened once the inspector has slid in.
     func showLanguageMenu() {
         tab = .process
-        defaults.set(true, forKey: "inspector.group.ocr")
+        defaults.set("read", forKey: "inspector.tab")
         let wasOpen = inspectorOpen
         inspectorOpen = true
         Task {

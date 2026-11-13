@@ -172,12 +172,14 @@ enum DebugCapture {
     /// The main window, and each alert panel over it drawn where it is on screen.
     private static func captureAll(_ model: AppModel, _ path: String, schemes: [ColorScheme]) async -> [String] {
         guard let main = WindowSizer.main(model.config) else { return [] }
-        return await perScheme(path, schemes, { [main] + alertPanels() }) { p in
+        // The alerts and the sheet hanging on the main window (the end-of-batch sheet, C2-V5).
+        let panels = { alertPanels() + [main.attachedSheet].compactMap { $0 } }
+        return await perScheme(path, schemes, { [main] + panels() }) { p in
             guard let base = bitmap(main) else { return false }
             guard let context = NSGraphicsContext(bitmapImageRep: base) else { return false }
             NSGraphicsContext.saveGraphicsState()
             NSGraphicsContext.current = context
-            for panel in alertPanels() {
+            for panel in panels() {
                 guard let rep = bitmap(panel) else { continue }
                 let f = panel.frame, m = main.frame
                 let image = NSImage(size: f.size)

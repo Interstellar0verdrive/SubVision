@@ -22,9 +22,12 @@ inspector open
 capture $OUT/N2.png
 ? N2.png$
 inspector close
-tab preview
-capture $OUT/N1-preview.png
-? N1-preview.png$
+tab review
+capture $OUT/N1-review.png
+? N1-review.png$
+tab fix
+capture $OUT/N1-fix.png
+? N1-fix.png$
 tab process
 size 1360x840
 window-size

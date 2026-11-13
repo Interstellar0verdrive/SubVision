@@ -1,0 +1,38 @@
+# C2 (design notes 74, 75; boards C2-S1, S2): Sub fix in two columns with the
+# parameters shared with Video. A value changed in the parameters panel shows
+# in Sub fix and the other way round (the same UserDefaults keys); the page in
+# a narrow window has one column.
+! printf '1\n00:00:01,000 --> 00:00:02,500\nCiao a tutti.\n\n2\n00:00:03,000 --> 00:00:04,000\nCiao a tutti.\n\n3\n00:00:05,000 --> 00:00:05,100\nx\n' > "$WORK/prova.srt"
+@launch
+wait-ready 600
+? ^ready
+lang it
+theme dark
+size 1360x840
+params default
+tab fix
+capture $OUT/F0-dark.png
+? F0-dark.png$
+fix-open $WORK/prova.srt
+fix-state
+? lines 3 .* · gap 0\.6 · wrap 42 · lang it-IT
+inspector-set ocr.wrapWidth 38
+inspector-set ocr.mergeGap 1.0
+fix-state
+? gap 1\.0 · wrap 38
+capture $OUT/S1-dark.png
+? S1-dark.png$
+theme light
+capture $OUT/S1-light.png
+? S1-light.png$
+theme dark
+size 760x780
+capture $OUT/S2-dark.png
+? S2-dark.png$
+size 1360x840
+fix-run
+wait-fix 60
+fix-state
+? outcome created
+! ls "$WORK"/prova-fixed-*.srt
+params default
