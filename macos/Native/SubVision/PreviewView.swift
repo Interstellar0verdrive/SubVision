@@ -162,7 +162,7 @@ struct PreviewVideoMenu: View {
             Text(model.t("app.preview.video")).svSmall()
             PopupMenu({
                 model.videos.map { video in
-                    .item(video.name, checked: video.id == model.previewVideo?.id, enabled: video.state == .ready && video.exists) {
+                    .item(video.name, checked: video.id == model.previewVideo?.id, enabled: model.canPreview(video)) {
                         model.selectPreviewVideo(video.id)
                     }
                 }
@@ -219,8 +219,7 @@ struct FrameViewer: View {
             }
             caption.padding(.top, 12)
             strip(small: small).padding(.top, 10)
-            Text(model.t("app.preview.summary", ["n": result.frames.count, "k": result.found, "m": result.frames.count - result.found]))
-                .svSmall().padding(.top, 6)
+            Text(summary).svSmall().padding(.top, 6)
             // At the foot of the page, as on board A3 (note 22).
             Spacer(minLength: 16)
             tryButton(primary: true)
@@ -298,11 +297,20 @@ struct FrameViewer: View {
         }
     }
 
-    /// Text in the dialogue (green), at the top (blue), none (grey).
+    /// "20 frames · 17 with text · 5 with signs · 3 without": the signs counted when their band is on (design note 78).
+    private var summary: String {
+        let values: [String: Any] = ["n": result.frames.count, "k": result.found, "s": result.foundSigns,
+                                     "m": result.frames.count - result.found]
+        return model.t(model.ocrParams.topBand || result.foundSigns > 0 ? "app.preview.summary_signs" : "app.preview.summary", values)
+    }
+
+    /// Text in the dialogue (green), at the top (blue), in both (green and blue), none (grey).
+    @ViewBuilder
     private func badge(_ frame: PreviewFrame) -> some View {
-        switch frame.band {
-        case "bottom": StatusChip(model.t("app.preview.badge_dlg"), tone: .green)
-        case "top": StatusChip(model.t("app.preview.badge_sig"), tone: .accent)
+        switch (frame.hasDialogue, frame.hasSigns) {
+        case (true, true): BothBandsChip(text: model.t("app.preview.badge_both"))
+        case (true, false): StatusChip(model.t("app.preview.badge_dlg"), tone: .green)
+        case (false, true): StatusChip(model.t("app.preview.badge_sig"), tone: .accent)
         default: StatusChip(model.t("app.preview.badge_none"), tone: .neutral)
         }
     }
@@ -326,8 +334,7 @@ struct FrameViewer: View {
                     .saturation(f.hasText ? 1 : 0)
                     .opacity(f.hasText ? 1 : 0.5)
                     if f.hasText {
-                        Circle().fill(f.band == "top" ? BandColors.signs : BandColors.dialogue)
-                            .frame(width: 5, height: 5)
+                        BandDot(dialogue: f.hasDialogue, signs: f.hasSigns, size: 5)
                             .padding(2)
                     }
                 }
@@ -339,14 +346,9 @@ struct FrameViewer: View {
         }
     }
 
-    /// "Try OCR on This Frame ⌘T": primary under the strip (A3), secondary by the frame (A4).
+    /// "Try OCR on This Frame" (⌘T in the tooltip): primary under the strip (A3), secondary by the frame (A4).
     private func tryButton(primary: Bool) -> some View {
-        Button { model.tryOCR() } label: {
-            HStack(spacing: 6) {
-                Label(model.t("app.preview.test"), systemImage: "magnifyingglass")
-                Text(verbatim: "⌘T").svFont(10, mono: true).opacity(0.7)
-            }
-        }
+        Button { model.tryOCR() } label: { Label(model.t("app.preview.test"), systemImage: "magnifyingglass") }
         .svButton(primary ? .primary : .secondary, .regular)
         .disabled(!model.canTryOCR)
         .help(model.t("app.preview.test_help"))
@@ -384,5 +386,46 @@ struct FrameBox: View {
         }
         .frame(width: size.width, height: size.height)
         .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { model.preview.frameRect = $0 }
+    }
+}
+
+/// The dot of a thumbnail: green for a line, blue for a sign, half and half for both (design note 78).
+struct BandDot: View {
+    var dialogue: Bool
+    var signs: Bool
+    var size: CGFloat
+
+    var body: some View {
+        Group {
+            if dialogue && signs {
+                Circle().fill(LinearGradient(stops: [.init(color: BandColors.dialogue, location: 0.5),
+                                                     .init(color: BandColors.signs, location: 0.5)],
+                                             startPoint: .leading, endPoint: .trailing))
+            } else {
+                Circle().fill(signs ? BandColors.signs : BandColors.dialogue)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// "Text in the dialogue and in the signs": the chip of a frame with both, with the two colours of the bands.
+struct BothBandsChip: View {
+    var text: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            HStack(spacing: 2) {
+                Circle().fill(BandColors.dialogue).frame(width: 6, height: 6)
+                Circle().fill(BandColors.signs).frame(width: 6, height: 6)
+            }
+            Text(text).offset(y: -0.5)
+        }
+        .font(SVFont.smallNumbers.font)
+        .frame(height: SVFont.smallNumbers.lineHeight)
+        .foregroundStyle(SV.text)
+        .svBox(Capsule(), fill: SVTone.neutral.background, line: SVTone.neutral.line,
+               padding: EdgeInsets(vertical: 1, horizontal: 8))
+        .fixedSize()
     }
 }

@@ -229,7 +229,7 @@ enum DebugQA {
         case "inspector-groups":
             for g in ["ocr", "dlg", "sig", "seg", "adv"] { model.defaults.set(argument == "open", forKey: "inspector.group.\(g)") }
         // F5.2 · Preview (the commands are in `preview(_:_:_:)` below).
-        case "preview-select", "find-frames", "stop-frames", "wait-frames", "frame", "band-set", "drag-handle",
+        case "preview-select", "preview-menu", "frames", "frame-bands", "find-frames", "stop-frames", "wait-frames", "frame", "band-set", "drag-handle",
              "try-ocr", "wait-ocr", "preview-state":
             return await preview(command, argument, model)
         // F5.4: the report windows (ReportWindow.swift, ReportBridge.swift).
@@ -388,10 +388,15 @@ enum DebugQA {
 
     // MARK: - F5.2 · Preview
     //
-    //   preview-select <idx>           the list's video (0-based) in Preview
+    //   preview-select <idx>           the list's video (0-based) in Preview, as its item in the Video menu
+    //                                  does (refused when that item is off)
+    //   preview-menu                   the Video menu's items: "name on|off", the chosen one with ✓
     //   find-frames · stop-frames      Find 20 Frames / Stop
     //   wait-frames <s>                until the search ends (replies with the frames found)
-    //   frame <n>                      the frame shown, 1-based
+    //   frame <n>|silent               the frame shown, 1-based; "silent": the first one without text
+    //   frames                         every frame with its bands: "1:bottom 2:bottom+top 3:none …"
+    //   frame-bands <bottom|top|bottom+top|none>   the shown frame's bands set by hand, as a quick probe
+    //                                  of the search could have read them (design note 77: Try OCR corrects them)
     //   band-set <key> <value>         bottom-height, bottom-width, top-height, top-width (percent), top-band (0/1)
     //   drag-handle <band> <handle> <dx> <dy>   the drag's own function (`BandGeometry.apply`, the one the
     //                                  gesture calls) with the pointer moved by (dx, dy) pt from the handle
@@ -406,9 +411,14 @@ enum DebugQA {
         switch command {
         case "preview-select":
             guard let i = Int(argument), model.videos.indices.contains(i) else { return "bad index" }
+            guard model.canPreview(model.videos[i]) else { return "menu item off · \(model.videos[i].name)" }
             model.tab = .preview
             model.selectPreviewVideo(model.videos[i].id)
             return "ok · \(model.videos[i].name)"
+        case "preview-menu":
+            return model.videos.map { v in
+                "\(v.id == model.previewVideo?.id ? "✓ " : "")\(v.name) \(model.canPreview(v) ? "on" : "off")"
+            }.joined(separator: " · ")
         case "find-frames":
             guard model.canFindFrames else { return "cannot find: \(previewState(model))" }
             model.findFrames()
@@ -421,11 +431,28 @@ enum DebugQA {
             guard ended else { return "timeout · \(previewState(model))" }
             if case .failed(let code, let message) = model.preview.search { return "failed \(code) \(message ?? "")" }
             guard let result = model.previewResult else { return "no frames" }
-            return "\(result.frames.count) frames · \(result.found) with text · index \(result.index + 1)"
+            return "\(result.frames.count) frames · \(result.found) with text · \(result.foundSigns) with signs · index \(result.index + 1)"
         case "frame":
+            if argument == "silent" {
+                guard let i = model.previewFrames.firstIndex(where: { !$0.hasText }) else { return "no frame without text" }
+                model.selectFrame(i)
+                return "ok · frame \(i + 1)"
+            }
             guard let n = Int(argument) else { return "bad number" }
             model.selectFrame(n - 1)
             return "ok · frame \(model.previewResult.map { $0.index + 1 } ?? 0)"
+        case "frames":
+            return model.previewFrames.enumerated().map { i, f in
+                "\(i + 1):\(f.bands.isEmpty ? "none" : f.bands.joined(separator: "+"))"
+            }.joined(separator: " ")
+        case "frame-bands":
+            guard let video = model.previewVideo, var result = model.preview.results[video.id],
+                  result.frames.indices.contains(result.index) else { return "no frame" }
+            let bands = argument == "none" ? [] : argument.split(separator: "+").map(String.init)
+            result.frames[result.index].bands = bands
+            result.frames[result.index].hasText = !bands.isEmpty
+            model.preview.results[video.id] = result
+            return "ok · \(previewState(model))"
         case "band-set":
             guard args.count == 2, let value = Int(args[1]) else { return "bad arguments" }
             switch args[0] {
@@ -484,7 +511,7 @@ enum DebugQA {
 
     private static func previewState(_ model: AppModel) -> String {
         var parts = ["video \(model.previewVideo?.name ?? "none")", "search \(model.preview.search)"]
-        if let r = model.previewResult { parts.append("frames \(r.frames.count) found \(r.found) index \(r.index + 1) band \(model.previewFrame?.band ?? "none")") }
+        if let r = model.previewResult { parts.append("frames \(r.frames.count) found \(r.found) index \(r.index + 1) bands \(model.previewFrame.map { $0.bands.isEmpty ? "none" : $0.bands.joined(separator: "+") } ?? "none")") }
         parts.append(bandValues())
         parts.append("test \(model.preview.test == nil ? "none" : model.isReadingOCR ? "reading" : "done")" + (model.preview.stale ? " stale" : ""))
         parts.append("batch \(model.batch.running)")

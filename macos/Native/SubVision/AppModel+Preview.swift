@@ -29,6 +29,8 @@ struct PreviewState {
         /// One small image per frame, made once from the whole frames (design note 30).
         var thumbnails: [NSImage?] = []
         var found: Int { frames.filter(\.hasText).count }
+        /// The frames with a sign (design note 78: "17 with text · 5 with signs").
+        var foundSigns: Int { frames.filter(\.hasSigns).count }
     }
 
     enum Test {
@@ -85,6 +87,12 @@ extension AppModel {
     var canFindFrames: Bool {
         guard status == .ready, !batch.running, !isSearchingFrames, let video = previewVideo else { return false }
         return video.state != .unreadable && video.exists
+    }
+
+    /// The Video menu's items: every readable video that exists and is not being processed,
+    /// the processed ones too (design note 73, the rule of `canFindFrames`).
+    func canPreview(_ video: VideoItem) -> Bool {
+        video.state != .unreadable && video.state != .running && video.exists
     }
 
     /// "Try OCR" (⌘T): a frame on screen, Vision answering, nothing else running.
@@ -241,12 +249,36 @@ extension AppModel {
                 guard preview.testFrame == frame.path, isReadingOCR else { return }
                 preview.test = .done(reply, params: params, useIgnore: ignore, useCorrections: corrections)
                 log.info("preview.test: bottom \"\(reply.bottom?.text ?? "")\" top \"\(reply.top?.text ?? "")\"")
+                applyTestToBadge(reply, frame: frame.path)
                 refreshPreviewStale()
             } catch {
                 guard preview.testFrame == frame.path, isReadingOCR else { return }
                 log.error("preview.test: \(error)")
                 preview.test = .failed(code: (error as? EngineError)?.remoteCode ?? "unknown", message: Self.errorDetail(error))
             }
+        }
+    }
+
+    /// After Try OCR the frame's badge and dot say what the full reading found, not the
+    /// quick probe of the search (design note 77): a band that reads nothing loses its colour.
+    /// A band the test did not read (the signs band off) keeps what the search said.
+    func applyTestToBadge(_ reply: OcrTestReply, frame path: String) {
+        for (id, var result) in preview.results {
+            guard let i = result.frames.firstIndex(where: { $0.path == path }) else { continue }
+            var f = result.frames[i]
+            var bands: [String] = []
+            for band in ["bottom", "top"] {
+                if let read = reply.bands[band] {
+                    if !read.empty { bands.append(band) }
+                } else if f.bands.contains(band) {
+                    bands.append(band)
+                }
+            }
+            guard bands != f.bands else { continue }
+            f.bands = bands
+            f.hasText = !bands.isEmpty
+            result.frames[i] = f
+            preview.results[id] = result
         }
     }
 

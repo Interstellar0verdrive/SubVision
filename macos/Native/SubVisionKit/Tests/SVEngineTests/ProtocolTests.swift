@@ -46,14 +46,18 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
     }
 
     @Test func previewEventsAndTest() throws {
+        #expect(try event("preview.progress", #"{"done":3,"total":20,"found":2,"found_top":1}"#)
+                == .previewProgress(PreviewProgress(done: 3, total: 20, found: 2, foundTop: 1)))
         #expect(try event("preview.progress", #"{"done":3,"total":20,"found":2}"#)
                 == .previewProgress(PreviewProgress(done: 3, total: 20, found: 2)))
         let done = try event("preview.done", #"""
-            {"frames":[{"path":"/s/tmp/preview/ab/000.jpg","band":"bottom","has_text":true,"width":1920,"height":1080,"ts":12.5},
-                       {"path":"/s/tmp/preview/ab/001.jpg","band":null,"has_text":false,"width":1920,"height":1080,"ts":40.0}]}
+            {"frames":[{"path":"/s/tmp/preview/ab/000.jpg","bands":["bottom","top"],"has_text":true,"width":1920,"height":1080,"ts":12.5},
+                       {"path":"/s/tmp/preview/ab/001.jpg","bands":[],"has_text":false,"width":1920,"height":1080,"ts":40.0},
+                       {"path":"/s/tmp/preview/ab/002.jpg","bands":["top"],"has_text":true,"width":1920,"height":1080,"ts":52.0}]}
             """#)
         guard case .previewDone(let p) = done else { Issue.record("\(done)"); return }
-        #expect(p.frames.map(\.hasText) == [true, false] && p.frames[1].band == nil)
+        #expect(p.frames.map(\.hasText) == [true, false, true] && p.frames[1].bands.isEmpty)
+        #expect(p.frames.map(\.hasDialogue) == [true, false, false] && p.frames.map(\.hasSigns) == [true, false, true])
         #expect(try event("preview.stopped", "{}") == .previewStopped)
         #expect(try event("preview.failed", #"{"error":"invalid_duration","message":"invalid_duration (path=/v)"}"#)
                 == .previewFailed(PreviewFailed(error: "invalid_duration", message: "invalid_duration (path=/v)")))

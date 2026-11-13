@@ -247,7 +247,7 @@ enum DebugSnapshot {
         await capture(model, "\(base)-A4.png", schemes: schemes)
         // A5, fed by hand: no zone with text, the duration not read, a stale test with an empty dialogue band.
         var silent = result
-        silent.frames = result.frames.map { var f = $0; f.band = nil; f.hasText = false; return f }
+        silent.frames = result.frames.map { var f = $0; f.bands = []; f.hasText = false; return f }
         silent.index = min(silent.index, silent.frames.count - 1)
         model.preview.results[video.id] = silent
         model.preview.search = .failed(code: "invalid_duration", message: nil)
