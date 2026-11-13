@@ -57,6 +57,50 @@ def test_clean_old_removes_week_old_folders(tmp_path: Path) -> None:
     assert preview.clean_old(tmp_path / "nowhere") == 0
 
 
+# ---------------------------------------------------------------- quick "is there text?"
+def test_looks_like_text() -> None:
+    # what the quick OCR invents on the frames of the demo clips without
+    # subtitles (confidence 0.5, like a real line): never "text"
+    for junk in ("", " ", "r", "i", "I", "a", "*", "(", "-{", "?", "...", "- !", "\n"):
+        assert not preview.looks_like_text(junk), junk
+    # real lines, short ones included
+    for text in ("Un drago.", "So...", "Eh?", "No", "OK", "42", "Sei sciocca\na viaggiare sola,",
+                 "Grazie.", "A dragon."):
+        assert preview.looks_like_text(text), text
+    # one ideograph, kana or hangul is a whole line
+    for text in ("え", "嗯", "是", "네", "あ！"):
+        assert preview.looks_like_text(text), text
+    assert preview.QUICK_MIN_CHARS == 2 and preview.QUICK_MIN_CONF == 0.25
+
+
+@pytest.mark.parametrize("clip_name, lang", [("ita", "Italian"), ("eng", "English")])
+def test_find_frames_has_no_false_positive_on_the_demo(clip_name: str, lang: str, demo_ita: Path,
+                                                       demo_eng: Path, tmp_path: Path,
+                                                       ffmpeg_bin: str, vision) -> None:
+    """
+    F6: zone 4 of both demo clips (12-14 s) has no subtitle at any of the
+    three timestamps tried, but the quick OCR reads "r" / "i" (confidence
+    0.5) in the picture at 13.77 s: it used to count as a frame with text.
+    Zone 15 (41-43 s) has no subtitle either. Every other zone that had
+    text before still has it (no false negative): 18 of 20 on the ita clip.
+    """
+    clip = demo_ita if clip_name == "ita" else demo_eng
+    p = OcrParams(**{**FAST_PROFILE, "lang_hint": lang})
+    frames = preview.find_frames(clip, p, n=20, tries=3, state=tmp_path)
+    assert len(frames) == 20
+    flags = [f["has_text"] for f in frames]
+    assert not flags[4] and frames[4]["band"] is None, frames[4]
+    assert 12.0 < frames[4]["ts"] < 14.0            # the fallback: the first timestamp tried
+    assert not flags[15]
+    without = [i for i, has in enumerate(flags) if not has]
+    if clip_name == "ita":
+        assert without == [4, 15], without
+    else:
+        # zone 8 of the eng clip ("So...", small and short): the quick OCR sees
+        # nothing at all there, before and after this change
+        assert set(without) <= {4, 8, 15}, without
+
+
 # ---------------------------------------------------------------- frames + OCR test
 def test_find_frames_and_test_frame(demo_ita: Path, params: OcrParams, tmp_path: Path,
                                     ffmpeg_bin: str, vision) -> None:

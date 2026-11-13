@@ -2,12 +2,15 @@
 Batch runner (activity 1.5): events in the expected order, outputs next to
 the videos, timestamp suffix on a second run, stop with scope file / all,
 a failing file that does not stop the batch, bad parameters refused.
+F6: the stop meant for one file (by batch index or path), the fields of a
+failed file (`text`, `log`) and two really damaged videos.
 """
 
 from __future__ import annotations
 
 import re
 import shutil
+import subprocess
 import threading
 from pathlib import Path
 
@@ -17,7 +20,7 @@ from subvision import batch, core
 from subvision.batch import BatchControl, run_batch
 from subvision.core import EngineError, OcrParams
 
-from conftest import FAST_PROFILE, FAST_PROFILE_LINES
+from conftest import FAST_PROFILE, FAST_PROFILE_LINES, damage_head, damage_tail
 
 
 class Recorder:
@@ -88,6 +91,12 @@ def test_bad_params_are_refused_before_starting(tmp_path: Path):
     with pytest.raises(EngineError) as exc:
         run_batch([tmp_path / "x.mp4"], _params(lang_hint="Klingon"), None, "it", rec)
     assert exc.value.code == "bad_params" and exc.value.args_["field"] == "lang_hint"
+    # field and reason travel as `data`, the detail is "field: reason" with nothing appended
+    d = exc.value.details()
+    assert d["data"] == {"field": "lang_hint", "reason": exc.value.args_["reason"]}
+    assert "not supported by Vision" in d["data"]["reason"]
+    assert d["detail"] == f"lang_hint: {d['data']['reason']}"
+    assert exc.value.describe() == f"bad_params ({d['detail']})"
     with pytest.raises(EngineError) as exc:
         run_batch([tmp_path / "x.mp4"], _params(fps=0), None, "it", rec)
     assert exc.value.args_["field"] == "fps"
@@ -98,6 +107,171 @@ def test_bad_params_are_refused_before_starting(tmp_path: Path):
     # explicit codes pass too (case-insensitive)
     batch.validate_params(_params(lang_hint="it-IT"))
     batch.validate_params(_params(lang_hint="English"))
+
+
+# ---------------------------------------------------------------- stop for one file
+def test_control_stops_only_the_file_in_progress(tmp_path: Path):
+    c = BatchControl()
+    # between two videos nothing is in progress: a stop with `file` finds nothing
+    assert c.current is None
+    assert c.stop("file", file=0) is False and not c._file.is_set()
+    ev0 = c._begin_file(0, tmp_path / "a.mkv")
+    assert c.current == 0
+    assert c.stop("file", file=1) is False and not ev0.is_set()
+    assert c.stop("file", file=str(tmp_path / "b.mkv")) is False and not ev0.is_set()
+    assert c.stop("file", file=0) is True and ev0.is_set()
+    # the next video: the stop of the previous one does not reach it
+    ev1 = c._begin_file(1, tmp_path / "b.mkv")
+    assert not ev1.is_set() and c.current == 1
+    assert c.stop("file", file=0) is False and not ev1.is_set()
+    assert c.stop("file", file=str(tmp_path / "a.mkv")) is False and not ev1.is_set()
+    # by path too (the same file spelled differently)
+    assert c.stop("file", file=str(tmp_path / "x" / ".." / "b.mkv")) is False
+    assert c.stop("file", file=str(tmp_path) + "//b.mkv") is True and ev1.is_set()
+    # over: nothing to stop, and the event of the next video is a fresh one
+    c._end_file()
+    assert c.current is None and c.stop("file", file=1) is False
+    ev2 = c._begin_file(2, tmp_path / "c.mkv")
+    assert not ev2.is_set()
+    # without `file` it is the stop of 1.5: whatever is in progress
+    assert c.stop("file") is True and ev2.is_set()
+    assert not c.stop_all
+
+
+def test_control_scope_all_ignores_file(tmp_path: Path):
+    c = BatchControl()
+    ev = c._begin_file(3, tmp_path / "a.mkv")
+    assert c.stop("all", file=0) is True          # not the file in progress: stopped anyway
+    assert ev.is_set() and c.stop_all
+    assert c._begin_file(4, tmp_path / "b.mkv").is_set()
+    c2 = BatchControl()
+    assert c2.stop("all", file=object()) is True and c2.stop_all      # not even looked at
+
+
+def test_control_refuses_a_file_of_the_wrong_kind(tmp_path: Path):
+    c = BatchControl()
+    ev = c._begin_file(1, tmp_path / "a.mkv")
+    for bad in (1.0, True, [1], {"idx": 1}):
+        with pytest.raises(TypeError):
+            c.stop("file", file=bad)
+    with pytest.raises(ValueError):
+        c.stop("next", file=1)
+    assert not ev.is_set() and not c.stop_all
+
+
+def test_a_stop_for_one_file_never_lands_on_the_next():
+    """
+    The batch moves through 300 videos as fast as it can while another
+    thread keeps asking to stop video 150: only the event of video 150 may
+    ever be set, and only when the stop said True.
+    """
+    c = BatchControl()
+    target, total = 150, 300
+    events: dict[int, threading.Event] = {}
+    taken: list[bool] = []
+    over = threading.Event()
+
+    def stopper() -> None:
+        while not over.is_set():
+            taken.append(c.stop("file", file=target))
+
+    th = threading.Thread(target=stopper)
+    th.start()
+    try:
+        for idx in range(total):
+            events[idx] = c._begin_file(idx, f"/videos/{idx}.mkv")
+            for _ in range(200):        # the video "runs" for a moment
+                pass
+            c._end_file()
+    finally:
+        over.set()
+        th.join()
+    hit = [idx for idx, ev in events.items() if ev.is_set()]
+    assert hit in ([], [target]), hit
+    assert any(taken) == (hit == [target])
+    assert not c.stop_all
+
+
+def test_stop_for_one_file_in_a_real_batch(two_clips: list[Path], tmp_path: Path):
+    control = BatchControl()
+    answers: dict[str, object] = {}
+
+    def emit(event: str, data: dict) -> None:
+        rec(event, data)
+        if event == "batch.step" and data["step"] == "ocr":
+            if data["idx"] == 0 and "first" not in answers:
+                # video 0 is running: a stop for video 1 (index or path) is refused...
+                answers["other"] = control.stop("file", file=1)
+                answers["other_path"] = control.stop("file", file=str(two_clips[1]))
+                answers["during"] = control.current
+                # ...and the one for video 0 is taken
+                answers["first"] = control.stop("file", file=0)
+            elif data["idx"] == 1 and "late" not in answers:
+                # video 1 is running by now: the stop meant for video 0 comes late
+                answers["late"] = control.stop("file", file=0)
+                answers["late_path"] = control.stop("file", file=str(two_clips[0]))
+
+    rec = Recorder()
+    done = run_batch(two_clips, _params(), None, "it", emit, stop=control, tmp_root=tmp_path / "tmp")
+    assert answers == {"other": False, "other_path": False, "during": 0, "first": True,
+                       "late": False, "late_path": False}
+    assert rec.of("batch.file.stopped") == [{"idx": 0}]
+    assert [d["idx"] for d in rec.of("batch.file.done")] == [1]
+    assert done["done"] == 1 and done["stopped"] == 1 and done["failed"] == 0
+    assert control.current is None and control.stop("file", file=1) is False
+    assert not two_clips[0].with_suffix(".srt").exists()
+    assert len(core.parse_srt(two_clips[1].with_suffix(".srt"))) > 0
+
+
+# ---------------------------------------------------------------- error fields
+def test_error_info_text_has_no_type_name_and_no_prefix():
+    # an unexpected exception: its own message; the type name only in `detail`
+    info = batch.error_info(ValueError("the disk is full"), path="/v/a.mkv")
+    assert info["code"] == "unknown" and info["message"] == "unknown"
+    assert info["text"] == "the disk is full"
+    assert info["detail"] == "ValueError: the disk is full"
+    assert info["error"] == "unknown (ValueError: the disk is full)" and info["path"] == "/v/a.mkv"
+    # no message at all: the type name is all there is
+    assert batch.error_info(RuntimeError())["text"] == "RuntimeError"
+    assert batch.error_info(KeyError())["text"] == "KeyError"
+    # several lines: the first one; a very long one is cut
+    assert batch.error_info(OSError("\n first line \nsecond"))["text"] == "first line"
+    long = batch.error_info(ValueError("x" * 1000))["text"]
+    assert len(long) == 300 and long.endswith("…")
+    # an engine error: the first line of the detail, nothing when there is none
+    e = EngineError("probe_failed", tool="ffprobe", path="/v/a.mkv",
+                    detail="moov atom not found\n/v/a.mkv: Invalid data found when processing input")
+    info = batch.error_info(e)
+    assert info["code"] == "probe_failed" and info["text"] == "moov atom not found"
+    assert info["detail"].count("\n") == 1 and "\n" not in info["error"]
+    assert "text" not in batch.error_info(EngineError("vision_unavailable", tool="vision"))
+    # the prefix of the alert ("Something went wrong: ...") belongs to the app
+    for exc in (ValueError("boom"), RuntimeError(), e, EngineError("vision_unavailable")):
+        text = batch.error_info(exc).get("text", "")
+        for prefix in ("Qualcosa", "Something", "ERRORE", "ERROR", "Error:", "unknown"):
+            assert not text.startswith(prefix), text
+
+
+def test_error_info_of_a_tool_that_exits_with_an_error():
+    cmd = ["/opt/bin/ffmpeg", "-hide_banner", "-i", "/v/a.mkv", "/tmp/f_%08d.jpg"]
+    stderr = ("[mov,mp4,m4a,3gp,3g2,mj2 @ 0x7a61008600] UDTA parsing failed retrying raw\n"
+              "[vist#0:0/h264 @ 0x7a61] [dec:h264 @ 0x7a60] Error submitting packet to decoder: "
+              "Invalid data found when processing input\n"
+              "[vist#0:0/h264 @ 0x7a61] [dec:h264 @ 0x7a60] Decode error rate 0.88 exceeds maximum 0.666667\n"
+              "[vist#0:0/h264 @ 0x7a61] Terminating thread with return code -1145393733 "
+              "(Error number -1145393733 occurred)\n"
+              "Conversion failed!\n")
+    info = batch.error_info(subprocess.CalledProcessError(69, cmd, stderr=stderr), path="/v/a.mkv")
+    assert info["code"] == "unknown" and info["tool"] == "ffmpeg" and info["path"] == "/v/a.mkv"
+    # not the command line: the tool, the exit status and what it complained about
+    assert info["text"] == "ffmpeg exited with status 69: Decode error rate 0.88 exceeds maximum 0.666667"
+    assert info["error"] == f"unknown ({info['text']})"
+    assert info["detail"].startswith("CalledProcessError: Command '['/opt/bin/ffmpeg'")
+    assert "Decode error rate 0.88 exceeds maximum 0.666667" in info["detail"]
+    assert "@ 0x" not in info["detail"]
+    # without stderr, and for a tool that is not ours
+    bare = batch.error_info(subprocess.CalledProcessError(1, ["/usr/bin/true"]))
+    assert bare["text"] == "true exited with status 1" and "tool" not in bare
 
 
 def test_log_catalogues_are_aligned():
@@ -247,8 +421,77 @@ def test_failed_file_does_not_stop_the_batch(demo_ita: Path, ffmpeg_bin: str, tm
     assert failed[0]["tool"] == "ffprobe" and failed[0]["path"] == str(bogus)
     assert failed[0]["detail"]
     assert "line" not in failed[0]
+    # F6: the log of the file and a short text for its row (what ffprobe said)
+    assert failed[0]["log"] == str(bogus.with_suffix(".log"))
+    assert failed[0]["text"] == failed[0]["detail"].splitlines()[0]
+    assert "Command" not in failed[0]["detail"] and "probe_failed" not in failed[0]["text"]
     assert [d["idx"] for d in rec.of("batch.file.done")] == [1]
     assert done["failed"] == 1 and done["done"] == 1 and done["stopped"] == 0
     assert "ERROR: probe_failed" in bogus.with_suffix(".log").read_text(encoding="utf-8")
     assert not bogus.with_suffix(".srt").exists()
     assert good.with_suffix(".srt").exists()
+
+
+# ---------------------------------------------------------------- damaged videos
+def test_damaged_video_refused_by_the_probe(demo_ita: Path, ffmpeg_bin: str, tmp_path: Path):
+    """Recipe (a), conftest.damage_head: no index, ffprobe refuses the file."""
+    if not core.vision_available():
+        pytest.skip("Apple Vision (ocrmac) not available")
+    video = damage_head(demo_ita, tmp_path / "no-index.mp4")
+    rec = Recorder()
+    done = run_batch([video], _params(), None, "en", rec, tmp_root=tmp_path / "tmp")
+    assert done["failed"] == 1 and done["done"] == 0
+    failed = rec.of("batch.file.failed")[0]
+    assert failed["code"] == "probe_failed" and failed["tool"] == "ffprobe"
+    assert failed["at_step"] == "extract:bottom" and failed["path"] == str(video)
+    assert failed["text"] == "moov atom not found"
+    assert failed["detail"].splitlines()[0] == "moov atom not found"
+    assert "Invalid data found when processing input" in failed["detail"]
+    assert failed["log"] == str(video.with_suffix(".log")) and Path(failed["log"]).is_file()
+    assert "batch.step" not in rec.names()
+    assert not video.with_suffix(".srt").exists()
+
+
+def test_damaged_video_fails_in_the_middle_of_the_extraction(demo_ita: Path, ffmpeg_bin: str,
+                                                             tmp_path: Path):
+    """
+    Recipe (b), conftest.damage_tail: the probe is happy (the index is
+    intact), ffmpeg extracts the first seconds and then gives up. The file
+    fails with the tool and its words, the batch goes on with the next one.
+    """
+    if not core.vision_available():
+        pytest.skip("Apple Vision (ocrmac) not available")
+    video = damage_tail(demo_ita, tmp_path / "damaged.mp4")
+    good = tmp_path / demo_ita.name
+    shutil.copyfile(demo_ita, good)
+    # the probe sees a normal video
+    assert core.ffprobe_duration(str(video)) == pytest.approx(55.0, abs=0.5)
+    assert core.ffprobe_fps(str(video)) == pytest.approx(24.0, abs=0.1)
+
+    rec = Recorder()
+    done = run_batch([video, good], _params(), None, "en", rec, tmp_root=tmp_path / "tmp")
+    assert done["failed"] == 1 and done["done"] == 1 and done["stopped"] == 0
+    failed = rec.of("batch.file.failed")
+    assert len(failed) == 1 and failed[0]["idx"] == 0
+    f = failed[0]
+    assert f["code"] == "unknown" and f["message"] == "unknown" and f["tool"] == "ffmpeg"
+    assert f["at_step"] == "extract:bottom" and f["path"] == str(video)
+    assert re.fullmatch(r"ffmpeg exited with status \d+: Decode error rate 0\.\d+ exceeds maximum 0\.\d+",
+                        f["text"]), f["text"]
+    assert f["error"] == f"unknown ({f['text']})"
+    assert f["detail"].startswith("CalledProcessError: Command ")
+    assert "Decode error rate" in f["detail"] and "Conversion failed!" in f["detail"]
+    # ffmpeg did write frames before giving up (the "frame=" line of its summary)
+    frames = re.search(r"frame=\s*(\d+)", f["detail"])
+    assert frames and 0 < int(frames.group(1)) < 330 * 0.34
+    # the log of the file tells the same story; nothing else is left behind
+    log = Path(f["log"])
+    assert log == video.with_suffix(".log")
+    text = log.read_text(encoding="utf-8")
+    assert f"ERROR: unknown ({f['text']})" in text and "RESULT" not in text
+    assert not video.with_suffix(".srt").exists()
+    assert not video.with_suffix(".revisione.html").exists()
+    assert not list((tmp_path / "tmp").glob("voc26_*"))
+    # and the next video is processed as usual
+    assert [d["idx"] for d in rec.of("batch.file.done")] == [1]
+    assert rec.of("batch.file.done")[0]["segments"] == FAST_PROFILE_LINES
