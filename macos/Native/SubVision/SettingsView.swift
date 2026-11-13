@@ -130,12 +130,18 @@ struct ToolsSettings: View {
             SettingsGroup {
                 SettingsRow(model.t("app.settings.ffmpeg"), description: model.t("app.settings.ffmpeg_desc"),
                             defaultText: model.defaultText(model.t("app.settings.ffmpeg_default"))) {
-                    let own = model.customFFmpeg != nil
+                    let brew = model.homebrewFFmpeg
+                    let onBrew = brew != nil && model.customFFmpeg?.path == brew?.ffmpegPath
+                    let own = model.customFFmpeg != nil && !onBrew
+                    let bundledTitle = model.t("app.settings.ffmpeg_bundled", ["version": bundledVersion])
+                    let brewTitle = brew.map { model.t("app.settings.ffmpeg_brew", ["version": $0.version, "folder": $0.folder]) }
                     PopupMenu({
-                        [.item(model.t("app.settings.ffmpeg_bundled", ["version": bundledVersion]), checked: !own) { model.useBundledFFmpeg() },
-                         .item(model.t("app.settings.ffmpeg_own"), checked: own) { model.chooseOwnFFmpeg() }]
+                        var items: [SVMenuItem] = [.item(bundledTitle, checked: model.customFFmpeg == nil) { model.useBundledFFmpeg() }]
+                        if let brew, let brewTitle { items.append(.item(brewTitle, checked: onBrew) { model.useHomebrewFFmpeg(brew) }) }
+                        items.append(.item(model.t("app.settings.ffmpeg_own"), checked: own) { model.chooseOwnFFmpeg() })
+                        return items
                     }) {
-                        PopupLabel(title: own ? model.t("app.settings.ffmpeg_own") : model.t("app.settings.ffmpeg_bundled", ["version": bundledVersion]),
+                        PopupLabel(title: onBrew ? (brewTitle ?? "") : own ? model.t("app.settings.ffmpeg_own") : bundledTitle,
                                    width: 250)
                     }
                     .fixedSize()
@@ -144,7 +150,7 @@ struct ToolsSettings: View {
                     SettingsRow(model.t("app.settings.ffmpeg_path"), description: nil) {
                         VStack(alignment: .trailing, spacing: 6) {
                             HStack(spacing: 8) {
-                                PathField(custom.path, symbol: "terminal", height: 26).frame(width: 200)
+                                PathField(custom.folder.path, symbol: "folder", height: 26).frame(width: 200)
                                 Button(model.t("app.common.choose")) { model.chooseOwnFFmpeg() }.svButton(.secondary, .small)
                             }
                             customStatus(custom)
@@ -170,6 +176,7 @@ struct ToolsSettings: View {
             .disabled(model.settingsLocked)
             .opacity(model.settingsLocked ? 0.45 : 1)
         }
+        .onAppear { model.findHomebrewFFmpeg() }
         SettingsGroup {
             infoRow(model.t("app.settings.engine"),
                     model.t("app.settings.engine_val", ["version": model.hello?.version ?? model.config.appVersion,
