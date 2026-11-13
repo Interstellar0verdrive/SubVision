@@ -28,3 +28,13 @@ Con `SUBVISION_SNAPSHOT_PREVIEW=1` sulla clip demo `sintel_ita_hardsub_demo.mp4`
 - `real/A3-window-dark.png`, `real/A4-window-dark.png`: la finestra vera (`screencapture -l`) dopo lo scenario `DebugQA` (`find-frames`, `drag-handle`, `try-ocr`).
 
 Nota: i valori delle bande sono quelli di `UserDefaults` al momento della cattura (`ocr.bottomKeepPct`, `ocr.keepWPct`, `ocr.topBand`…), condivisi con l'inspector.
+
+## Sub fix (5.3)
+
+Catture della finestra vera (`DebugSnapshot.capture`, `cacheDisplay`) con `SUBVISION_SNAPSHOT_FIX=<srt>` (qui l'SRT demo `sintel_ita_hardsub_demo.srt` della release `demo-assets`, 12 righe, copiato in una cartella temporanea: il percorso nella scheda è quello).
+
+- F0: pagina vuota (area di trascinamento).
+- F1: file scelto, le quattro opzioni, nota sui parametri condivisi, Esegui.
+- F2: dopo un `srt.fix` vero (nota verde con Mostra nel Finder e Apri, "Creato · 12 righe" con la spunta nella barra laterale); "Togli i flash" spento per mostrare Durata minima attenuata, come nella tavola.
+- F3: errore `no_valid_segments` (stato alimentato a mano dopo il run: la tavola mostra tre note insieme, nell'app ne compare una alla volta). `F3-unreadable`: SRT illeggibile (`bad_srt`, riga 214). `F3-notsrt`: trascinato un file che non è `.srt` (nota gialla).
+- `real/F2-window-dark.png`: la finestra vera con `screencapture -l`, aspetto scuro, finestra non attiva: gli interruttori accesi sono bianchi (resa di macOS per le finestre inattive; nella finestra attiva sono in accento, come nella F1 chiara).

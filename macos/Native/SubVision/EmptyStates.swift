@@ -157,35 +157,21 @@ struct FixEmptyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PageTop(title: model.t("app.fix.title"), intro: model.t("app.fix.intro")) {
-                Button { openSRT() } label: {
-                    HStack(spacing: 6) {
-                        Label(model.t("app.fix.open"), systemImage: "doc")
-                        Text("⇧⌘O").svFont(10, mono: true).foregroundStyle(SV.text3)
-                    }
-                }
-                .svButton(.secondary, .regular)
+            PageTop(title: model.t("app.fix.title"), intro: model.t("app.fix.intro")) { OpenSRTButton() }
+                .padding(.bottom, 18)
+            // A drop that is not an .srt: the yellow note of board F3, here too.
+            if model.fix.outcome == .notSrt {
+                NoteView(.yellow, text: model.t("app.fix.only_srt"))
+                    .frame(maxWidth: FixReadyView.columnWidth, alignment: .leading)
+                    .padding(.bottom, 14)
             }
-            .padding(.bottom, 18)
             DropArea(symbol: "text.badge.checkmark", title: model.t("app.fix.drop"), orText: model.t("app.process.empty.or_open"),
                      buttonTitle: model.t("app.fix.open"), shortcut: "⇧⌘O",
                      footnote: model.t("app.fix.why"),
-                     onOpen: { openSRT() }, onDrop: { receive($0) })
+                     onOpen: { model.openSRTPanel() }, onDrop: { model.receiveFixDrop($0) })
         }
         .padding(.horizontal, 28)
         .padding(.top, top)
         .padding(.bottom, 28)
-    }
-
-    /// F5.3 takes these over: here the chosen file is only remembered.
-    private func openSRT() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.init(filenameExtension: "srt") ?? .plainText]
-        panel.message = model.t("app.menu.open_panel_srt")
-        if panel.runModal() == .OK, let url = panel.url { model.fixPath = url }
-    }
-
-    private func receive(_ urls: [URL]) {
-        if let srt = VideoScan.videos(in: urls, extensions: ["srt"], recursive: false).first { model.fixPath = srt }
     }
 }

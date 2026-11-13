@@ -14,7 +14,7 @@ extension AppModel {
          ShellTab(id: Tab.preview.rawValue, symbol: Tab.preview.symbol, title: t("app.sidebar.tab.preview"),
                   subtitle: previewSubtitle, busy: isSearchingFrames),
          ShellTab(id: Tab.fix.rawValue, symbol: Tab.fix.symbol, title: t("app.sidebar.tab.fix"),
-                  subtitle: fixSubtitle)]
+                  subtitle: fixSubtitle, done: fixDone)]
     }
 
     /// The videos the sidebar counts: the unreadable ones are left out (board E1).
@@ -41,10 +41,6 @@ extension AppModel {
         if case .running(let done, let total, _) = preview.search { return t("app.sidebar.prev_search", ["i": done, "n": total]) }
         if let result = preview.results[video.id] { return t("app.sidebar.prev_found", ["k": result.found, "n": result.frames.count]) }
         return video.name
-    }
-
-    var fixSubtitle: String {
-        fixPath?.lastPathComponent ?? t("app.sidebar.no_srt")
     }
 }
 

@@ -94,16 +94,3 @@ struct InspectorButton: View {
         .accessibilityLabel(model.t("app.process.show_inspector"))
     }
 }
-
-/// Sub fix (F5.3): the empty state until an SRT is chosen.
-struct FixPage: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        if model.fixPath == nil {
-            FixEmptyView()
-        } else {
-            PlaceholderPage(title: model.t("app.fix.title"), symbol: Tab.fix.symbol, text: model.t("app.fix.intro"))
-        }
-    }
-}

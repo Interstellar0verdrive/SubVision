@@ -3,7 +3,8 @@
 // few seconds after launch, in light and dark with
 // `SUBVISION_SNAPSHOT_SCHEME=both`, then quits. `SUBVISION_SNAPSHOT_ADD=<paths>`
 // (comma-separated files or folders) fills the list first;
-// `SUBVISION_SNAPSHOT_SETTINGS=1` renders the four Settings tabs.
+// `SUBVISION_SNAPSHOT_SETTINGS=1` renders the four Settings tabs;
+// `SUBVISION_SNAPSHOT_FIX=<srt>` runs Sub fix on that file and captures F1–F3.
 // Adapted from the DebugSnapshot of the native macOS app of AnimeUp (by the
 // same author); the renderers are the shell's.
 
@@ -28,6 +29,9 @@ enum DebugSnapshot {
             await capture(model, "\(base)-preview-empty.png", schemes: schemes)
             model.tab = .fix
             await capture(model, "\(base)-fix-empty.png", schemes: schemes)
+            if let srt = env["SUBVISION_SNAPSHOT_FIX"], !srt.isEmpty {
+                await fixStates(model, srt: srt, base: base, schemes: schemes)
+            }
             model.tab = .process
             if let add = env["SUBVISION_SNAPSHOT_ADD"], !add.isEmpty {
                 model.add(add.split(separator: ",").map { URL(fileURLWithPath: String($0)) })
@@ -262,6 +266,41 @@ enum DebugSnapshot {
             window.setFrame(saved, display: true)
             try? await Task.sleep(for: .milliseconds(500))
         }
+    }
+
+    /// Sub fix (F5.3) in the real window: F1 with the file chosen, F2 after a
+    /// real `srt.fix` (flashes kept, so the shortest line is dimmed as on the
+    /// board), F3 with the three notes one at a time (no valid segments, an
+    /// unreadable SRT, a drop that is not an .srt).
+    private static func fixStates(_ model: AppModel, srt: String, base: String, schemes: [ColorScheme]) async {
+        let saved = model.fix
+        model.fix.merge = true
+        model.fix.ignore = true
+        model.fix.flash = true
+        model.fix.minDuration = 0.2
+        model.chooseSRT(URL(fileURLWithPath: srt))
+        // The switches draw as inactive (white) unless the app is the active one.
+        NSApp.activate(ignoringOtherApps: true)
+        try? await Task.sleep(for: .milliseconds(500))
+        await capture(model, "\(base)-fix-ready.png", schemes: schemes)
+        model.runFix()
+        _ = await DebugQA.wait(30) { !model.fix.running && model.fix.outcome != nil }
+        try? await Task.sleep(for: .milliseconds(500))
+        model.fix.flash = false
+        await capture(model, "\(base)-fix-done.png", schemes: schemes)
+        model.fix.flash = true
+        model.fix.outcome = .noValidSegments
+        await capture(model, "\(base)-fix-error.png", schemes: schemes)
+        model.fix.outcome = .unreadable(line: 214)
+        await capture(model, "\(base)-fix-unreadable.png", schemes: schemes)
+        model.fix.outcome = .notSrt
+        await capture(model, "\(base)-fix-notsrt.png", schemes: schemes)
+        model.fix.outcome = nil
+        model.fixPath = nil
+        model.fix.merge = saved.merge
+        model.fix.ignore = saved.ignore
+        model.fix.flash = saved.flash
+        model.fix.minDuration = saved.minDuration
     }
 
     /// The tools window while it downloads and while it prepares the recognition (T1, T2).
