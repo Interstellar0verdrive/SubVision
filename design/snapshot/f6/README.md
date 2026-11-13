@@ -56,10 +56,8 @@ Non c'è una pagina dell'app per tavola: `DS-gallery-light.png` / `-dark.png` è
 
 ## Differenze dalle tavole e cose da guardare
 
-- Report che eredita le scelte: un report nuovo si apre con le spunte di un report vecchio con lo stesso nome di SRT. Il primo R1 fatto su `sintel_eng_hardsub_demo.revisione.html` mostrava «11 righe incluse su 12» con la riga 1 tolta, senza `.revisione.json` accanto: la pagina, senza stato iniettato, legge `localStorage` (`voc26_rev_<srt>`), che la WKWebView dell'app conserva tra un report e l'altro. Per questo R1/R2 sono su una copia rinominata.
-- Menu Modifica (O9): «Annulla Annulla Togli» (il nome dell'azione contiene già «Annulla») e due «Seleziona tutto» (quello di sistema spento con ⌘A, quello dell'app senza scorciatoia).
-- Avvisi: l'ombra della scheda è tagliata dal bordo del pannello (rettangolo grigio visibile in chiaro, `real/O7-alert-light.png`, `O8`).
-- Impostazioni › Aspetto: dopo un cambio di tema fatto fuori dalla scheda, il selettore resta sul valore vecchio.
+- Corretti dopo queste catture (commit `0ad366a`, «Four small bugs seen in the F6 snapshots»): il report che ereditava le scelte di un report vecchio con lo stesso nome di SRT (`localStorage` della WKWebView conservato tra un report e l'altro: ora l'archivio è non persistente; per questo R1/R2 sono su una copia rinominata), «Annulla Annulla Togli» nel menu Modifica (O9: ora «Annulla Togli dall'elenco»), il selettore di Impostazioni › Aspetto che non seguiva un cambio di tema fatto altrove, l'ombra degli avvisi tagliata dal bordo del pannello (O7 e `real/O7-alert-*` rifatti dopo la correzione; O1, O2, O4, O8 e `real/O1-alert-*` hanno ancora il rettangolo grigio in chiaro).
+- Menu Modifica (O9): due «Seleziona tutto» (quello di sistema spento con ⌘A, quello dell'app senza scorciatoia): resta per F7.
 - O3: il pulsante «Esci e ferma» è rosso pieno; la tavola lo ha primario.
 - O10: la prima riga del menu del Dock («File 1 di 3 · …») non è attenuata come nella tavola.
 - N1: a 760 pt le statistiche delle tappe si troncano con «…».
