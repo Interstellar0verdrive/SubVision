@@ -22,7 +22,9 @@ REPO="$(cd "${SRCROOT}/../.." && pwd)"
 DEST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/SubVision"
 
 # What the engine is made of. Folders are copied whole, minus caches.
-ALLOW=(subvision pyproject.toml uv.lock .python-version LICENSE src defaults)
+# README.md and LICENSE are there because pyproject.toml names them: uv
+# builds the project on the first launch and hatchling refuses without them.
+ALLOW=(subvision pyproject.toml uv.lock .python-version LICENSE README.md src defaults)
 
 rm -rf "$DEST"
 mkdir -p "$DEST"

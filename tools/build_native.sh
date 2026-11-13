@@ -92,7 +92,7 @@ ALLOW=(
   '^Contents/Resources/locales/[a-z]{2}(-[A-Za-z]+)?$'
   '^Contents/Resources/locales/[a-z]{2}(-[A-Za-z]+)?/[a-z_]+\.json$'
   "^$ENGINE\$"
-  "^$ENGINE/(subvision|pyproject\\.toml|uv\\.lock|\\.python-version|LICENSE)\$"
+  "^$ENGINE/(subvision|pyproject\\.toml|uv\\.lock|\\.python-version|LICENSE|README\\.md)\$"
   "^$ENGINE/defaults(/[A-Za-z0-9_-]+\\.txt)?\$"
   "^$ENGINE/src(/[A-Za-z0-9_]+)*(\\.py)?\$"
 )
@@ -120,7 +120,8 @@ done < <(find "$APP" -mindepth 1 | sort)
 
 # What must be there.
 for must in Contents/Info.plist Contents/MacOS/SubVision "$ENGINE/subvision" \
-            "$ENGINE/pyproject.toml" "$ENGINE/uv.lock" "$ENGINE/src/subvision/__init__.py"; do
+            "$ENGINE/pyproject.toml" "$ENGINE/uv.lock" "$ENGINE/README.md" "$ENGINE/LICENSE" \
+            "$ENGINE/src/subvision/__init__.py"; do
   [[ -e "$APP/$must" ]] || fail "missing from the bundle: $must"
 done
 [[ -x "$APP/Contents/MacOS/SubVision" && -x "$APP/$ENGINE/subvision" ]] || fail "executables lost their x bit"
