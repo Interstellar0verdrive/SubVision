@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Sub fix (F5.3, design boards F0–F3): the SRT chosen (drop or Open SRT…),
-// the four options kept in UserDefaults under `fix.*`, the note on the
-// parameters shared with Process, `srt.fix` and its outcome. `srt.fix` is
+// the four options kept in UserDefaults under `fix.*`, the name of the copy,
+// `srt.fix` and its outcome. `srt.fix` is
 // never `busy`: the page works during a batch (design note 11).
 
 import AppKit
@@ -157,14 +157,17 @@ extension AppModel {
         }
     }
 
-    // MARK: - The shared parameters (design note 1)
-
-    /// "Also uses the parameters of Process: merging within 0.6 s, wrapping at 42, Italian, …".
-    var fixSharedNote: String {
-        let p = ocrParams
-        return t("app.fix.shared", ["gap": localizer.number(p.mergeGap, decimals: 1), "wrap": p.wrapWidth,
-                                    "lang": languageName(p.langHint)])
+    /// The name the engine gives the fixed copy (`fix.py`: `<stem>-fixed-<YYYYMMDD_HHMMSS>.srt`,
+    /// next to the source); the stamp is the moment of asking, as the run's will be.
+    var fixCopyName: String? {
+        guard let path = fixPath else { return nil }
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.dateFormat = "yyyyMMdd_HHmmss"
+        return path.deletingPathExtension().lastPathComponent + "-fixed-" + format.string(from: Date()) + ".srt"
     }
+
+    // MARK: - The shared parameters (design note 1)
 
     /// An OCR language by name, in the app's language: "Italiano" for `it-IT`
     /// when Vision's list has one variant of that language, the whole name
@@ -177,12 +180,6 @@ extension AppModel {
         let name = variants.count > 1 ? locale.localizedString(forIdentifier: code) : locale.localizedString(forLanguageCode: base(code))
         guard let name, !name.isEmpty else { return code }
         return name.prefix(1).uppercased() + name.dropFirst()
-    }
-
-    /// "Show Parameters": Process with the inspector open.
-    func showFixParameters() {
-        tab = .process
-        inspectorOpen = true
     }
 
     // MARK: - Running

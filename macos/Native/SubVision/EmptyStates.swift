@@ -149,7 +149,7 @@ struct FixEmptyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            PageTop(title: model.t("app.fix.title"), intro: model.t("app.fix.intro")) { OpenSRTButton() }
+            PageTop(title: model.t("app.fix.title"), intro: model.t("app.fix.intro")) { EmptyView() }
                 .padding(.bottom, 18)
             // A drop that is not an .srt: the yellow note of board F3, here too.
             if model.fix.outcome == .notSrt {
