@@ -1,0 +1,27 @@
+{
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "image-name" : "SubVision-Dark-1024.png",
+          "name" : "dark",
+          "hidden-specializations" : [
+            { "value" : true },
+            { "appearance" : "dark", "value" : false }
+          ]
+        },
+        {
+          "image-name" : "SubVision-Light-1024.png",
+          "name" : "light",
+          "hidden-specializations" : [
+            { "value" : false },
+            { "appearance" : "dark", "value" : true }
+          ]
+        }
+      ]
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [ "macOS" ]
+  }
+}
