@@ -356,6 +356,7 @@ struct InspectorGroup<Content: View>: View {
                             .help(toggleHelp ?? "")
                     }
                     .disabled(locked)
+                    .opacity(locked ? 0.45 : 1)
                 }
                 Spacer()
                 Button(model.t("app.common.defaults")) { reset() }

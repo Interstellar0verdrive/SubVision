@@ -280,6 +280,7 @@ struct FrameViewer: View {
         .disabled(previous ? result.index == 0 : result.index >= result.frames.count - 1)
         .opacity((previous ? result.index == 0 : result.index >= result.frames.count - 1) ? 0.45 : 1)
         .help(model.t(previous ? "app.preview.prev_frame" : "app.preview.next_frame"))
+        .accessibilityLabel(model.t(previous ? "app.preview.prev_frame" : "app.preview.next_frame"))
     }
 
     /// "Frame 8 of 20 · 00:00:20" and the badge.

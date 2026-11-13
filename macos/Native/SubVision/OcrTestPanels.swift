@@ -80,7 +80,7 @@ struct OcrTestPanel: View {
 
     @ViewBuilder
     private func result(_ r: OcrTestReply.Band) -> some View {
-        Text(model.t("app.preview.vote", ["ms": Int(r.ms.rounded()), "n": r.variants ?? r.alts.count + 1]))
+        Text(model.tn("app.preview.vote", r.variants ?? r.alts.count + 1, ["ms": Int(r.ms.rounded())]))
             .svSmall()
             .padding(.bottom, 6)
         textBox(r.text, mono: false)

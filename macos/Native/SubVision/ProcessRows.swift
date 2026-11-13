@@ -57,7 +57,7 @@ struct VideoRow: View {
                 StatusCircle(circle)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(2)
+                        Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
                         if video.state == .ready, video.srtExists {
                             StatusChip(model.t("app.process.row.srt_exists"))
                                 .help(model.t("app.process.row.srt_exists_help", ["name": renamedSRT]))

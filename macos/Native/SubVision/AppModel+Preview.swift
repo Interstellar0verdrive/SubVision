@@ -80,10 +80,11 @@ extension AppModel {
         return false
     }
 
-    /// "Find 20 Frames": the engine up, no batch (A6), no search, a readable video.
+    /// "Find 20 Frames": the engine up, no batch (A6), no search, a readable
+    /// video (a processed one too: the search is about the bands, not the batch).
     var canFindFrames: Bool {
         guard status == .ready, !batch.running, !isSearchingFrames, let video = previewVideo else { return false }
-        return video.state == .ready && video.exists
+        return video.state != .unreadable && video.exists
     }
 
     /// "Try OCR" (⌘T): a frame on screen, Vision answering, nothing else running.

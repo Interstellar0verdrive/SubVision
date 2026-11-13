@@ -32,8 +32,9 @@ struct ProcessView: View {
                         Button { model.openVideos() } label: { Label(model.t("app.process.open"), systemImage: "folder") }
                             .svButton(.secondary, .regular)
                     }
-                    // In a narrow window the top bar holds the inspector button (board N1).
-                    if !compact { InspectorButton() }
+                    // In a narrow window the top bar holds the inspector button (board N1);
+                    // with the inspector open the button stays, to close it (review note 1).
+                    if windowWidth >= chrome.collapseBelow { InspectorButton() }
                 }
                 .padding(.bottom, 18)
                 if model.videos.isEmpty {
