@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// The empty states of the three pages (design boards E0, A0, F0): three
+// The empty states of the pages (design boards E0, F0): three
 // numbered step cards and a drop area that fills the rest of the page.
 
 import SVShell
@@ -139,34 +139,6 @@ struct ProcessEmptyView: View {
                      onOpen: { model.openVideos() }, onDrop: { model.add($0) })
                 .padding(.top, 18)
         }
-    }
-}
-
-/// A0: Preview with no videos in Process.
-struct PreviewEmptyView: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.svPageTop) private var top
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            PageTop(title: model.t("app.preview.title"), intro: model.t("app.preview.intro")) { EmptyView() }
-                .padding(.bottom, 18)
-            HStack(alignment: .top, spacing: 16) {
-                ForEach(1...3, id: \.self) { n in
-                    StepCard(number: n, title: model.t("app.preview.empty_\(n)"), text: model.t("app.preview.empty_\(n)_text"))
-                }
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            DropArea(symbol: "viewfinder", title: model.t("app.preview.empty_title"),
-                     orText: model.t("app.process.empty.drop") + model.t("app.common.list_separator") + model.t("app.process.empty.or_open"),
-                     buttonTitle: model.t("app.process.open"), help: model.t("app.process.open_help"),
-                     footnote: model.t("app.preview.empty_drop_text"),
-                     onOpen: { model.openVideos() }, onDrop: { model.add($0) })
-                .padding(.top, 18)
-        }
-        .padding(.horizontal, 28)
-        .padding(.top, top)
-        .padding(.bottom, 28)
     }
 }
 

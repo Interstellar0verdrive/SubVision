@@ -1,172 +1,222 @@
 // SPDX-License-Identifier: MIT
-// Try OCR (design boards A4, A5): one panel per band with the voted text,
-// confidence and agreement, the alternatives, the final text (what the SRT
-// would get, `{\an8}` first for the signs band) and the time taken; the
-// panel while it reads, the empty band, the error, and the "parameters
-// changed" line when the test is older than the inspector's values.
+// Try OCR's two panels (design boards C2-A1–A3, design note 79): always
+// there under the summary, Dialogue | Signs, as tall as each other. Each
+// says what its band read on the frame on screen: the text in an inset box,
+// confidence, agreement and readings under it, the kind of OCR and the time
+// in its header; before a test the prompt, during the batch when the test
+// comes back, the spinner while it reads, the empty band, the error, the
+// signs band off with its switch, and "Superato" over a result whose
+// parameters changed since (the result at half strength).
 
 import AppKit
 import SVShell
 import SwiftUI
 
-/// The two panels side by side, one under the other in a narrow page.
+/// The two panels side by side (`.panel2`, 12 pt apart), filling the height given.
 struct OcrTestPanels: View {
-    @Environment(AppModel.self) private var model
-    var test: PreviewState.Test
-    var stale: Bool
-    var narrow: Bool
-
     var body: some View {
-        let layout = narrow ? AnyLayout(VStackLayout(spacing: 16)) : AnyLayout(HStackLayout(alignment: .top, spacing: 16))
-        layout {
-            switch test {
-            case .reading:
-                OcrTestPanel(band: .dialogue, state: .reading, stale: false)
-                if BandValues.signsOn { OcrTestPanel(band: .signs, state: .reading, stale: false) }
-            case .done(let reply, _, _, _):
-                OcrTestPanel(band: .dialogue, state: reply.bottom.map { .result($0) } ?? .empty, stale: stale)
-                if let top = reply.top { OcrTestPanel(band: .signs, state: .result(top), stale: stale) }
-            case .failed(let code, let message):
-                OcrTestPanel(band: .dialogue, state: .failed(model.previewErrorText(code: code, message: message)), stale: false)
-            }
+        HStack(alignment: .top, spacing: 12) {
+            OcrTestPanel(band: .dialogue)
+                .previewMetric("panel.dialogue")
+            OcrTestPanel(band: .signs)
+                .previewMetric("panel.signs")
         }
     }
 }
 
-/// One band's panel (`.panel` of the boards).
+/// One band's panel.
 struct OcrTestPanel: View {
-    enum State {
+    private enum Content {
+        /// No test on this frame yet: "Premi Prova OCR…".
+        case prompt
+        /// No test, and none until the batch ends.
+        case batch
         case reading
-        case result(OcrTestReply.Band)
-        /// The reply had no entry for this band.
-        case empty
+        case result(OcrTestReply.Band, multi: Bool)
+        /// The band was read and holds no text.
+        case empty(OcrTestReply.Band, multi: Bool)
         case failed(String)
+        /// The signs band is off: its switch.
+        case signsOff
     }
 
     @Environment(AppModel.self) private var model
+    @AppStorage(OcrKey.topBand) private var signsOn = ocrDefaults.topBand
     var band: PreviewBand
-    var state: State
-    var stale: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 3).fill(band.color).frame(width: 10, height: 10)
-                Text(model.t(band == .dialogue ? "app.preview.panel_dlg" : "app.preview.panel_sig"))
-                    .svFont(13, .semibold).foregroundStyle(SV.text)
+        let content = self.content
+        VStack(alignment: .leading, spacing: 6) {
+            header(content)
+            if stale(content) {
+                staleNote
             }
-            .padding(.bottom, 6)
-            switch state {
-            case .reading:
-                HStack(spacing: 8) {
-                    Spinner(size: 12)
-                    Text(model.t("app.preview.reading")).svFont(12).foregroundStyle(SV.text2)
+            contentView(content)
+                .opacity(stale(content) ? 0.5 : 1)
+                .frame(maxHeight: .infinity, alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .background(RoundedRectangle(cornerRadius: SV.Radius.card).fill(SV.surface))
+        .overlay(RoundedRectangle(cornerRadius: SV.Radius.card).strokeBorder(SV.line))
+        .clipShape(RoundedRectangle(cornerRadius: SV.Radius.card))
+    }
+
+    private var content: Content {
+        if band == .signs && !signsOn { return .signsOff }
+        switch model.previewTest {
+        case .reading?:
+            return .reading
+        case .failed(let code, let message)?:
+            return .failed(model.previewErrorText(code: code, message: message))
+        case .done(let reply, let params)?:
+            if let read = reply.bands[band.engineKey] {
+                return read.empty || read.text.isEmpty ? .empty(read, multi: params.multiVariant) : .result(read, multi: params.multiVariant)
+            }
+            // Not read (the signs band was off then): as if there were no test.
+            return model.batch.running ? .batch : .prompt
+        case nil:
+            return model.batch.running ? .batch : .prompt
+        }
+    }
+
+    private func stale(_ content: Content) -> Bool {
+        switch content {
+        case .result, .empty: model.previewStale(band)
+        default: false
+        }
+    }
+
+    // MARK: Header
+
+    /// The swatch, the band's name and, after a test, "OCR con voto · 214 ms" on the right.
+    private func header(_ content: Content) -> some View {
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 3).fill(band.color).frame(width: 10, height: 10)
+            Text(model.t(band.nameKey)).svFont(13, .semibold).foregroundStyle(SV.text)
+            Spacer(minLength: 8)
+            if let meta = meta(content) {
+                // A narrow panel: the time alone.
+                ViewThatFits(in: .horizontal) {
+                    Text(meta.long).svFont(11.5).foregroundStyle(SV.text3).fixedSize()
+                    Text(meta.short).svFont(11.5).foregroundStyle(SV.text3).lineLimit(1)
                 }
-                .padding(.vertical, 30)
-            case .result(let r):
-                result(r)
-            case .empty:
-                NoteView(.neutral, text: model.t("app.preview.no_text_band"))
-                    .padding(.top, 4)
-            case .failed(let text):
-                NoteView(.red, text: text)
-                    .padding(.top, 4)
+                .layoutPriority(1)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .svBox(RoundedRectangle(cornerRadius: SV.Radius.card), fill: SV.surface, line: SV.line,
-               padding: EdgeInsets(vertical: 14, horizontal: 16))
+        .frame(height: 18)
     }
+
+    private func meta(_ content: Content) -> (long: String, short: String)? {
+        switch content {
+        case .result(let r, let multi), .empty(let r, let multi):
+            let ms = ["ms": Int(r.ms.rounded())]
+            return (model.t(multi ? "app.preview.meta_vote" : "app.preview.meta_single", ms), model.t("app.preview.meta_ms", ms))
+        default:
+            return nil
+        }
+    }
+
+    // MARK: Content
 
     @ViewBuilder
-    private func result(_ r: OcrTestReply.Band) -> some View {
-        Text(model.tn("app.preview.vote", r.variants ?? r.alts.count + 1, ["ms": Int(r.ms.rounded())]))
-            .svSmall()
-            .padding(.bottom, 6)
-        textBox(r.text, mono: false)
-        if r.text.isEmpty && r.empty {
-            NoteView(.neutral, text: model.t("app.preview.no_text_band"))
-                .padding(.top, 10)
-        } else {
-            Text(model.t("app.preview.conf", ["c": Int((r.conf * 100).rounded()), "a": Int((r.agree * 100).rounded())]))
-                .svSmall()
-                .padding(.top, 6)
-            if !r.alts.isEmpty {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(model.t("app.preview.alts")).svSmall()
-                    FlowChips(r.alts)
-                }
-                .padding(.top, 6)
+    private func contentView(_ content: Content) -> some View {
+        switch content {
+        case .prompt:
+            centred(symbol: "magnifyingglass", text: model.t("app.preview.panel_prompt"))
+        case .batch:
+            centred(symbol: "magnifyingglass", text: model.t("app.preview.panel_batch"))
+        case .reading:
+            HStack(spacing: 8) {
+                Spinner(size: 12)
+                Text(model.t("app.preview.reading")).svFont(12).foregroundStyle(SV.text2)
             }
-            HStack(spacing: 6) {
-                Text(model.t("app.preview.final").uppercased()).svFont(10.5, .semibold).foregroundStyle(SV.text3).tracking(0.3)
-                HelpDot(text: model.t("app.preview.final_help"))
-                Spacer(minLength: 0)
-                Button(model.t("app.preview.copy")) { copy(r.finalText) }
-                    .svButton(.plain, .small)
-                    .disabled(r.finalText.isEmpty)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .result(let r, let multi):
+            VStack(alignment: .leading, spacing: 6) {
+                textBox(r)
+                Text(confidence(r, multi: multi)).svSmall().fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.top, 10).padding(.bottom, 4)
-            textBox(r.finalText, mono: true)
-            if stale {
-                HStack(spacing: 5) {
-                    Image(systemName: "exclamationmark.triangle.fill").svFont(11)
-                    Text(model.t("app.preview.stale")).svFont(12)
-                }
-                .foregroundStyle(SV.yellowText)
-                .padding(.top, 6)
+        case .empty:
+            centred(symbol: "text.badge.xmark", text: model.t("app.preview.no_text_band"))
+        case .failed(let text):
+            NoteView(.red, text: text) { EmptyView() }
+        case .signsOff:
+            HStack(spacing: 10) {
+                Text(model.t("app.preview.signs_off")).svFont(12).foregroundStyle(SV.text3)
+                InspectorSwitch(isOn: $signsOn)
+                    .disabled(model.batch.running)
+                    .help(model.t("app.inspector.help.sig_on"))
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
-    /// The voted or the final text in an inset box; "‹empty›" in italics when there is none.
-    private func textBox(_ text: String, mono: Bool) -> some View {
-        Group {
-            if text.isEmpty {
-                Text(model.t("app.preview.empty_text")).svFont(13).italic().foregroundStyle(SV.text3)
-            } else {
-                Text(text).svFont(mono ? 12.5 : 13, mono: mono, leading: 1.45).foregroundStyle(SV.text)
-                    .textSelection(.enabled)
-            }
+    /// `.panel2 .empty`: a symbol and a short text in the middle of the panel.
+    private func centred(symbol: String, text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol).svFont(12)
+            Text(text).svFont(12).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .svBox(RoundedRectangle(cornerRadius: SV.Radius.icon), fill: SV.inset, line: SV.line,
-               padding: EdgeInsets(vertical: 8, horizontal: 10))
+        .foregroundStyle(SV.text3)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// `.textbox`: what the band read. The final text (what the SRT would get) and the
+    /// alternatives in the tooltip; both texts in the context menu.
+    private func textBox(_ r: OcrTestReply.Band) -> some View {
+        Text(r.text).svFont(13, leading: 1.45).foregroundStyle(SV.text)
+            .lineLimit(4)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .background(RoundedRectangle(cornerRadius: SV.Radius.icon).fill(SV.inset))
+            .overlay(RoundedRectangle(cornerRadius: SV.Radius.icon).strokeBorder(SV.line))
+            .help(tooltip(r))
+            .contextMenu {
+                Button(model.t("app.preview.copy_final")) { copy(r.finalText) }.disabled(r.finalText.isEmpty)
+                Button(model.t("app.preview.copy_read")) { copy(r.text) }
+            }
+    }
+
+    /// "Testo finale: …" and "Alternative: … · …".
+    private func tooltip(_ r: OcrTestReply.Band) -> String {
+        var lines = ["\(model.t("app.preview.final")): \(r.finalText)"]
+        if !r.alts.isEmpty { lines.append("\(model.t("app.preview.alts")): \(r.alts.joined(separator: " · "))") }
+        return lines.joined(separator: "\n")
+    }
+
+    /// "Confidenza 94 % · accordo 100 % · 3 letture"; one reading: the confidence alone.
+    private func confidence(_ r: OcrTestReply.Band, multi: Bool) -> String {
+        let reads = r.variants ?? r.alts.count + 1
+        let values: [String: Any] = ["c": Int((r.conf * 100).rounded()), "a": Int((r.agree * 100).rounded())]
+        if !multi { return model.t("app.preview.conf_single", values) }
+        return reads > 1 ? model.tn("app.preview.conf_reads", reads, values) : model.t("app.preview.conf", values)
+    }
+
+    /// `.note.yellow.slim`: "**Superato:** rifai la prova."
+    private var staleNote: some View {
+        var text = AttributedString(model.t("app.preview.stale_title"))
+        text.inlinePresentationIntent = .stronglyEmphasized
+        text += AttributedString(" " + model.t("app.preview.stale"))
+        return HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle").svFont(12)
+            Text(text).svFont(12).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(SV.yellowText)
+        .padding(.vertical, 7)
+        .padding(.horizontal, 10)
+        .background(RoundedRectangle(cornerRadius: SV.Radius.field).fill(SV.yellowBg))
+        .overlay(RoundedRectangle(cornerRadius: SV.Radius.field).strokeBorder(SV.yellowLine))
     }
 
     private func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-    }
-}
-
-/// The alternatives as chips, wrapping when they are many.
-struct FlowChips: View {
-    var items: [String]
-    init(_ items: [String]) { self.items = items }
-
-    var body: some View {
-        // A few short readings fit one line; long lines wrap inside their chip instead.
-        HStack(spacing: 6) {
-            ForEach(Array(items.enumerated()), id: \.offset) { _, alt in
-                Text(alt).svFont(11, mono: true).foregroundStyle(SV.text2).lineLimit(2)
-                    .svBox(RoundedRectangle(cornerRadius: 9), fill: SV.chipBg, line: SV.chipLine,
-                           padding: EdgeInsets(vertical: 1, horizontal: 8))
-            }
-        }
-        .fixedSize(horizontal: false, vertical: true)
-    }
-}
-
-/// The small "?" of the boards: a tooltip on hover.
-struct HelpDot: View {
-    var text: String
-
-    var body: some View {
-        Text(verbatim: "?").svFont(9, .semibold).foregroundStyle(SV.text2)
-            .frame(width: 14, height: 14)
-            .overlay(Circle().strokeBorder(SV.glassLine))
-            .help(text)
     }
 }

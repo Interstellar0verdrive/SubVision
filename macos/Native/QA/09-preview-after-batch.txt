@@ -37,12 +37,16 @@ preview-menu
 ? ✓ sintel_eng_hardsub_demo\.mp4 on
 preview-select 0
 ? ^ok · sintel_ita_hardsub_demo\.mp4$
-find-frames
-? ^ok · searching
+# Design note 80: Preview is a window of its own; a video without frames
+# starts Find 20 Frames by itself when the window opens on it.
+preview-open
+? ^ok · sintel_ita_hardsub_demo\.mp4 · searching$
 wait-frames 300
 ? ^20 frames · 1[5-9] with text · 0 with signs
-capture $OUT/preview-ita.png
+preview-capture $OUT/preview-ita.png
 ? preview-ita.png$
+preview-close
+? ^ok
 # Design note 72: the report follows the app's language at open and when it changes,
 # in place (an edit in a text box survives the switch); 71: its English names.
 ! test -s "$WORK/sintel_ita_hardsub_demo.review.html" && test ! -e "$WORK/sintel_ita_hardsub_demo.revisione.html"

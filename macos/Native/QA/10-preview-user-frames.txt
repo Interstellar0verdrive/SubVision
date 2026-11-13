@@ -16,10 +16,8 @@ inspector-set langHint it-IT
 band-set top-band 1
 ? top on
 add $WORK/_test-1.mkv
-preview-select 0
-? ^ok · _test-1\.mkv$
-find-frames
-? ^ok · searching
+preview-open 0
+? ^ok · _test-1\.mkv · searching$
 wait-frames 600
 ? ^20 frames · 17 with text · 1 with signs
 frames
@@ -27,7 +25,7 @@ frames
 frame 9
 preview-state
 ? bands bottom\+top
-capture $OUT/frame-9-both-bands.png
+preview-capture $OUT/frame-9-both-bands.png
 ? frame-9-both-bands.png$
 try-ocr
 ? ^ok · reading
@@ -44,6 +42,6 @@ try-ocr
 wait-ocr 120
 preview-state
 ? bands none
-capture $OUT/silent-after-test.png
+preview-capture $OUT/silent-after-test.png
 ? silent-after-test.png$
 params default

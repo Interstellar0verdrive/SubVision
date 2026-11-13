@@ -252,10 +252,10 @@ enum DebugSnapshot {
         model.preview.results[video.id] = silent
         model.preview.search = .failed(code: "invalid_duration", message: nil)
         let json = #"{"bands":{"bottom":{"text":"","conf":0,"agree":0,"alts":[],"final":"","ms":214,"variants":3,"empty":true},"top":{"text":"IL MERCATO","conf":0.71,"agree":0.67,"alts":["IL MERCAT0","LL MERCATO"],"final":"{\\an8}IL MERCATO","ms":96,"variants":3,"empty":false}}}"#
-        if let reply = try? EngineCoding.decoder.decode(OcrTestReply.self, from: Data(json.utf8)) {
-            model.preview.test = .done(reply, params: model.ocrParams, useIgnore: model.useIgnore, useCorrections: model.useCorrections)
-            model.preview.testFrame = model.previewFrame?.path
-            model.preview.stale = true
+        if let reply = try? EngineCoding.decoder.decode(OcrTestReply.self, from: Data(json.utf8)), let key = model.previewTestKey {
+            var params = model.ocrParams
+            params.minConfidence += 0.05  // older than the parameters: stale
+            model.preview.tests[key] = .done(reply, params: params)
         }
         try? await Task.sleep(for: .milliseconds(600))
         await capture(model, "\(base)-A5.png", schemes: schemes)

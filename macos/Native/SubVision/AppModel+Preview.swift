@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT
-// Preview (F5.2, design boards A1–A6): `preview.frames` with its progress and
-// stop, the frames found (kept per video while the app is open), the current
-// frame with its thumbnails, and Try OCR (`preview.test`) with the two
-// panels. The bands themselves live in UserDefaults (`OcrKey`), shared with
-// the inspector: `BandOverlay.swift` reads and writes them.
+// Preview (F5.2, design boards C2-A1–A3, design notes 76, 79, 80): the
+// Preview window on one video of the list, `preview.frames` with its
+// progress and stop, the frames found (kept per video while the app is
+// open), the current frame with its thumbnails, and Try OCR
+// (`preview.test`), whose results stay per frame until the app quits. The
+// bands themselves live in UserDefaults (`OcrKey`), shared with the
+// parameters panel: `BandOverlay.swift` reads and writes them. The window is
+// in PreviewWindow.swift, its content in PreviewView.swift.
 
 import AppKit
 import ImageIO
 import SVShell
 import SwiftUI
 
-/// Everything the Preview page shows; `AppModel.preview` holds it.
+/// Everything the Preview window shows; `AppModel.preview` holds it.
 struct PreviewState {
     enum Search: Equatable {
         case idle
@@ -26,45 +29,76 @@ struct PreviewState {
         var frames: [PreviewFrame]
         /// The frame shown, 0-based.
         var index = 0
-        /// One small image per frame, made once from the whole frames (design note 30).
+        /// One small image per frame, made once from the whole frames (design notes 30, 76).
         var thumbnails: [NSImage?] = []
         var found: Int { frames.filter(\.hasText).count }
         /// The frames with a sign (design note 78: "17 with text · 5 with signs").
         var foundSigns: Int { frames.filter(\.hasSigns).count }
     }
 
+    /// Try OCR on one frame.
     enum Test {
         case reading
-        /// The reply, with the parameters it ran with (a change after it makes it stale, A5).
-        case done(OcrTestReply, params: OcrParams, useIgnore: Bool, useCorrections: Bool)
+        /// The reply, with the parameters it ran with: a change of the ones a band
+        /// depends on makes that band's panel stale (design note 79).
+        case done(OcrTestReply, params: OcrParams)
         case failed(code: String, message: String?)
+    }
+
+    /// A frame of a video: where its test is kept (design note 79).
+    struct FrameKey: Hashable {
+        var video: UUID
+        var frame: String
     }
 
     static let zones = 20
     static let tries = 3
+    /// The thumbnails' long side, in pixels (design note 76: about 240, was 120).
+    static let thumbnailPixels = 240
 
     var search: Search = .idle
-    /// The video the search runs on (the Video menu is disabled meanwhile, A2).
+    /// The video the search runs on (the Video menu is disabled meanwhile).
     var searching: UUID?
     var results: [UUID: Result] = [:]
-    var test: Test?
-    /// The frame the test ran on: another frame, or video, clears the panels.
-    var testFrame: String?
-    /// The parameters changed after the test (A5: "try again").
-    var stale = false
+    /// The tests made, per frame, until the app quits (design note 79): another
+    /// frame or video does not clear them.
+    var tests: [FrameKey: Test] = [:]
+    /// The frame being read: one test at a time.
+    var reading: FrameKey?
+    /// The parameters as they are now, refreshed on every change of UserDefaults
+    /// while the window is open (the panels compare a test's parameters with them).
+    var params = OcrParams()
     /// The current whole frame, decoded once per frame.
     var frameImage: NSImage?
     var frameImagePath: String?
-    /// The band being dragged with its values: the label next to the handle (A3).
+    /// The band being dragged with its values: the label next to the handle.
     var drag: BandDrag?
     /// Where the frame is drawn (SwiftUI's global space), for the DebugQA drag commands.
     var frameRect: CGRect = .zero
     /// The Preview window is the key window: the Preview commands of the menu bar act on it.
     var windowKey = false
+    /// The one Preview window, while it is open (design note 80).
+    var window: PreviewWindowController?
+}
+
+extension PreviewBand {
+    /// The band's name in `OcrTestReply.bands` and `PreviewFrame.bands`.
+    var engineKey: String { self == .dialogue ? "bottom" : "top" }
+
+    /// Whether a test made with `a` still says what one with `b` would (design note 79):
+    /// the band's own height and width (and, for the signs, its switch), the OCR language,
+    /// the multiple reading and the minimum confidence.
+    func sameReading(_ a: OcrParams, _ b: OcrParams) -> Bool {
+        guard a.langHint == b.langHint, a.multiVariant == b.multiVariant, a.minConfidence == b.minConfidence else { return false }
+        switch self {
+        case .dialogue: return a.bottomKeepPct == b.bottomKeepPct && a.keepWPct == b.keepWPct
+        case .signs: return a.topBand == b.topBand && a.topKeepPct == b.topKeepPct && a.topKeepWPct == b.topKeepWPct
+        }
+    }
 }
 
 extension AppModel {
-    // MARK: - What the page reads
+    // MARK: - What the window reads
 
     var previewResult: PreviewState.Result? { previewVideo.flatMap { preview.results[$0.id] } }
     var previewFrames: [PreviewFrame] { previewResult?.frames ?? [] }
@@ -74,17 +108,29 @@ extension AppModel {
         return r.frames[r.index]
     }
 
+    /// The frame on screen, as its test is kept.
+    var previewTestKey: PreviewState.FrameKey? {
+        guard let video = previewVideo, let frame = previewFrame else { return nil }
+        return PreviewState.FrameKey(video: video.id, frame: frame.path)
+    }
+
+    /// The test of the frame on screen, if one was made.
+    var previewTest: PreviewState.Test? { previewTestKey.flatMap { preview.tests[$0] } }
+
+    /// The band's result on screen is older than the parameters it depends on ("Superato").
+    func previewStale(_ band: PreviewBand) -> Bool {
+        guard case .done(_, let params)? = previewTest else { return false }
+        return !band.sameReading(params, preview.params)
+    }
+
     var isSearchingFrames: Bool {
         if case .running = preview.search { return true }
         return false
     }
 
-    var isReadingOCR: Bool {
-        if case .reading? = preview.test { return true }
-        return false
-    }
+    var isReadingOCR: Bool { preview.reading != nil }
 
-    /// "Find 20 Frames": the engine up, no batch (A6), no search, a readable
+    /// "Find 20 Frames": the engine up, no batch, no search, a readable
     /// video (a processed one too: the search is about the bands, not the batch).
     var canFindFrames: Bool {
         guard status == .ready, !batch.running, !isSearchingFrames, let video = previewVideo else { return false }
@@ -105,28 +151,80 @@ extension AppModel {
     /// Previous / Next Frame (⌘← ⌘→).
     var canBrowseFrames: Bool { previewFrames.count > 1 }
 
-    /// The handles: not during the batch (the parameters are locked, A6).
+    /// The handles: not during the batch (the parameters are locked, C2-A3).
     var canDragBands: Bool { !batch.running && status == .ready }
+
+    /// "Anteprima · 01:03 · 23,976 fps · 2544×1440": the window's subtitle.
+    var previewSubtitle: String {
+        var parts = [t("app.preview.title")]
+        if let video = previewVideo {
+            if let duration = video.duration { parts.append(Localizer.clock(duration)) }
+            if let fps = video.fps { parts.append(t("app.preview.fps", ["fps": previewFPSText(fps)])) }
+            if let size = video.size { parts.append(size) }
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// "23,976" or "24": the language's separators, no trailing zeros (as the list's column).
+    func previewFPSText(_ fps: Double) -> String {
+        let rounded = (fps * 1000).rounded() / 1000
+        return localizer.number(rounded, decimals: rounded == rounded.rounded() ? 0 : 3)
+    }
 
     // MARK: - The window
 
     /// The Preview window on a video (the row's Preview button, the ⋯ and context menus,
     /// the menu bar): one window at a time, brought to the front if open (design note 80).
-    /// nil keeps the video chosen last.
+    /// nil keeps the video chosen last. A video without frames yet starts its search.
     func openPreview(_ id: UUID?) {
-        if let id, id != previewVideoID { selectPreviewVideo(id) }
+        if let id, id != previewVideoID {
+            if isSearchingFrames {
+                log.info("preview: \(previewVideo?.name ?? "-") is being searched, the window stays on it")
+            } else {
+                selectPreviewVideo(id)
+            }
+        }
+        if preview.window == nil {
+            let controller = PreviewWindowController(model: self)
+            controller.onClose = { [weak self] in self?.previewWindowClosed() }
+            preview.window = controller
+        }
+        refreshPreviewParams()
+        loadFrameImage()
+        preview.window?.show()
         log.info("preview window: \(previewVideo?.name ?? "-")")
+        findFramesIfNone()
+    }
+
+    /// The window went: the menu bar's Preview commands go off with it.
+    private func previewWindowClosed() {
+        preview.window = nil
+        preview.windowKey = false
+        preview.drag = nil
     }
 
     // MARK: - The video
 
-    /// The Video menu: the chosen one is kept (`previewVideoID`), the panels go.
+    /// The chosen video (`previewVideoID`, kept across launches). Its frames and
+    /// tests, and those of the others, stay.
     func selectPreviewVideo(_ id: UUID) {
         guard !isSearchingFrames, id != previewVideoID else { return }
         previewVideoID = id
-        clearTest()
         preview.search = .idle
+        preview.drag = nil
         loadFrameImage()
+    }
+
+    /// An item of the window's Video menu: the video, and its search when it has no frames yet.
+    func choosePreviewVideo(_ id: UUID) {
+        selectPreviewVideo(id)
+        if preview.window != nil { findFramesIfNone() }
+    }
+
+    /// Find 20 Frames by itself, on a video that has none yet (when it can run).
+    func findFramesIfNone() {
+        guard let video = previewVideo, preview.results[video.id] == nil, canFindFrames else { return }
+        findFrames()
     }
 
     // MARK: - Find 20 Frames
@@ -135,7 +233,6 @@ extension AppModel {
         guard canFindFrames, let video = previewVideo else { return }
         preview.searching = video.id
         preview.search = .running(done: 0, total: PreviewState.zones, found: 0)
-        clearTest()
         let params = ocrParams
         Task {
             do {
@@ -153,7 +250,7 @@ extension AppModel {
         }
     }
 
-    /// Stop (A2): `preview.stop`; the engine answers with `preview.stopped`.
+    /// Stop: `preview.stop`; the engine answers with `preview.stopped`.
     func stopFrames() {
         guard isSearchingFrames else { return }
         Task {
@@ -174,6 +271,8 @@ extension AppModel {
             result.index = frames.firstIndex(where: \.hasText) ?? 0
             result.thumbnails = Array(repeating: nil, count: frames.count)
             preview.results[id] = result
+            // New frames: the tests of the old ones of this video go with them.
+            preview.tests = preview.tests.filter { $0.key.video != id }
             preview.search = .idle
             preview.searching = nil
             log.info("preview: \(frames.count) frames, \(result.found) with text")
@@ -205,11 +304,11 @@ extension AppModel {
     }
 
     /// The 20 thumbnails, decoded small from the JPEGs off the main thread
-    /// (about 120 px wide: 20 of them weigh a few hundred KB).
+    /// (240 px on the long side, design note 76: 20 of them weigh about a megabyte).
     private func makeThumbnails(for id: UUID, frames: [PreviewFrame]) {
         let paths = frames.map(\.path)
         Task.detached(priority: .utility) {
-            let batch = ThumbnailBatch(paths: paths, maxPixels: 120)
+            let batch = ThumbnailBatch(paths: paths, maxPixels: PreviewState.thumbnailPixels)
             await MainActor.run {
                 guard var result = self.preview.results[id], result.frames.map(\.path) == paths else { return }
                 result.thumbnails = paths.map { batch.images[$0].map { NSImage(cgImage: $0, size: .zero) } }
@@ -225,14 +324,13 @@ extension AppModel {
         guard result.index != index else { return }
         result.index = index
         preview.results[video.id] = result
-        clearTest()
         loadFrameImage()
     }
 
     func nextFrame() { if let r = previewResult { selectFrame(min(r.index + 1, r.frames.count - 1)) } }
     func previousFrame() { if let r = previewResult { selectFrame(max(r.index - 1, 0)) } }
 
-    /// The whole frame on screen, decoded once; nil when the file went (A5: "not available").
+    /// The whole frame on screen, decoded once; nil when the file went ("not available").
     func loadFrameImage() {
         let path = previewFrame?.path
         guard path != preview.frameImagePath else { return }
@@ -249,25 +347,24 @@ extension AppModel {
 
     // MARK: - Try OCR
 
+    /// Try OCR on the frame on screen; its result stays with that frame (design note 79).
     func tryOCR() {
-        guard canTryOCR, let frame = previewFrame else { return }
+        guard canTryOCR, let key = previewTestKey else { return }
         let params = ocrParams, ignore = useIgnore, corrections = useCorrections
-        preview.test = .reading
-        preview.testFrame = frame.path
-        preview.stale = false
+        preview.tests[key] = .reading
+        preview.reading = key
+        preview.params = params
         Task {
             do {
-                let reply = try await engine.previewTest(frame: frame.path, params: params, useIgnore: ignore, useCorrections: corrections)
-                guard preview.testFrame == frame.path, isReadingOCR else { return }
-                preview.test = .done(reply, params: params, useIgnore: ignore, useCorrections: corrections)
+                let reply = try await engine.previewTest(frame: key.frame, params: params, useIgnore: ignore, useCorrections: corrections)
+                preview.tests[key] = .done(reply, params: params)
                 log.info("preview.test: bottom \"\(reply.bottom?.text ?? "")\" top \"\(reply.top?.text ?? "")\"")
-                applyTestToBadge(reply, frame: frame.path)
-                refreshPreviewStale()
+                applyTestToBadge(reply, frame: key.frame)
             } catch {
-                guard preview.testFrame == frame.path, isReadingOCR else { return }
                 log.error("preview.test: \(error)")
-                preview.test = .failed(code: (error as? EngineError)?.remoteCode ?? "unknown", message: Self.errorDetail(error))
+                preview.tests[key] = .failed(code: (error as? EngineError)?.remoteCode ?? "unknown", message: Self.errorDetail(error))
             }
+            preview.reading = nil
         }
     }
 
@@ -294,24 +391,20 @@ extension AppModel {
         }
     }
 
+    /// Forgets the test of the frame on screen.
     func clearTest() {
-        preview.test = nil
-        preview.testFrame = nil
-        preview.stale = false
+        guard let key = previewTestKey, preview.reading != key else { return }
+        preview.tests[key] = nil
     }
 
-    /// After any change in UserDefaults: the test is stale when its parameters differ from today's.
-    func refreshPreviewStale() {
-        guard case .done(_, let params, let ignore, let corrections)? = preview.test else {
-            if preview.stale { preview.stale = false }
-            return
-        }
-        let stale = params != ocrParams || ignore != useIgnore || corrections != useCorrections
-        if stale != preview.stale { preview.stale = stale }
+    /// After any change in UserDefaults: today's parameters, which the panels compare their test with.
+    func refreshPreviewParams() {
+        let now = ocrParams
+        if now != preview.params { preview.params = now }
     }
 }
 
-/// The small images of the strip, made with ImageIO's downsampling decoder:
+/// The small images of the thumbnails, made with ImageIO's downsampling decoder:
 /// the whole JPEG is never decoded at full size.
 struct ThumbnailBatch: @unchecked Sendable {
     var images: [String: CGImage] = [:]

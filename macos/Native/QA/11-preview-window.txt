@@ -1,0 +1,89 @@
+# Design notes 76, 79, 80 (boards C2-A1–A3): Preview in its own window. It
+# opens on a video and finds its 20 frames by itself; the block (frame,
+# thumbnails in two rows of ten as wide as the frame, summary, the two
+# panels as tall as each other) fits the window without scrolling, at the
+# board's size and at the smallest. Try OCR's results stay with their frame;
+# a change of the signs band in the main window's panel makes the signs
+# panel "Superato" and leaves the dialogue panel as it was.
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
+@launch
+wait-ready 600
+? ^ready
+lang it
+params default
+inspector-set langHint it-IT
+add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4
+preview-state
+? ^window closed
+preview-open 1
+? ^ok · sintel_eng_hardsub_demo\.mp4 · searching$
+wait-frames 300
+? ^20 frames · 1[5-9] with text
+preview-menu
+? ✓ sintel_eng_hardsub_demo\.mp4 on
+preview-size 1280x860
+? ^ok · 1280x860
+preview-layout
+? ^window 1280x860 .* thumbs 2x10 .* · fits$
+# No test yet: the panels wait for Try OCR.
+preview-state
+? test none
+try-ocr
+? ^ok · reading
+wait-ocr 120
+? ^bottom ".+"
+preview-state
+? test done · tests 1
+?! stale
+# The signs band higher in the main window's panel: only the signs panel is stale.
+inspector-set ocr.topKeepPct 26
+preview-state
+? test done stale signs ·
+?! stale dialogue
+theme dark
+preview-capture $OUT/A2-dark.png
+? A2-dark.png$
+theme light
+preview-capture $OUT/A2-light.png
+? A2-light.png$
+theme dark
+# Another frame has no test; back on the first, its test is still there.
+frame 2
+preview-state
+? test none · tests 1
+frame 1
+preview-state
+? test done stale signs
+# The dialogue band changed too: both panels stale.
+band-set bottom-height 30
+preview-state
+? test done stale dialogue\+signs
+# The smallest window, and the ones of design note 76.
+preview-size 600x400
+? ^ok · 900x640 · min 900x640
+preview-layout
+? ^window 900x640 .* · fits$
+preview-capture $OUT/min.png
+? min.png$
+preview-size 1000x700
+preview-layout
+? · fits$
+preview-size 1360x840
+preview-layout
+? · fits$
+preview-size 1280x860
+# The other video from the window's menu: its frames are searched by themselves.
+preview-select 0
+? ^ok · sintel_ita_hardsub_demo\.mp4$
+wait-frames 300
+? ^20 frames
+preview-state
+? video sintel_ita_hardsub_demo\.mp4 .* test none
+preview-select 1
+preview-state
+? test done stale dialogue\+signs
+preview-close
+? ^ok
+preview-state
+? ^window closed
+params default
