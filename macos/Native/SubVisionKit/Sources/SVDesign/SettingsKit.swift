@@ -91,7 +91,7 @@ public struct SettingsGroup<Content: View>: View {
     public var body: some View {
         // Label 6 pt above a border-box of rows.
         VStack(alignment: .leading, spacing: 6) {
-            if let title { Text(title).svLabel().padding(.leading, 4) }
+            if let title { Text(title).svLabel().textCase(.uppercase).tracking(0.4).padding(.leading, 4) }
             Group(subviews: content()) { subviews in
                 VStack(spacing: 0) {
                     ForEach(Array(subviews.enumerated()), id: \.offset) { index, sub in

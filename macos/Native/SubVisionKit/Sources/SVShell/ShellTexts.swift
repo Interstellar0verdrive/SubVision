@@ -46,6 +46,14 @@ public struct ShellTexts: Sendable, Equatable {
     /// A task row failed (the warm-up: Vision did not load).
     public var toolsTaskFailedTitle = "The preparation did not start."
     public var toolsTaskFailedText = "The log says why."
+    /// The footer while a task runs (T2): quitting now postpones it.
+    public var toolsWarmupNote = "If you quit now, the preparation starts again at the next launch."
+    /// The header when the window comes back for one missing download (T4 left); `{mb}` is filled in.
+    public var toolsOneMissingTitle = "One tool is missing"
+    public var toolsOneMissingText = "FFmpeg is no longer in the app's folder. Downloading it again: {mb} MB."
+    /// The header when only the preparation runs again, after a macOS update (T4 right).
+    public var toolsAgainTitle = "macOS was updated"
+    public var toolsAgainText = "Vision prepares its models again for this version: about 30 seconds."
     public var toolsRuntime = "the engine's own Python"
     public var toolsMegabytes = "{n} MB"
     public var toolsSeconds = "{n} s"
@@ -111,6 +119,11 @@ public struct ShellTexts: Sendable, Equatable {
         (\.toolsStoppedKept, "app.tools.stopped_kept"),
         (\.toolsTaskFailedTitle, "app.tools.vision_failed"),
         (\.toolsTaskFailedText, "app.tools.vision_failed_text"),
+        (\.toolsWarmupNote, "app.tools.warmup_note"),
+        (\.toolsOneMissingTitle, "app.tools.one_missing"),
+        (\.toolsOneMissingText, "app.tools.one_missing_text"),
+        (\.toolsAgainTitle, "app.tools.again_title"),
+        (\.toolsAgainText, "app.tools.again_text"),
         (\.toolsRuntime, "app.tools.row.python_sub"),
         (\.toolsMegabytes, "app.tools.mb"),
         (\.toolsSeconds, "app.tools.seconds"),

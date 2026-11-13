@@ -37,15 +37,18 @@ public final class ToolsSetupState {
         public var total: Int64 = 0
         /// A task's real duration, from `warmup.done`.
         public var seconds: Double?
+        /// When a task row started: its bar runs against the expected time.
+        public var startedAt: Date?
         public var id: String { tool.key }
 
         public init(tool: ToolRow, state: ToolProgress.State = .waiting, bytes: Int64 = 0, total: Int64 = 0,
-                    seconds: Double? = nil) {
+                    seconds: Double? = nil, startedAt: Date? = nil) {
             self.tool = tool
             self.state = state
             self.bytes = bytes
             self.total = total
             self.seconds = seconds
+            self.startedAt = startedAt
         }
     }
 
@@ -154,6 +157,7 @@ public final class ToolsSetupState {
         guard !rows.contains(where: { $0.tool.kind == .task && $0.state == .running }),
               let i = rows.firstIndex(where: { $0.tool.kind == .task && $0.state == .waiting }) else { return }
         rows[i].state = .running
+        rows[i].startedAt = Date()
         guard let engine else { return }
         let params: [String: any Sendable] = warmupLanguages.isEmpty ? [:] : ["languages": warmupLanguages]
         let method = methods.warmup
@@ -210,6 +214,16 @@ public final class ToolsSetupState {
         if wasShowing { onFinished() }
     }
 
+    /// The window came back on a later launch for the downloads only (T4 left).
+    public var isReturnForDownloads: Bool {
+        !runtimePending && !rows.isEmpty && rows.allSatisfy { $0.tool.kind == .download }
+    }
+
+    /// The window came back on a later launch for the tasks only (T4 right: a macOS update).
+    public var isReturnForTasks: Bool {
+        !runtimePending && !rows.isEmpty && rows.allSatisfy { $0.tool.kind == .task }
+    }
+
     /// The task in progress (the warm-up), when the downloads are over.
     public var runningTask: Row? {
         rows.first { $0.tool.kind == .task && $0.state == .running }
@@ -258,12 +272,12 @@ public struct ToolsSetupView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 16) {
+                // The icon's own margins leave about 62 pt visible at 72 (board T1).
                 Image(nsImage: appIcon)
-                    .resizable().frame(width: 64, height: 64)
+                    .resizable().frame(width: 72, height: 72)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(ShellTexts.fill(texts.welcome, ["app": appName])).svFont(17, .bold).foregroundStyle(SV.text)
-                    Text(ShellTexts.fill(texts.toolsIntro1, ["app": appName, "mb": totalMB]) + "\n" + texts.toolsIntro2)
-                        .svSmall().fixedSize(horizontal: false, vertical: true)
+                    Text(headTitle).svFont(17, .bold).foregroundStyle(SV.text)
+                    Text(headText).svSmall().fixedSize(horizontal: false, vertical: true)
                 }
             }
             if let failed = state.failure {
@@ -283,7 +297,7 @@ public struct ToolsSetupView: View {
                     if state.runningTask != nil {
                         Text(texts.toolsPreparing).svFont(13, .semibold).foregroundStyle(SV.text)
                         if !texts.toolsPreparingTime.isEmpty {
-                            Text("· " + texts.toolsPreparingTime).svFont(12).foregroundStyle(SV.text2)
+                            Text(texts.toolsPreparingTime).svFont(12).foregroundStyle(SV.text2)
                         }
                     } else if totals.count > 0 {
                         Text(ShellTexts.fill(texts.toolsDownloading, ["i": totals.index, "n": totals.count]))
@@ -296,6 +310,7 @@ public struct ToolsSetupView: View {
                 }
             }
             rows
+                .padding(.top, 4)
             HStack(spacing: 8) {
                 if state.failure != nil {
                     UnderlineLink(texts.showLog, tone: .red, action: showLog)
@@ -303,7 +318,7 @@ public struct ToolsSetupView: View {
                     Button(texts.quit, action: quit).svButton(.secondary, .regular)
                     Button(texts.retry) { state.retry() }.svButton(.primary, .regular)
                 } else {
-                    Text(texts.toolsInside).svSmall()
+                    Text(state.runningTask != nil ? texts.toolsWarmupNote : texts.toolsInside).svSmall()
                     Spacer()
                     Button(texts.quit, action: quit).svButton(.secondary, .regular)
                 }
@@ -316,6 +331,19 @@ public struct ToolsSetupView: View {
         .background(SV.bg)
     }
 
+    /// The header: the welcome on the first launch, else why the window is back (T4).
+    private var headTitle: String {
+        if state.isReturnForDownloads { return texts.toolsOneMissingTitle }
+        if state.isReturnForTasks { return texts.toolsAgainTitle }
+        return ShellTexts.fill(texts.welcome, ["app": appName])
+    }
+
+    private var headText: String {
+        if state.isReturnForDownloads { return ShellTexts.fill(texts.toolsOneMissingText, ["mb": totalMB]) }
+        if state.isReturnForTasks { return texts.toolsAgainText }
+        return ShellTexts.fill(texts.toolsIntro1, ["app": appName, "mb": totalMB]) + "\n" + texts.toolsIntro2
+    }
+
     /// " · about a minute left", from the bytes since the window opened.
     private func timeLeft(_ t: (done: Int64, total: Int64, index: Int, count: Int)) -> String {
         guard let start = state.startedAt, t.done > state.startBytes else { return "" }
@@ -324,6 +352,9 @@ public struct ToolsSetupView: View {
         guard left.isFinite, left > 0 else { return "" }
         return " · " + (left < 90 ? texts.toolsMinuteLeft : ShellTexts.fill(texts.toolsMinutesLeft, ["n": Int((left / 60).rounded())]))
     }
+
+    /// What the warm-up usually takes (spike S5): the task bar runs against it.
+    static let expectedTaskSeconds: Double = 30
 
     private var totalMB: Int {
         Int(state.rows.reduce(Int64(0)) { $0 + $1.tool.megabytes })
@@ -357,15 +388,34 @@ public struct ToolsSetupView: View {
         let detail = !tool.detail.isEmpty ? tool.detail : tool.kind == .runtime ? texts.toolsRuntime : ""
         return HStack(spacing: 10) {
             icon(row.state)
+            // Only the name goes bold in the running or failed row; the detail stays regular and grey.
+            let name = Text(title).fontWeight(running || isFailed ? .semibold : .regular)
+                .foregroundStyle(isFailed ? SV.redText : running || row.state == .done ? SV.text : SV.text2)
             let tail = Text(detail.isEmpty ? "" : " · " + detail).foregroundStyle(SV.text3)
-            Text("\(Text(title).foregroundStyle(isFailed ? SV.redText : running || row.state == .done ? SV.text : SV.text2))\(tail)")
-                .svFont(12.5, running || isFailed ? .semibold : .regular)
+            Text("\(name)\(tail)")
+                .svFont(12.5)
                 .lineLimit(1)
             Spacer(minLength: 8)
             if running, tool.kind == .download, row.total > 0 {
                 SVBar(Double(row.bytes) / Double(row.total)).frame(width: 90)
             }
+            if running, tool.kind == .task, let start = row.startedAt {
+                // A bar against the expected 30 s, and the seconds so far: the task gives no progress of its own.
+                TimelineView(.periodic(from: start, by: 1)) { context in
+                    let elapsed = context.date.timeIntervalSince(start)
+                    HStack(spacing: 10) {
+                        SVBar(min(0.95, elapsed / Self.expectedTaskSeconds)).frame(width: 90)
+                        Text(ShellTexts.fill(texts.toolsSeconds, ["n": Int(elapsed)]))
+                            .svFont(SVFont.smallNumbers).foregroundStyle(SV.text3)
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+            }
             if isFailed { StatusChip(texts.stopped, tone: .red) }
+            if isFailed, tool.kind == .task {
+                // The size column stays empty, so the chip sits where the bar was (board T3).
+                Color.clear.frame(width: 44)
+            }
             if let seconds = row.seconds {
                 Text(ShellTexts.fill(texts.toolsSeconds, ["n": Int(seconds.rounded())]))
                     .svFont(SVFont.smallNumbers).foregroundStyle(SV.text3)
@@ -376,25 +426,19 @@ public struct ToolsSetupView: View {
                     .frame(width: 44, alignment: .trailing)
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 13)
         .frame(height: 33)
         .background(running ? SV.soft : isFailed ? SV.redSoft : .clear)
     }
 
-    @ViewBuilder
+    /// The 22 pt ring of the design (note 38), shared with the file rows.
     private func icon(_ state: ToolProgress.State) -> some View {
-        switch state {
-        case .done:
-            Image(systemName: "checkmark").svFont(9, .bold).foregroundStyle(SV.greenText)
-                .frame(width: 18, height: 18).background(Circle().fill(SV.greenBg))
-                .overlay(Circle().strokeBorder(SV.greenLine))
-        case .running:
-            Spinner(size: 16).frame(width: 18, height: 18)
-        case .failed:
-            Image(systemName: "xmark").svFont(8, .bold).foregroundStyle(SV.redText)
-                .frame(width: 18, height: 18).overlay(Circle().strokeBorder(SV.redLine))
-        case .waiting:
-            Circle().strokeBorder(SV.glassLine).frame(width: 18, height: 18)
+        let circle: StatusCircle.State = switch state {
+        case .done: .done
+        case .running: .running
+        case .failed: .failed
+        case .waiting: .waiting
         }
+        return StatusCircle(circle)
     }
 }

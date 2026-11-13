@@ -388,10 +388,135 @@ public struct NumberedSteps: View {
     }
 }
 
+// MARK: - Drop frame
+
+/// The stripes inside a drop area (design note 40): bands at 135°, `width`
+/// on and `width` off, in `SV.dropHatch`. A Canvas, so it costs nothing at any size.
+public struct DiagonalHatch: View {
+    var width: CGFloat
+    var color: Color
+
+    public init(width: CGFloat = 14, color: Color = SV.dropHatch) {
+        self.width = width
+        self.color = color
+    }
+
+    public var body: some View {
+        Canvas { context, size in
+            let step = width * 2
+            var x: CGFloat = -size.height
+            while x < size.width {
+                var band = Path()
+                band.move(to: CGPoint(x: x, y: 0))
+                band.addLine(to: CGPoint(x: x + width, y: 0))
+                band.addLine(to: CGPoint(x: x + width + size.height, y: size.height))
+                band.addLine(to: CGPoint(x: x + size.height, y: size.height))
+                band.closeSubpath()
+                context.fill(band, with: .color(color))
+                x += step
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+extension View {
+    /// The frame of a drop area (design notes 38 and 40): 12 pt corners, a 2 pt
+    /// dash `[6, 4]` in `SV.dropLine` over the stripes; with a file over it the
+    /// dash turns to the accent and the stripes give way to the `soft` fill.
+    public func svDropFrame(targeted: Bool, cornerRadius: CGFloat = 12) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius)
+        return background {
+            ZStack {
+                if targeted { shape.fill(SV.soft) } else { DiagonalHatch() }
+            }
+            .clipShape(shape)
+        }
+        .overlay(shape.strokeBorder(targeted ? SV.primary : SV.dropLine, style: StrokeStyle(lineWidth: 2, dash: [6, 4])))
+    }
+}
+
+// MARK: - Status circle
+
+/// The 22 pt status ring of a row (design note 38): a symbol that stays clear
+/// of the ring, a 16 pt spinner while the row works, the warning triangle
+/// drawn inside 68 % of the box. Used by the file rows and the tools window.
+public struct StatusCircle: View {
+    public enum State: Sendable, Equatable {
+        /// Ready or waiting: an empty ring.
+        case waiting
+        /// Work going on: the spinner.
+        case running
+        /// Green check.
+        case done
+        /// Yellow triangle (done without subtitles, file missing).
+        case warning
+        /// Red cross (failed, unreadable).
+        case failed
+        /// Grey square (stopped by the person).
+        case stopped
+    }
+
+    var state: State
+    public static let size: CGFloat = 22
+
+    public init(_ state: State) { self.state = state }
+
+    public var body: some View {
+        ZStack {
+            switch state {
+            case .waiting:
+                Circle().strokeBorder(SV.glassLine)
+            case .running:
+                Spinner(size: 16)
+            case .done:
+                Circle().fill(SV.greenBg)
+                Circle().strokeBorder(SV.greenLine)
+                Image(systemName: "checkmark").svFont(11, .bold).foregroundStyle(SV.greenText)
+            case .warning:
+                Circle().fill(SV.yellowBg)
+                Circle().strokeBorder(SV.yellowLine)
+                WarningTriangle().foregroundStyle(SV.yellowText)
+            case .failed:
+                Circle().strokeBorder(SV.redLine)
+                Image(systemName: "xmark").svFont(10, .bold).foregroundStyle(SV.redText)
+            case .stopped:
+                Circle().strokeBorder(SV.glassLine)
+                RoundedRectangle(cornerRadius: 1.5).fill(SV.text2).frame(width: 8, height: 8)
+            }
+        }
+        .frame(width: Self.size, height: Self.size)
+    }
+}
+
+/// The warning triangle of `StatusCircle`: 9.5 × 8.2 pt, its vertices 6.2 pt
+/// from the centre, so it never touches the ring.
+struct WarningTriangle: View {
+    var body: some View {
+        ZStack {
+            Path { p in
+                let w: CGFloat = 9.5, h: CGFloat = 8.2
+                p.move(to: CGPoint(x: w / 2, y: 0))
+                p.addLine(to: CGPoint(x: w, y: h))
+                p.addLine(to: CGPoint(x: 0, y: h))
+                p.closeSubpath()
+            }
+            .strokedPath(StrokeStyle(lineWidth: 1.4, lineJoin: .round))
+            .frame(width: 9.5, height: 8.2)
+            VStack(spacing: 0.8) {
+                RoundedRectangle(cornerRadius: 0.6).frame(width: 1.3, height: 3)
+                Circle().frame(width: 1.3, height: 1.3)
+            }
+            .offset(y: 1.4)
+        }
+        .frame(width: 14, height: 14)
+    }
+}
+
 // MARK: - Drop zone
 
 /// Where files can be dropped; the button opens the same thing from the
-/// keyboard. Dashed 1.5 pt border, inset fill with a soft accent glow, and
+/// keyboard. The drop frame of the design (2 pt dash over faint stripes) and
 /// three fanned video cards that open when the view appears.
 public struct DropZone: View {
     var title: String
@@ -433,19 +558,7 @@ public struct DropZone: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            RoundedRectangle(cornerRadius: SV.Radius.field)
-                .fill(SV.inset)
-                .overlay(
-                    EllipticalGradient(colors: [targeted ? SV.sel : SV.soft, .clear],
-                                       center: axis == .vertical ? UnitPoint(x: 0.5, y: 0.4) : UnitPoint(x: 0.12, y: 0.5),
-                                       startRadiusFraction: 0, endRadiusFraction: 0.7)
-                        .clipShape(RoundedRectangle(cornerRadius: SV.Radius.field)))
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: SV.Radius.field)
-                .strokeBorder(targeted ? SV.primary : SV.boxLine,
-                              style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])))
+        .svDropFrame(targeted: targeted)
         .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
             Task { @MainActor in
                 var urls: [URL] = []

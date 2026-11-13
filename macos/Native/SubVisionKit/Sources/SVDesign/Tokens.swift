@@ -118,6 +118,11 @@ public enum SV {
     public static let redSoft = Color(dark: "rgba(242,109,109,.07)", light: "rgba(205,55,37,.10)")
     public static let redTint = Color(dark: "rgba(242,109,109,.16)", light: "rgba(217,64,46,.12)")
 
+    /// Drop areas (design notes 38 and 40): a 2 pt dash strong enough to read in
+    /// both appearances, and faint diagonal stripes inside (14 pt on, 14 pt off).
+    public static let dropLine = Color(dark: "rgba(255,255,255,.40)", light: "rgba(0,0,0,.40)")
+    public static let dropHatch = Color(dark: "rgba(255,255,255,.035)", light: "rgba(0,0,0,.03)")
+
     public static let chipBg = Color(dark: "#1C1F23", light: "#EEF0F2")
     public static let chipLine = Color(dark: "rgba(255,255,255,.10)", light: "rgba(0,0,0,.08)")
     public static let segOn = Color(dark: "#3A3E44", light: "#FFFFFF")

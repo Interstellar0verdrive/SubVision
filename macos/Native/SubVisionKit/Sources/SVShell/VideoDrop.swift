@@ -44,6 +44,15 @@ public enum VideoScan {
 }
 
 extension View {
+    /// Takes dropped files and folders and hands over every item as it came
+    /// (the app sorts videos from the rest, to say what it skipped).
+    public func fileDrop(isTargeted: Binding<Bool>? = nil, action: @escaping ([URL]) -> Void) -> some View {
+        onDrop(of: [.fileURL], isTargeted: isTargeted) { providers in
+            Task { @MainActor in action(await droppedURLs(providers)) }
+            return true
+        }
+    }
+
     /// Takes dropped files and folders and hands over the videos found in them
     /// (`extensions: ["srt"], recursive: false` for Sub fix). `isTargeted`
     /// follows the drag, for a highlight; `onEmpty` gets the dropped items
@@ -53,19 +62,26 @@ extension View {
                           action: @escaping ([URL]) -> Void) -> some View {
         onDrop(of: [.fileURL], isTargeted: isTargeted) { providers in
             Task { @MainActor in
-                var urls: [URL] = []
-                for provider in providers {
-                    if let url = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) as? URL {
-                        urls.append(url)
-                    } else if let data = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) as? Data,
-                              let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        urls.append(url)
-                    }
-                }
+                let urls = await droppedURLs(providers)
                 let videos = VideoScan.videos(in: urls, extensions: extensions, recursive: recursive)
                 if !videos.isEmpty { action(videos) } else if !urls.isEmpty { onEmpty?(urls) }
             }
             return true
         }
     }
+}
+
+/// The file URLs of dropped items, in the drop's order.
+@MainActor
+func droppedURLs(_ providers: [NSItemProvider]) async -> [URL] {
+    var urls: [URL] = []
+    for provider in providers {
+        if let url = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) as? URL {
+            urls.append(url)
+        } else if let data = try? await provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) as? Data,
+                  let url = URL(dataRepresentation: data, relativeTo: nil) {
+            urls.append(url)
+        }
+    }
+    return urls
 }
