@@ -8,7 +8,9 @@
 // The app's own alert, chosen over the native one: a 280 pt card, symbol at
 // 40 pt in the status colour, centred title and text, buttons stacked at full
 // width. `runModal()` is synchronous like NSAlert's, so it works inside
-// applicationShouldTerminate too.
+// applicationShouldTerminate too. `present(over:completion:)` shows the same
+// card without a modal loop: the main actor keeps running under it (the
+// engine's events, the timers), and the alert can be closed from code.
 
 import AppKit
 import SwiftUI
@@ -154,6 +156,93 @@ public final class SVAlert {
         panel.orderOut(nil)
         return max(0, response.rawValue - 1000)
     }
+
+    /// Shows the alert over `window` (the main window when nil) and returns at
+    /// once: no modal loop, so whatever runs on the main actor keeps running
+    /// while the alert is up. `completion` gets the index of the button pressed
+    /// (Return presses the first, Esc the cancel one, as in `runModal()`); it is
+    /// not called when the alert is closed from code with `close()`.
+    @discardableResult
+    public func present(over window: NSWindow? = nil, completion: @escaping @MainActor (Int) -> Void) -> SVAlertPresentation {
+        let cancelIndex = buttons.lastIndex(where: \.cancel) ?? (buttons.count > 1 ? buttons.count - 1 : 0)
+        let panel = AlertWindow(cancelIndex: cancelIndex)
+        let parent = window ?? NSApp.mainWindow ?? NSApp.keyWindow ?? NSApp.windows.first { $0.isVisible && !($0 is AlertWindow) }
+        let presentation = SVAlertPresentation(alert: self, panel: panel, parent: parent, completion: completion)
+        // The panel keeps the presentation alive while it is up; `close()` breaks the cycle.
+        panel.onPress = { index in presentation.press(index) }
+        let card = SVAlertCard(alert: self) { [weak presentation] index in presentation?.press(index) }
+        let host = NSHostingView(rootView: card.padding(AlertWindow.margin))
+        host.frame.size = host.fittingSize
+        panel.contentView = host
+        panel.setContentSize(host.fittingSize)
+        // A panel hides when the app is not the active one: this one stays, as a sheet would.
+        panel.hidesOnDeactivate = false
+        panel.level = parent == nil ? .floating : .normal
+        panel.place(over: parent)
+        // A child of the window: above it, and it follows the window around.
+        parent?.addChildWindow(panel, ordered: .above)
+        panel.makeKeyAndOrderFront(nil)
+        presentation.watchParent()
+        return presentation
+    }
+}
+
+/// An alert shown with `SVAlert.present`: open until a button is pressed, the
+/// window under it closes, or `close()`.
+@MainActor
+public final class SVAlertPresentation {
+    public let alert: SVAlert
+    private let panel: AlertWindow
+    private weak var parent: NSWindow?
+    private var completion: (@MainActor (Int) -> Void)?
+    private var observer: NSObjectProtocol?
+    public private(set) var isOpen = true
+
+    init(alert: SVAlert, panel: AlertWindow, parent: NSWindow?, completion: @escaping @MainActor (Int) -> Void) {
+        self.alert = alert
+        self.panel = panel
+        self.parent = parent
+        self.completion = completion
+    }
+
+    /// The panel's window number, for a capture of the alert alone.
+    public var windowNumber: Int { panel.windowNumber }
+
+    /// The window under the alert closed: that is a cancel.
+    func watchParent() {
+        guard let parent else { return }
+        observer = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: parent, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.press(self?.panel.cancelIndex ?? 0) }
+        }
+    }
+
+    /// As if the button at `index` had been pressed: closes the alert and calls the completion.
+    public func press(_ index: Int) {
+        guard isOpen, alert.buttons.indices.contains(index) else { return }
+        let done = completion
+        close()
+        done?(index)
+    }
+
+    /// Brings the alert back in front, with the keyboard.
+    public func focus() {
+        guard isOpen else { return }
+        panel.makeKeyAndOrderFront(nil)
+    }
+
+    /// Closes the alert without an answer: the completion is not called.
+    public func close() {
+        guard isOpen else { return }
+        isOpen = false
+        completion = nil
+        if let observer { NotificationCenter.default.removeObserver(observer) }
+        observer = nil
+        panel.onPress = nil
+        panel.parent?.removeChildWindow(panel)
+        panel.orderOut(nil)
+        // The keyboard goes back to the window the alert was over.
+        if let parent, parent.isVisible, NSApp.keyWindow == nil || NSApp.keyWindow === panel { parent.makeKey() }
+    }
 }
 
 /// A borderless, see-through panel: the card draws its own shape and shadow.
@@ -161,6 +250,8 @@ final class AlertWindow: NSPanel {
     /// Room around the card for its 60 pt shadow.
     static let margin: CGFloat = 48
     let cancelIndex: Int
+    /// Set by `present`: a press (Esc here, the buttons through the card) without a modal loop.
+    var onPress: ((Int) -> Void)?
 
     init(cancelIndex: Int) {
         self.cancelIndex = cancelIndex
@@ -177,7 +268,12 @@ final class AlertWindow: NSPanel {
     override var canBecomeKey: Bool { true }
 
     override func cancelOperation(_ sender: Any?) {
-        NSApp.stopModal(withCode: .init(rawValue: 1000 + cancelIndex))
+        if let onPress { onPress(cancelIndex) } else { NSApp.stopModal(withCode: .init(rawValue: 1000 + cancelIndex)) }
+    }
+
+    /// Esc reaches a borderless panel as a plain key: it is the cancel button.
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 { cancelOperation(nil) } else { super.keyDown(with: event) }
     }
 
     /// Centred on the window, its top a third of the way down, as macOS places alerts.

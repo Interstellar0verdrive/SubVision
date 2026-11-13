@@ -120,6 +120,19 @@ struct BatchRun: Equatable {
     }
 }
 
+/// The stop confirmation that is up (O1 or O2): one at a time, not modal.
+struct StopAlert {
+    enum Kind: Equatable {
+        /// O1, for the file at this index of the batch (`BatchRun.ids`).
+        case file(idx: Int, name: String)
+        /// O2.
+        case all
+    }
+
+    var kind: Kind
+    var presentation: SVAlertPresentation
+}
+
 extension AppModel {
     private var summaryFile: URL { configuration.stateFolder.appendingPathComponent("records/batch-summary.json") }
 
@@ -173,6 +186,7 @@ extension AppModel {
         for i in videos.indices where ids.contains(videos[i].id) && videos[i].state.inBatch { videos[i].state = .ready }
         run = BatchRun()
         batch = BatchActivity()
+        closeStopAlert()
         saveVideos()
         updateDock()
     }
@@ -190,33 +204,69 @@ extension AppModel {
     /// The video the batch works on.
     var runningVideo: VideoItem? { videos.first { $0.state == .running } }
 
-    /// Stop on the row or ⌥⌘. (O1): the file stops, the batch goes on.
+    /// Stop on the row or ⌥⌘. (O1): the file stops, the batch goes on. The
+    /// alert is not modal: the events keep coming under it, and the answer is
+    /// for the file it names (its batch index goes with `batch.stop`).
     func stopCurrentFile() {
-        guard batch.running, let video = runningVideo else { return }
-        afterClick { [self] in
-            guard Alerts.confirmStopFile(self, name: video.name) else { return }
-            Task { await stop(all: false) }
-        }
+        guard batch.running, let video = runningVideo, let idx = run.ids.firstIndex(of: video.id) else { return }
+        afterClick { [self] in askStop(.file(idx: idx, name: video.name)) }
     }
 
     /// Stop All (⌘., the sidebar card, the bottom bar, the Dock; O2).
     func stopAll() {
         guard batch.running else { return }
-        afterClick { [self] in
-            guard Alerts.confirmStopAll(self) else { return }
-            run.stoppedByUser = true
-            Task { await stop(all: true) }
+        afterClick { [self] in askStop(.all) }
+    }
+
+    /// O1 or O2, one at a time: with one up already, that one comes to the front.
+    private func askStop(_ kind: StopAlert.Kind) {
+        if let open = stopAlert, open.presentation.isOpen {
+            open.presentation.focus()
+            return
         }
+        // The click was queued: the file may be over by now, or the batch.
+        guard batch.running else { return }
+        if case .file(let idx, _) = kind {
+            guard let video = runningVideo, run.ids.firstIndex(of: video.id) == idx else { return }
+        }
+        let presentation = Alerts.confirmStop(self, kind) { [self] confirmed in
+            stopAlert = nil
+            guard confirmed else { return }
+            switch kind {
+            case .file(let idx, _): Task { await stop(all: false, file: idx) }
+            case .all: Task { await stop(all: true) }
+            }
+        }
+        stopAlert = StopAlert(kind: kind, presentation: presentation)
+    }
+
+    /// The file an open O1 names is over (or the batch, for O2 too): the alert goes by itself.
+    private func closeStopAlert(file idx: Int? = nil) {
+        guard let open = stopAlert else { return }
+        if let idx {
+            guard case .file(let asked, _) = open.kind, asked == idx else { return }
+        }
+        log.info("stop alert closed: \(idx.map { "file \($0) is over" } ?? "the batch is over")")
+        open.presentation.close()
+        stopAlert = nil
     }
 
     /// Without a confirmation (the quit alert said it already, the QA scenarios).
-    func stop(all: Bool) async {
+    /// `file` is the batch index the stop is meant for: when that file is not
+    /// the one in progress any more the engine answers `not_running` and
+    /// nothing stops. Returns the engine's answer, for the log and the QA.
+    @discardableResult
+    func stop(all: Bool, file: Int? = nil) async -> String {
         if all { run.stoppedByUser = true }
         do {
-            let reply = try await engine.batchStop(all: all)
-            log.info("batch.stop \(all ? "all" : "file"): \(reply.ok) \(reply.reason ?? "")")
+            let reply = try await engine.batchStop(all: all, file: file)
+            let what = all ? "all" : file.map { "file \($0)" } ?? "file"
+            let answer = reply.ok ? "ok" : (reply.reason ?? "refused")
+            log.info("batch.stop \(what): \(answer)")
+            return answer
         } catch {
             log.error("batch.stop failed: \(error)")
+            return "error: \(error)"
         }
     }
 
@@ -296,6 +346,7 @@ extension AppModel {
         }
         run.lastFileElapsed = d.elapsed
         saveVideos()
+        closeStopAlert(file: d.idx)
         let v = videos[i]
         notifyFile(v, body: d.empty ? t("app.notify.file_no_subs", ["name": v.name])
                    : tn("app.notify.file_done", d.segments, ["name": v.name]))
@@ -310,6 +361,7 @@ extension AppModel {
         videos[i].times = stepTimes()
         abortSteps(at: videos[i].atStep)
         saveVideos()
+        closeStopAlert(file: f.idx)
         let v = videos[i]
         log.error("file \(v.name) failed at \(v.atStep ?? "?"): \(f.error)")
         notifyFile(v, body: t("app.notify.file_failed", ["name": v.name, "step": stepLabel(v.atStep)]))
@@ -323,9 +375,11 @@ extension AppModel {
         videos[i].times = stepTimes()
         abortSteps(at: videos[i].atStep)
         saveVideos()
+        closeStopAlert(file: s.idx)
     }
 
     private func batchDone(_ d: BatchDone) {
+        closeStopAlert()
         // Rows never started (Stop All) are ready again (E5).
         for i in videos.indices where videos[i].state.inBatch { videos[i].resetOutcome() }
         if let error = d.error { log.error("batch failed: \(error)") }

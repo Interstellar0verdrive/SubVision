@@ -14,6 +14,14 @@
 //   report-export · report-confirm yes|no|ask · report-elsewhere <path>|cancel|ask
 //   report-windows · report-capture <path>
 //   report-close (the front report window; all with "all")
+//   The stop alerts (F6; O1 and O2 are not modal, the commands keep running under them):
+//   stop-file-ask · stop-all-ask   what the Stop / Stop All buttons do: the alert opens, the reply does not wait for it
+//   alert-state                    "none", or "file <idx> <name> · window <id> · buttons Stop|Continue" / "all · …"
+//   alert-press <n>                presses button n of the open alert (0 = Stop / Stop All, 1 = Continue)
+//   alert-key return|esc           the key, sent to the alert's panel as a real key event
+//   stop-file [<idx>]              batch.stop for one file, no alert: with <idx> (the batch index, 0-based) the
+//                                  engine stops it only if it is still the one in progress, else "not_running";
+//                                  without it, the file in progress whatever it is. Replies with the engine's answer.
 
 #if DEBUG
 import AppKit
@@ -113,9 +121,36 @@ enum DebugQA {
             model.startBatch()
             _ = await wait(10) { model.batch.running && model.runningVideo != nil }
         case "stop-file":
-            await model.stop(all: false)
+            if argument.isEmpty { return "batch.stop file: " + (await model.stop(all: false)) }
+            guard let idx = Int(argument) else { return "bad index" }
+            return "batch.stop file \(idx): " + (await model.stop(all: false, file: idx)) + " · running \(runningIndex(model).map(String.init) ?? "-")"
         case "stop-all":
             await model.stop(all: true)
+        case "stop-file-ask", "stop-all-ask":
+            guard model.batch.running else { return "no batch" }
+            if command == "stop-file-ask" { model.stopCurrentFile() } else { model.stopAll() }
+            _ = await wait(3) { model.stopAlert != nil }
+            return alertState(model)
+        case "alert-state":
+            return alertState(model)
+        case "alert-press":
+            guard let open = model.stopAlert, open.presentation.isOpen else { return "no alert" }
+            guard let n = Int(argument), open.presentation.alert.buttons.indices.contains(n) else { return "bad button" }
+            open.presentation.press(n)
+            return "pressed \(open.presentation.alert.buttons[n].title) · " + alertState(model)
+        case "alert-key":
+            guard let open = model.stopAlert, open.presentation.isOpen else { return "no alert" }
+            guard let code: UInt16 = ["return": 36, "esc": 53][argument] else { return "unknown key" }
+            let characters = argument == "return" ? "\r" : "\u{1b}"
+            guard let window = NSApp.window(withWindowNumber: open.presentation.windowNumber),
+                  let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                               windowNumber: window.windowNumber, context: nil, characters: characters,
+                                               charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
+            else { return "no event" }
+            window.makeKey()
+            window.sendEvent(event)
+            try? await Task.sleep(for: .milliseconds(200))
+            return "key \(argument) · " + alertState(model)
         case "wait-batch":
             let ok = await wait(Double(argument) ?? 600) { !model.batch.running && model.videos.allSatisfy { !$0.state.inBatch } }
             return ok ? "batch done · \(summaryLine(model))" : "timeout"
@@ -201,6 +236,23 @@ enum DebugQA {
             return "unknown"
         }
         return "ok · tab \(model.tab.rawValue) · \(model.videos.count) videos · status \(model.status)"
+    }
+
+    /// The batch index (0-based) of the file in progress.
+    private static func runningIndex(_ model: AppModel) -> Int? {
+        model.runningVideo.flatMap { model.run.ids.firstIndex(of: $0.id) }
+    }
+
+    /// The stop alert that is up, the file it names and the file in progress now.
+    private static func alertState(_ model: AppModel) -> String {
+        guard let open = model.stopAlert, open.presentation.isOpen else { return "none" }
+        let what: String
+        switch open.kind {
+        case .file(let idx, let name): what = "file \(idx) \(name)"
+        case .all: what = "all"
+        }
+        return "\(what) · window \(open.presentation.windowNumber) · buttons \(open.presentation.alert.buttons.map(\.title).joined(separator: "|"))"
+            + " · running \(runningIndex(model).map(String.init) ?? "-")"
     }
 
     /// "done 2 failed 0 stopped 0 skipped 0 elapsed 12.3" of the last batch.

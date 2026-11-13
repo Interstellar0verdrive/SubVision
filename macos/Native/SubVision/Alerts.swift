@@ -25,8 +25,10 @@ enum Alerts {
                         text: model.t("app.alerts.close_text"))
         a.button(model.t("app.common.ok"), role: .primary)
         a.checkbox = model.t("app.alerts.dont_show")
-        a.runModal()
-        if a.checked { model.defaults.set(true, forKey: DefaultsKey.closeNoticeOff) }
+        // Not modal: the batch it talks about keeps reporting under it.
+        a.present { _ in
+            if a.checked { model.defaults.set(true, forKey: DefaultsKey.closeNoticeOff) }
+        }
     }
 
     /// O8a: a folder without videos; "Look in Subfolders" when they were not searched.
@@ -34,13 +36,14 @@ enum Alerts {
         let a = SVAlert(icon: AlertIconName.folderEmpty, tone: .yellow,
                         title: model.t("app.alerts.novideos_title", ["folder": folder.lastPathComponent]),
                         text: subfolders ? "" : model.t("app.alerts.novideos_text"))
+        // Not modal (as O8b and O8d): videos are added during a batch too.
         if subfolders {
             a.button(model.t("app.common.ok"), role: .primary)
-            a.runModal()
+            a.present { _ in }
         } else {
             a.button(model.t("app.alerts.look_sub"), role: .primary)
             a.button(model.t("app.common.ok"))
-            if a.runModal() == 0 { lookDeeper() }
+            a.present { if $0 == 0 { lookDeeper() } }
         }
     }
 
@@ -49,7 +52,7 @@ enum Alerts {
         let a = SVAlert(icon: AlertIconName.info, tone: .accent, title: model.tn("app.alerts.already_title", count),
                         text: model.t("app.alerts.already_text"))
         a.button(model.t("app.common.ok"), role: .primary)
-        a.runModal()
+        a.present { _ in }
     }
 
     /// O8c: Import… a list that already has lines. nil cancels.
@@ -77,39 +80,39 @@ enum Alerts {
                             text: model.t("app.alerts.update_text", ["current": model.config.appVersion]))
             a.button(model.t("app.common.download"), role: .primary)
             a.button(model.t("app.alerts.later"), cancel: true)
-            if a.runModal() == 0 { NSWorkspace.shared.open(url) }
+            a.present { if $0 == 0 { NSWorkspace.shared.open(url) } }
         case .upToDate:
             let a = SVAlert(icon: AlertIconName.update, tone: .accent,
                             title: model.t("app.settings.up_to_date", ["version": model.config.appVersion]), text: "")
             a.button(model.t("app.common.ok"), role: .primary)
-            a.runModal()
+            a.present { _ in }
         case .error(let message):
             model.log.error("update check (\(name)) failed: \(message)")
             let a = SVAlert(icon: AlertIconName.update, tone: .red, title: model.t("app.settings.update_error"),
                             text: model.t("app.alerts.update_error_text"))
             a.button(model.t("app.common.ok"), role: .primary)
-            a.runModal()
+            a.present { _ in }
         }
     }
 
     // MARK: - F5.1 (O1, O2, O7)
 
-    /// O1: Stop this file. True stops.
-    static func confirmStopFile(_ model: AppModel, name: String) -> Bool {
-        let a = SVAlert(icon: AlertIconName.stopFile, tone: .red, title: model.t("app.alerts.stop_title", ["name": name]),
+    /// O1 (Stop this file) or O2 (Stop the whole batch), not modal: the
+    /// batch's events keep coming while it is up. `answer` gets true for Stop.
+    static func confirmStop(_ model: AppModel, _ kind: StopAlert.Kind, answer: @escaping @MainActor (Bool) -> Void) -> SVAlertPresentation {
+        let a: SVAlert
+        switch kind {
+        case .file(_, let name):
+            a = SVAlert(icon: AlertIconName.stopFile, tone: .red, title: model.t("app.alerts.stop_title", ["name": name]),
                         text: model.t("app.alerts.stop_text"))
-        a.button(model.t("app.common.stop"), role: .destructiveSolid)
-        a.button(model.t("app.common.continue"), cancel: true)
-        return a.runModal() == 0
-    }
-
-    /// O2: Stop the whole batch. True stops.
-    static func confirmStopAll(_ model: AppModel) -> Bool {
-        let a = SVAlert(icon: AlertIconName.stopAll, tone: .red, title: model.t("app.alerts.stopall_title"),
+            a.button(model.t("app.common.stop"), role: .destructiveSolid)
+        case .all:
+            a = SVAlert(icon: AlertIconName.stopAll, tone: .red, title: model.t("app.alerts.stopall_title"),
                         text: model.t("app.alerts.stopall_text"))
-        a.button(model.t("app.common.stop_all"), role: .destructiveSolid)
+            a.button(model.t("app.common.stop_all"), role: .destructiveSolid)
+        }
         a.button(model.t("app.common.continue"), cancel: true)
-        return a.runModal() == 0
+        return a.present(over: WindowSizer.main(model.config).flatMap { $0.isVisible ? $0 : nil }) { answer($0 == 0) }
     }
 
     /// O7: the OCR language saved is not one Vision reads here; "Choose the Language" opens the inspector.
