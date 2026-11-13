@@ -133,7 +133,7 @@ struct VideoRow: View {
                 Text(model.t("app.process.row.no_subs")).svFont(11.5).foregroundStyle(SV.yellowText).lineLimit(2)
             case .failed:
                 Text(failedText).svFont(11.5).foregroundStyle(SV.redText).lineLimit(2)
-                    .help(video.error ?? "")
+                    .help(video.errorDetail ?? "")
             case .stopped:
                 Text(model.t("app.process.row.stopped", ["step": stepOnly, "band": bandOnly])).svFont(11.5).foregroundStyle(SV.text2)
             case .ready, .unreadable:
@@ -171,18 +171,15 @@ struct VideoRow: View {
         return model.bandName(String(band), lower: true)
     }
 
-    /// "Fallito durante OCR ×3 · dialoghi: Vision request failed (-1)": the code translated, the detail after it.
+    /// "Fallito durante OCR ×3 · dialoghi: Vision request failed (-1)": the step, then the
+    /// sentence of a known code or the engine's short text (`AppModel.failureText`).
     private var failedText: String {
-        model.t("app.process.row.failed", ["step": stepOnly, "band": bandOnly, "error": errorText])
-    }
-
-    private var errorText: String {
-        guard let error = video.error else { return "" }
-        if let code = video.errorCode, model.localizer.has("app.errors.\(code)") {
-            let detail = error.dropFirst(code.count).trimmingCharacters(in: CharacterSet(charactersIn: " ()"))
-            return model.t("app.errors.\(code)", ["detail": detail, "tool": "", "path": "", "line": ""])
-        }
-        return error
+        let error = model.failureText(video)
+        // Before any step (the file went away, the probe failed): no step to name.
+        guard video.atStep != nil else { return model.t("app.process.row.failed_plain", ["error": error]) }
+        let text = model.t("app.process.row.failed", ["step": stepOnly, "band": bandOnly, "error": error])
+        // A sentence of the catalogue ends with its own full stop; a bare text does not get one.
+        return text.hasSuffix(": ") ? String(text.dropLast(2)) : text
     }
 
     /// Numbers in mono, "—" where the probe has nothing (unreadable, not yet probed).
@@ -338,12 +335,12 @@ struct StepsPanel: View {
                     }
                 }
             }
-            if video.state == .failed, let error = video.error {
+            if video.state == .failed, let detail = video.errorDetail {
+                // The technical detail and where the whole story is (board E4).
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(error).svFont(11.5, mono: true).foregroundStyle(SV.redText)
-                    if video.logExists {
-                        Text("log: " + video.outputLog.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                            .svFont(11.5, mono: true).foregroundStyle(SV.textCode)
+                    Text(detail).svFont(11.5, mono: true).foregroundStyle(SV.redText).textSelection(.enabled)
+                    if video.logPath != nil || video.logExists {
+                        LogLine(video: video)
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -354,6 +351,29 @@ struct StepsPanel: View {
             }
         }
         .padding(.trailing, 2)
+    }
+}
+
+/// "log: ~/Downloads/name.log" in the box of a failed row: a click opens the log (as Open Log does).
+struct LogLine: View {
+    @Environment(AppModel.self) private var model
+    var video: VideoItem
+    @State private var hover = false
+
+    var body: some View {
+        let exists = video.logExists
+        Button { model.openLog(video) } label: {
+            Text("log: \(Text(verbatim: video.logDisplayPath).underline(hover && exists))")
+                .svFont(11.5, mono: true).foregroundStyle(SV.redText)
+                .multilineTextAlignment(.leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!exists)
+        .onHover { hover = $0 }
+        .svPointingHand(exists)
+        .help(model.t("app.process.row.open_log"))
+        .accessibilityLabel(model.t("app.process.row.open_log"))
     }
 }
 

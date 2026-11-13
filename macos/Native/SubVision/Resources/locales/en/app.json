@@ -324,6 +324,7 @@
   "app.process.row.dropped.uno": "{n} dropped (in the report)",
   "app.process.row.elapsed": "elapsed {t}",
   "app.process.row.failed": "Failed during {step} · {band}: {error}",
+  "app.process.row.failed_plain": "Failed: {error}",
   "app.process.row.failed_state": "failed",
   "app.process.row.file_missing_help": "It was moved or deleted after it was added.",
   "app.process.row.file_of": "File {i} of {n}",

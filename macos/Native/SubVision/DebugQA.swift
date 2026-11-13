@@ -14,6 +14,8 @@
 //   report-export · report-confirm yes|no|ask · report-elsewhere <path>|cancel|ask
 //   report-windows · report-capture <path>
 //   report-close (the front report window; all with "all")
+//   engine-event <name> <json>     an engine event fed by hand to the batch's own handler, e.g.
+//                                  engine-event batch.file.failed {"idx":0,"error":"unknown (X: y)","at_step":"ocr:bottom","code":"unknown","text":"y","detail":"X: y","log":"/path/name.log"}
 //   The stop alerts (F6; O1 and O2 are not modal, the commands keep running under them):
 //   stop-file-ask · stop-all-ask   what the Stop / Stop All buttons do: the alert opens, the reply does not wait for it
 //   alert-state                    "none", or "file <idx> <name> · window <id> · buttons Stop|Continue" / "all · …"
@@ -126,6 +128,15 @@ enum DebugQA {
             return "batch.stop file \(idx): " + (await model.stop(all: false, file: idx)) + " · running \(runningIndex(model).map(String.init) ?? "-")"
         case "stop-all":
             await model.stop(all: true)
+        case "engine-event":
+            let p = argument.split(separator: " ", maxSplits: 1).map(String.init)
+            guard p.count == 2 else { return "usage: engine-event <name> <json>" }
+            do {
+                let message = try EngineEvent(name: p[0], data: Data(p[1].utf8)).message()
+                model.handleBatch(message, name: p[0])
+            } catch {
+                return "bad event: \(error)"
+            }
         case "stop-file-ask", "stop-all-ask":
             guard model.batch.running else { return "no batch" }
             if command == "stop-file-ask" { model.stopCurrentFile() } else { model.stopAll() }

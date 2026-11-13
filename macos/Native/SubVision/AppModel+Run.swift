@@ -273,6 +273,23 @@ extension AppModel {
     // MARK: - Events
 
     /// The `batch.*` events, from the one consumer in `AppModel.listen()`.
+    /// What a failed row says after the step (E4): the sentence of a code the
+    /// catalogue knows, else the engine's short text as it is. Never the
+    /// "Something went wrong:" of `unknown`, never the exception's type name.
+    func failureText(_ video: VideoItem) -> String {
+        if let code = video.errorCode, code != "unknown", localizer.has("app.errors.\(code)") {
+            // The row takes the engine's short text; a long technical detail (a command line,
+            // stderr) stays in the box under the steps.
+            var short = video.failText ?? video.errorShort ?? ""
+            if video.failText == nil, short.count > 60 || short.contains("\n") { short = "" }
+            var sentence = t("app.errors.\(code)", ["detail": short, "tool": video.failTool ?? "",
+                                                    "path": video.failPath ?? video.path, "line": video.failLine.map(String.init) ?? ""])
+            if short.isEmpty { sentence = sentence.replacing(/\s*:\s*\.?\s*$/, with: ".") }
+            return sentence
+        }
+        return video.errorShort ?? video.error ?? ""
+    }
+
     func handleBatch(_ message: EngineMessage, name: String) {
         switch message {
         case .batchFileStarted(let f): fileStarted(f)
@@ -356,6 +373,13 @@ extension AppModel {
         guard let i = index(of: f.idx) else { return }
         videos[i].state = .failed
         videos[i].error = f.error
+        videos[i].failCode = f.code
+        videos[i].failText = f.text
+        videos[i].failDetail = f.detail
+        videos[i].failTool = f.tool
+        videos[i].failPath = f.path
+        videos[i].failLine = f.line
+        if let log = f.log, !log.isEmpty { videos[i].logPath = log }
         videos[i].atStep = f.atStep ?? run.currentStep?.id
         videos[i].finished = Date()
         videos[i].times = stepTimes()

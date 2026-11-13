@@ -324,6 +324,7 @@
   "app.process.row.dropped.uno": "{n} scartata (nel report)",
   "app.process.row.elapsed": "trascorso {t}",
   "app.process.row.failed": "Fallito durante {step} · {band}: {error}",
+  "app.process.row.failed_plain": "Fallito: {error}",
   "app.process.row.failed_state": "fallito",
   "app.process.row.file_missing_help": "È stato spostato o cancellato dopo essere stato aggiunto.",
   "app.process.row.file_of": "File {i} di {n}",
