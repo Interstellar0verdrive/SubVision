@@ -10,6 +10,32 @@ the window. Every line is a JSON object:
               {"id": 7, "error": {"code": "unknown_method", "message": "..."}}
     event     {"event": "batch.step", "data": {...}}
 
+The error object: `code` (stable, the app translates it) and `message`,
+plus when known `detail` (technical text), `tool`, `path`, `line`. A
+`bad_params` also says which parameter and why:
+
+    {"code": "bad_params", "message": "fps: must be between 0.5 and 60",
+     "data": {"field": "fps", "reason": "must be between 0.5 and 60"}}
+
+`field` is the name of the parameter as the request spells it (a key of
+`params` for the OCR parameters: `fps`, `lang_hint`...; `videos`, `scope`,
+`file`... for the arguments of a method) and `message` is always
+"field: reason".
+
+`batch.stop {scope: "file" | "all", file?}`: `file` is the batch index of
+the video the stop is meant for (the `idx` of `batch.file.started`; its
+path is accepted too). With `file`, the video is stopped only if it is the
+one in progress at that moment; otherwise the reply is
+`{"ok": false, "reason": "not_running"}` and nothing is stopped (neither
+the video in progress nor the next one). Without `file` the video in
+progress is stopped, whichever it is; `scope: "all"` ignores `file`.
+Replies: `{"ok": true}`, `{"ok": false, "reason": "no_batch"}` when no
+batch is running.
+
+The events of a batch are described in batch.py; `batch.file.failed`
+carries `code`, `text` (short, for the row of the file), `detail`, `log`
+(the per-file log), `error`, `at_step` and `tool`/`path`/`line` when known.
+
 Replies may come back in a different order than the requests (each one
 runs in its own thread): the `id` is what counts. Events have no id.
 Lines that are not JSON are ignored (logged on stderr). `shutdown` and
@@ -63,23 +89,30 @@ class MethodError(Exception):
     An error for the caller: a stable `code` (the app translates it) and
     `message`, plus the optional details `detail` (technical text), `tool`
     (ffmpeg | ffprobe | vision | uv), `path` and `line`, shown by the app in
-    the detail of the alert.
+    the detail of the alert, and `data` (`{field, reason}` of a `bad_params`).
     """
 
     def __init__(self, code: str, message: str = "", detail: Optional[str] = None,
                  tool: Optional[str] = None, path: Optional[str] = None,
-                 line: Optional[int] = None) -> None:
+                 line: Optional[int] = None, data: Optional[Dict[str, Any]] = None) -> None:
         super().__init__(message or code)
         self.code = code
         self.detail, self.tool, self.path, self.line = detail, tool, path, line
+        self.data = data
 
     def payload(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {"code": self.code, "message": str(self)}
-        for k in ("detail", "tool", "path", "line"):
+        for k in ("detail", "tool", "path", "line", "data"):
             v = getattr(self, k)
             if v is not None:
                 out[k] = v
         return out
+
+
+def bad_params(field: str, reason: str) -> MethodError:
+    """`bad_params` about one parameter: message "field: reason", data {field, reason}."""
+    return MethodError("bad_params", f"{field}: {reason}",
+                       data={"field": field, "reason": reason})
 
 
 # ---------------------------------------------------------------------------
@@ -135,16 +168,19 @@ _PARAM_FIELDS = {f.name: f for f in dataclasses.fields(OcrParams)
 
 
 def _params_from(raw: Any) -> OcrParams:
-    """OcrParams from the `params` object of a request (unknown keys -> bad_params)."""
+    """
+    OcrParams from the `params` object of a request. An unknown key or a
+    value of the wrong kind is a `bad_params` whose `field` is that key.
+    """
     if raw is None:
         return OcrParams()
     if not isinstance(raw, dict):
-        raise MethodError("bad_params", "params must be an object")
+        raise bad_params("params", "must be an object")
     values: Dict[str, Any] = {}
     for key, value in raw.items():
         f = _PARAM_FIELDS.get(key)
         if f is None:
-            raise MethodError("bad_params", f"unknown parameter: {key}")
+            raise bad_params(str(key), "unknown parameter")
         try:
             if f.type in ("float", float):
                 values[key] = float(value)
@@ -155,7 +191,7 @@ def _params_from(raw: Any) -> OcrParams:
             else:
                 values[key] = str(value)
         except (TypeError, ValueError) as e:
-            raise MethodError("bad_params", f"{key}: {e}") from e
+            raise bad_params(key, str(e)) from e
     return OcrParams(**values)
 
 
@@ -172,12 +208,32 @@ def _with_lists(p: OcrParams, pair: lists.Lists) -> OcrParams:
 def _strings(params: dict, key: str) -> List[str]:
     value = params.get(key)
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-        raise MethodError("bad_params", f"{key} must be a list of strings")
+        raise bad_params(key, "must be a list of strings")
     return value
 
 
+def _number(params: dict, key: str, default: float, kind: type = float) -> Any:
+    """A numeric argument of a method (`n`, `tries`, `min_dur`): bad_params when it is not one."""
+    value = params.get(key, default)
+    try:
+        if isinstance(value, bool):
+            raise TypeError("must be a number")
+        return kind(value)
+    except (TypeError, ValueError) as e:
+        raise bad_params(key, str(e)) from e
+
+
 def _engine_error(e: EngineError) -> MethodError:
-    return MethodError(e.code, e.code, **e.details())
+    """
+    The engine's error for the caller: message = code, except `bad_params`
+    about one field, which reads "field: reason" like the ones raised here.
+    """
+    details = e.details()
+    data = details.get("data") or {}
+    message = e.code
+    if e.code == "bad_params" and data.get("field"):
+        message = f"{data['field']}: {data.get('reason', '')}".rstrip(": ")
+    return MethodError(e.code, message, **details)
 
 
 def _unknown_error(e: Exception) -> Dict[str, Any]:
@@ -215,7 +271,7 @@ def _tools_install(params: dict) -> dict:
     """Starts in a thread and replies at once: `tools.progress`, then `tools.done`."""
     keys = params.get("keys")
     if keys is not None and not (isinstance(keys, list) and all(isinstance(k, str) for k in keys)):
-        raise MethodError("bad_params", "keys must be a list of strings")
+        raise bad_params("keys", "must be a list of strings")
     if not _tools_lock.acquire(blocking=False):
         return {"started": False, "reason": "already_running"}
     todo = [k for k in (keys if keys is not None else tools.missing(_paths().root))
@@ -260,7 +316,7 @@ def _tools_use(params: dict) -> dict:
     global _custom_ffmpeg
     custom = params.get("ffmpeg")
     if custom is not None and not isinstance(custom, str):
-        raise MethodError("bad_params", "ffmpeg must be a path or null")
+        raise bad_params("ffmpeg", "must be a path or null")
     if custom and not tools.tool_version(custom):
         raise MethodError("bad_tool", "bad_tool", tool="ffmpeg", path=custom,
                           detail="the file does not answer -version")
@@ -277,7 +333,7 @@ def _warmup(params: dict) -> dict:
     """
     languages = params.get("languages") or ["it-IT"]
     if not isinstance(languages, list) or not all(isinstance(x, str) for x in languages):
-        raise MethodError("bad_params", "languages must be a list of strings")
+        raise bad_params("languages", "must be a list of strings")
     if not _warmup_lock.acquire(blocking=False):
         return {"started": False, "reason": "already_running"}
     langs = core.resolve_langs(languages[0])
@@ -303,8 +359,10 @@ def _lists_status(_params: dict) -> dict:
 
 def _lists_import(params: dict) -> dict:
     kind, path = params.get("kind"), params.get("path")
-    if kind not in lists.KINDS or not isinstance(path, str):
-        raise MethodError("bad_params", "lists.import wants {kind: ignore|corrections, path}")
+    if kind not in lists.KINDS:
+        raise bad_params("kind", "must be ignore or corrections")
+    if not isinstance(path, str):
+        raise bad_params("path", "must be the path of a text file")
     try:
         lists.import_file(kind, path, _paths().root)
     except FileNotFoundError as e:
@@ -386,7 +444,7 @@ def _current_job(kind: Optional[str] = None) -> Optional[Dict[str, Any]]:
 def _batch_start(params: dict) -> dict:
     videos = _strings(params, "videos")
     if not videos:
-        raise MethodError("bad_params", "videos must not be empty")
+        raise bad_params("videos", "must not be empty")
     p = _params_from(params.get("params"))
     try:
         batch.validate_params(p)
@@ -412,23 +470,33 @@ def _batch_start(params: dict) -> dict:
 
 
 def _batch_stop(params: dict) -> dict:
+    """
+    `{scope: file|all, file?}`. `file` (the `idx` of `batch.file.started`,
+    or the path of the video) says which video the stop is meant for: when
+    another one is in progress by now, `{ok: false, reason: "not_running"}`
+    and nothing is stopped. `scope: all` ignores `file`.
+    """
     scope = params.get("scope", "file")
     if scope not in ("file", "all"):
-        raise MethodError("bad_params", "scope must be file or all")
+        raise bad_params("scope", "must be file or all")
+    file = params.get("file") if scope == "file" else None
+    if file is not None and (isinstance(file, bool) or not isinstance(file, (int, str))):
+        raise bad_params("file", "must be a batch index or the path of a video")
     job = _current_job("batch")
     if job is None:
         return {"ok": False, "reason": "no_batch"}
-    job["stop"].stop(scope)
+    if not job["stop"].stop(scope, file):
+        return {"ok": False, "reason": "not_running"}
     return {"ok": True}
 
 
 def _preview_frames(params: dict) -> dict:
     video = params.get("video")
     if not isinstance(video, str) or not video:
-        raise MethodError("bad_params", "video must be a path")
+        raise bad_params("video", "must be a path")
     p = _params_from(params.get("params"))
-    n = int(params.get("n", 20))
-    tries = int(params.get("tries", 3))
+    n = _number(params, "n", 20, int)
+    tries = _number(params, "tries", 3, int)
     stop = threading.Event()
 
     def work() -> None:
@@ -473,13 +541,14 @@ def _srt_fix(params: dict) -> dict:
     """Synchronous and never `busy`: Sub fix must work during a batch."""
     path = params.get("path")
     if not isinstance(path, str):
-        raise MethodError("bad_params", "path must be the path of an .srt")
+        raise bad_params("path", "must be the path of an .srt")
     p = _params_from(params.get("params"))
+    min_dur = _number(params, "min_dur", 0.2)
     try:
         out, count = fix.fix_srt(path, merge=bool(params.get("merge", True)),
                                  ignore=bool(params.get("ignore", True)),
                                  flash=bool(params.get("flash", True)),
-                                 min_dur=float(params.get("min_dur", 0.2)),
+                                 min_dur=min_dur,
                                  params=p, lists=_lists_for(params))
     except EngineError as e:
         raise _engine_error(e) from e

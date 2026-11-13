@@ -96,6 +96,45 @@ def test_report_app_bridge_and_state(tmp_path: Path):
         assert "Chrome/Edge" in h          # the browser hint is unchanged
 
 
+def test_report_export_note_does_not_push_the_top_bar(tmp_path: Path):
+    """
+    F6 (report 2.0): after an export through the app the note is the short
+    "SRT saved" only, with the path as its tooltip, and the note always
+    keeps the width of that message, so the title and the buttons of the
+    top bar stay where they are. In a browser the message is the 1.0 one.
+    """
+    for lang, short, resting in (("it", "SRT salvato ✓", "salvato ✓"),
+                                 ("en", "SRT saved ✓", "saved ✓")):
+        html = _fixed_report(tmp_path, lang)
+        js = html.split("<script>", 1)[1]
+        css = html.split("<style>", 1)[1].split("</style>", 1)[0]
+        assert f'"srtSaved": "{short}"' in html
+        # the note reserves the width of the short export message (invisible sizer)
+        assert f'<span class="saved" id="savedNote" data-wide="{short}">{resting}</span>' in html
+        assert ".saved::after{content:attr(data-wide);height:0;visibility:hidden}" in css
+        saved = re.search(r"\.saved\{([^}]*)\}", css).group(1)
+        assert "display:inline-grid" in saved and "flex:none" in saved and "white-space:nowrap" in saved
+        # through the bridge: short message, path (and merge note) in the tooltip
+        bridge = js[js.index("if (BRIDGE) {"):js.index("window.showSaveFilePicker")]
+        assert "flash(T.srtSaved, ((r && r.path) || fname) + mergeNote);" in bridge
+        assert "T.srtSaved + ' ('" not in bridge
+        assert "flash(T.srtError + ' ' + e);" in bridge
+        # flash: the tooltip lives as long as the message, then both go back
+        flash = js[js.index("function flash(msg, tip){"):js.index("async function exportSrt()")]
+        assert "n.title = tip || '';" in flash and "n.title='';" in flash
+        assert "n.textContent=T.saved;" in flash
+        # anything longer than the short message (file name, error) wraps as before
+        assert "n.classList.toggle('long', msg !== T.srtSaved);" in flash
+        assert "n.classList.remove('long');" in flash
+        assert ".saved.long{flex:0 1 auto;white-space:normal}" in css
+        # in a browser nothing changes: the file name stays in the message
+        browser = js[js.index("window.showSaveFilePicker"):js.index("function resetAll()")]
+        assert "flash(T.srtSaved + ' (' + fname + ')' + mergeNote);" in browser
+        assert "flash(T.srtDownloaded + ' (' + fname + ')' + mergeNote);" in browser
+        # the look of the note is the 1.0 one
+        assert "color:var(--ok);font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s" in saved
+
+
 def test_report_light_and_dark_palettes(tmp_path: Path):
     html = _fixed_report(tmp_path, "it")
     css = html.split("<style>", 1)[1].split("</style>", 1)[0]

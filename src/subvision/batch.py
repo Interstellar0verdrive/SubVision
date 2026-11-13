@@ -10,15 +10,23 @@ other, and reports through the sidecar events of the protocol (plan, table
     batch.step         {idx, step, band, ratio, count, total, unit, elapsed, eta, rate}
     batch.file.done    {idx, segments, dropped, refined, elapsed, times:{"step:band": sec},
                         srt, report, log, empty}
-    batch.file.failed  {idx, error, at_step, code, message, detail?, tool?, path?, line?}
+    batch.file.failed  {idx, error, at_step, code, message, log, text?, detail?, tool?,
+                        path?, line?}
     batch.file.stopped {idx}
     batch.done         {done, failed, stopped, skipped, elapsed}
 - `stop` is a BatchControl: stop("file") moves on to the next video,
   stop("all") ends the batch (the current file is stopped, the others are
-  never started and counted as `skipped`). A plain threading.Event means
+  never started and counted as `skipped`). stop("file", file=idx) stops
+  the video with that batch index (or that path) only while it is the one
+  in progress, and returns False otherwise. A plain threading.Event means
   "all".
 - a failing file (`batch.file.failed`) never stops the batch; `Stopped`
-  from the engine is a `batch.file.stopped`, never a failure.
+  from the engine is a `batch.file.stopped`, never a failure. Of the error
+  fields, `code` is the stable one (the app translates it), `text` is a
+  short line for the row of the file (the exception's own message, or the
+  first line of the detail: no type name, no prefix), `detail` the
+  technical text, `error` the one-line summary that also goes in the log,
+  `log` the path of the per-file log.
 - outputs go next to the video: `<name>.srt` (or `<name>_YYYYMMDD_HHMMSS.srt`
   when it exists already), `<name>.revisione.html`, `<name>.log`.
 
@@ -32,10 +40,12 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import re
+import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from subvision import core
 from subvision.core import EngineError, LogEvent, OcrParams, ProgressEvent, Stopped
@@ -49,32 +59,73 @@ class BatchControl:
     Stop control shared between the batch thread and the caller.
     stop("file") stops only the video in progress (the batch goes on);
     stop("all") stops the video in progress and the whole batch.
+    stop("file", file=N) is meant for one video (N: its batch index, the
+    `idx` of `batch.file.started`, or its path): it stops it only if it is
+    the one in progress right now and returns False otherwise, touching
+    nothing. The check and the stop happen under the same lock that the
+    batch takes to move to the next video, so a stop meant for file N can
+    never land on file N+1.
     """
 
     def __init__(self) -> None:
         self._all = threading.Event()
         self._file = threading.Event()
         self._lock = threading.Lock()
+        self._current: Optional[Tuple[int, str]] = None     # (idx, path) in progress
 
-    def stop(self, scope: str = "file") -> None:
+    def stop(self, scope: str = "file", file: Optional[int | str] = None) -> bool:
+        """
+        True when the stop was taken, False when `file` is not the video in
+        progress (nothing is stopped). `file` is ignored with scope "all".
+        """
         if scope not in ("file", "all"):
             raise ValueError(f"unknown stop scope: {scope!r}")
+        if scope == "all":
+            file = None
+        elif file is not None and (isinstance(file, bool) or not isinstance(file, (int, str))):
+            raise TypeError(f"file must be a batch index or a path, not {type(file).__name__}")
         with self._lock:
             if scope == "all":
                 self._all.set()
+            elif file is not None and not self._is_current(file):
+                return False
             self._file.set()
+            return True
+
+    def _is_current(self, file: int | str) -> bool:
+        if self._current is None:
+            return False
+        idx, path = self._current
+        if isinstance(file, int):
+            return file == idx
+        return file == path or Path(file) == Path(path)
 
     @property
     def stop_all(self) -> bool:
         return self._all.is_set()
 
-    def _begin_file(self) -> threading.Event:
-        """A fresh per-file event (already set when the batch is being stopped)."""
+    @property
+    def current(self) -> Optional[int]:
+        """The batch index of the video in progress, None between two videos."""
+        with self._lock:
+            return self._current[0] if self._current else None
+
+    def _begin_file(self, idx: Optional[int] = None, path: str | Path = "") -> threading.Event:
+        """
+        A fresh per-file event (already set when the batch is being stopped);
+        from now on `idx` is the video in progress.
+        """
         with self._lock:
             self._file = threading.Event()
             if self._all.is_set():
                 self._file.set()
+            self._current = (idx, str(path)) if idx is not None else None
             return self._file
+
+    def _end_file(self) -> None:
+        """The video in progress is over: a stop meant for it finds nothing."""
+        with self._lock:
+            self._current = None
 
 
 # ---------------------------------------------------------------- log texts
@@ -212,9 +263,13 @@ def output_paths(video: Path, qc_report: bool = True,
 
 # ---------------------------------------------------------------- validation
 def validate_params(params: OcrParams) -> None:
-    """Raises EngineError("bad_params", field=..., reason=...) before any work."""
+    """
+    Raises EngineError("bad_params", field=..., reason=..., detail="field: reason")
+    before any work.
+    """
     def bad(field: str, reason: str) -> None:
-        raise EngineError("bad_params", field=field, detail=f"{field}: {reason}")
+        raise EngineError("bad_params", field=field, reason=reason,
+                          detail=f"{field}: {reason}")
 
     if not (0.5 <= float(params.fps) <= 60):
         bad("fps", "must be between 0.5 and 60")
@@ -278,7 +333,8 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
             counts["skipped"] += 1
             continue
         # a plain Event means "stop all": the engine takes it as it is
-        file_stop = plain_event if plain_event is not None else control._begin_file()
+        own_stop = control._begin_file(idx, video)
+        file_stop = plain_event if plain_event is not None else own_stop
 
         paths = output_paths(video, qc_report=p.qc_report)
         srt, logp, report = paths["srt"], paths["log"], paths["report"]
@@ -300,10 +356,15 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
         tracker = _StepTracker(plan, p, log, tr, emit, idx)
         t_file = time.monotonic()
         try:
-            segs, stats = core.process_video(
-                str(video), str(srt), p,
-                progress_cb=tracker.on_progress, log_cb=tracker.on_log,
-                tmp_root=tmp_root, ui_lang=report_lang, stop=file_stop)
+            try:
+                segs, stats = core.process_video(
+                    str(video), str(srt), p,
+                    progress_cb=tracker.on_progress, log_cb=tracker.on_log,
+                    tmp_root=tmp_root, ui_lang=report_lang, stop=file_stop)
+            finally:
+                # before any event of the end of this file: from here on a
+                # stop meant for it answers "not running"
+                control._end_file()
         except Stopped:
             tracker.abort()
             log.code("log_stopped")
@@ -316,7 +377,8 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
             info = error_info(e, path=str(video))
             log.code("log_error", e=info["error"])
             counts["failed"] += 1
-            emit("batch.file.failed", {"idx": idx, "at_step": at_step, **info})
+            emit("batch.file.failed", {"idx": idx, "at_step": at_step,
+                                       "log": str(logp), **info})
             continue
 
         tracker.finish_all()
@@ -340,20 +402,78 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
     return done
 
 
+_TEXT_MAX = 300      # characters of `text`: it is one row of the app
+
+
+def _short(text: str) -> Optional[str]:
+    """The first non-empty line of `text`, cut to _TEXT_MAX; None when empty."""
+    for ln in str(text).splitlines():
+        ln = ln.strip()
+        if ln:
+            return ln if len(ln) <= _TEXT_MAX else ln[:_TEXT_MAX - 1].rstrip() + "…"
+    return None
+
+
+def _tool_failure(e: subprocess.CalledProcessError) -> Dict[str, Any]:
+    """
+    A tool that exited with an error in the middle of the work (ffmpeg on a
+    damaged video): `tool`, a `text` that names the tool, the exit status
+    and its last real complaint on stderr (str(e) would be the whole
+    command line), and the whole story in `detail`.
+    """
+    cmd = e.cmd if isinstance(e.cmd, (list, tuple)) else [e.cmd]
+    name = Path(str(cmd[0])).name if cmd else "tool"
+    said = core.tool_stderr(e) if e.stderr else ""
+    lines = said.splitlines()
+    # ffmpeg's verdict is its last real complaint (the earlier ones come from
+    # its threads, in no fixed order): not the bookkeeping of the threads,
+    # not the final "Conversion failed!"
+    telling = [ln for ln in lines
+               if re.search(r"\berror\b|invalid|cannot|no such|denied", ln, re.I)
+               and not re.match(r"Terminating thread|Task finished|Last message repeated", ln)]
+    reason = (telling[-1:] or lines[-1:] or [""])[0]
+    text = f"{name} exited with status {e.returncode}" + (f": {reason}" if reason else "")
+    detail = f"{type(e).__name__}: {e}"
+    if lines:
+        # the last lines only: a damaged video repeats the same complaint for every packet
+        detail += "\n" + "\n".join(lines[-12:])
+    out: Dict[str, Any] = {"text": text, "detail": detail}
+    if name in ("ffmpeg", "ffprobe"):
+        out["tool"] = name
+    return out
+
+
 def error_info(e: Exception, path: Optional[str] = None) -> Dict[str, Any]:
     """
     The error fields of an event: `code` (stable, translated by the app),
-    `message` (= code), `error` (one line with the details, for logs), plus
-    `detail`, `tool`, `path`, `line` when known. Unexpected exceptions are
-    `unknown` with the exception text as detail.
+    `message` (= code), `error` (one line with the details, for logs),
+    `text` (a short line for the row of the file in the app), plus
+    `detail`, `tool`, `path`, `line` when known.
+
+    `text` never carries a type name nor a prefix of the engine ("Something
+    went wrong: ..." belongs to the catalogue of the app): for an
+    EngineError it is the first line of its detail (absent without detail);
+    for an unexpected exception it is str(e), or the type name when the
+    exception has no message; for a tool that exited with an error it names
+    the tool and the exit status. Unexpected exceptions are `unknown` with
+    `Type: message` as detail.
     """
     if isinstance(e, EngineError):
         info: Dict[str, Any] = {"code": e.code, "message": e.code, "error": e.describe(),
                                 **e.details()}
+        text = _short(info.get("detail") or "")
     else:
         detail = f"{type(e).__name__}: {e}"
         info = {"code": "unknown", "message": "unknown", "error": f"unknown ({detail})",
                 "detail": detail}
+        text = _short(str(e)) or type(e).__name__
+        if isinstance(e, subprocess.CalledProcessError):
+            tool = _tool_failure(e)
+            text = _short(tool.pop("text"))
+            info.update(tool)
+            info["error"] = f"unknown ({text})"
+    if text:
+        info["text"] = text
     if path and "path" not in info:
         info["path"] = path
     return info

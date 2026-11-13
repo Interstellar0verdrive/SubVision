@@ -128,11 +128,14 @@ class EngineError(RuntimeError):
     Engine error with a stable `code` (the message is the code itself) and
     optional details for the app: `detail` (technical text: exception,
     stderr), `tool` ("ffmpeg" | "ffprobe" | "vision" | "uv" when a tool is
-    involved), `path` (the file concerned), `line` (for parse errors). Any
-    other keyword ends up in `args_` and in the detail text.
+    involved), `path` (the file concerned), `line` (for parse errors), and
+    for `bad_params` the pair `field` / `reason` (the parameter refused and
+    why), which travels as `data: {field, reason}`. Any other keyword ends
+    up in `args_` and in the detail text.
     """
 
     DETAIL_KEYS = ("detail", "tool", "path", "line")
+    DATA_KEYS = ("field", "reason")
 
     def __init__(self, code: str, **args: Any) -> None:
         super().__init__(code)
@@ -140,9 +143,16 @@ class EngineError(RuntimeError):
         self.args_ = args
 
     def details(self) -> Dict[str, Any]:
-        """{detail, tool, path, line} when present; other args folded into detail."""
+        """
+        {detail, tool, path, line, data} when present; `data` is
+        {field, reason}; other args are folded into detail.
+        """
         out = {k: self.args_[k] for k in self.DETAIL_KEYS if self.args_.get(k) is not None}
-        extra = ", ".join(f"{k}={v}" for k, v in self.args_.items() if k not in self.DETAIL_KEYS)
+        data = {k: self.args_[k] for k in self.DATA_KEYS if self.args_.get(k) is not None}
+        if data:
+            out["data"] = data
+        extra = ", ".join(f"{k}={v}" for k, v in self.args_.items()
+                          if k not in self.DETAIL_KEYS and k not in self.DATA_KEYS)
         if extra:
             out["detail"] = f"{out['detail']} ({extra})" if out.get("detail") else extra
         return out
@@ -152,8 +162,24 @@ class EngineError(RuntimeError):
         d = self.details()
         parts = [f"{k}={d[k]}" for k in ("tool", "path", "line") if k in d]
         if d.get("detail"):
-            parts.append(d["detail"])
+            parts.append(" · ".join(ln.strip() for ln in str(d["detail"]).splitlines() if ln.strip()))
+        elif d.get("data"):
+            parts.append(": ".join(str(v) for v in d["data"].values()))
         return self.code + (f" ({'; '.join(parts)})" if parts else "")
+
+
+def tool_stderr(e: BaseException) -> str:
+    """
+    What a failed ffmpeg/ffprobe said, for the `detail` of an error: its
+    stderr without the `[demuxer @ 0x...]` prefixes (the first line is then
+    the reason itself), or the exception text when there is no stderr.
+    """
+    err = getattr(e, "stderr", None)
+    if isinstance(err, bytes):
+        err = err.decode("utf-8", "replace")
+    lines = [re.sub(r"^(\[[^\]]*\]\s*)+", "", ln).strip() for ln in (err or "").splitlines()]
+    lines = [ln for ln in lines if ln]
+    return "\n".join(lines) if lines else str(e)
 
 
 # Flags attached to the segments (SegInfo.flags). Codes only: the review
@@ -337,7 +363,8 @@ def ffprobe_duration(video: str) -> float:
                     "-of", "default=nw=1:nk=1", video]).stdout
         return float(out.strip())
     except (subprocess.CalledProcessError, OSError, ValueError) as e:
-        raise EngineError("probe_failed", path=video, tool="ffprobe", detail=str(e)) from e
+        raise EngineError("probe_failed", path=video, tool="ffprobe",
+                          detail=tool_stderr(e)) from e
 
 
 def ffprobe_fps(video: str) -> float:
@@ -362,7 +389,7 @@ def ffprobe_fps(video: str) -> float:
             last_err = e
             continue
     raise EngineError("probe_failed", path=video, tool="ffprobe",
-                      detail=str(last_err or "no frame rate"))
+                      detail=tool_stderr(last_err) if last_err else "no frame rate")
 
 
 def band_crop(p: OcrParams, band: str) -> str:
@@ -1199,7 +1226,13 @@ _QC_TEMPLATE = r"""<!DOCTYPE html>
  .dot.warn{background:var(--warn-bg);border:1px solid var(--warn-line)}
  .dot.bad{background:var(--bad-bg);border:1px solid var(--bad-line)}
  .dot.added{background:var(--added-bg);border:1px solid var(--added-line)}
- .saved{color:var(--ok);font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s}
+ .saved{color:var(--ok);font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s;
+        display:inline-grid;flex:none;white-space:nowrap}
+ /* invisible sizer: the note is always as wide as its longest short message,
+    so "saved" -> "SRT saved" does not move the controls of the top bar */
+ .saved::after{content:attr(data-wide);height:0;visibility:hidden}
+ /* a long message (file name, error) wraps and shrinks as it always did */
+ .saved.long{flex:0 1 auto;white-space:normal}
  .foot{margin-top:48px;padding-top:12px;border-top:1px solid var(--line2);color:var(--muted);
        font-size:12px;text-align:center}
  .foot a{color:var(--link);text-decoration:none} .foot a:hover{text-decoration:underline}
@@ -1212,7 +1245,7 @@ _QC_TEMPLATE = r"""<!DOCTYPE html>
    <input type="checkbox" id="mergeOnSave" checked> __T_MERGE_LABEL__</label>
  <button class="sec" onclick="resetAll()">__T_RESET__</button>
  <button onclick="exportSrt()">__T_SAVE__</button>
- <span class="saved" id="savedNote">__T_SAVED__</span>
+ <span class="saved" id="savedNote" data-wide="__T_SRT_SAVED__">__T_SAVED__</span>
 </div>
 <div class="wrap">
 <div class="sum">__SUMMARY__
@@ -1514,10 +1547,14 @@ function stamp(){
   const p = n => String(n).padStart(2,'0');
   return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes());
 }
-function flash(msg){
+// `tip`: what does not fit in the top bar (the path of the file), as the
+// tooltip of the note for as long as the note is shown.
+function flash(msg, tip){
   const n = document.getElementById('savedNote');
-  n.textContent = msg; n.style.opacity = 1;
-  setTimeout(()=>{ n.style.opacity=0; n.textContent=T.saved; }, 2500);
+  n.textContent = msg; n.title = tip || ''; n.style.opacity = 1;
+  n.classList.toggle('long', msg !== T.srtSaved);
+  setTimeout(()=>{ n.style.opacity=0; n.textContent=T.saved; n.title='';
+                   n.classList.remove('long'); }, 2500);
 }
 async function exportSrt(){
   const out = buildSrt();
@@ -1531,7 +1568,9 @@ async function exportSrt(){
   if (BRIDGE) {
     try {
       const r = await Promise.resolve(BRIDGE.postMessage({type:'export', name: fname, srt: out}));
-      flash(T.srtSaved + ' (' + ((r && r.path) || fname) + ')' + mergeNote);
+      // in the app only the short message: the path (and the merge note) go
+      // in the tooltip, a long text would push the title and the buttons
+      flash(T.srtSaved, ((r && r.path) || fname) + mergeNote);
     } catch(e) {
       flash(T.srtError + ' ' + e);   // no fallback: WKWebView has no useful dialog
     }
@@ -1625,6 +1664,7 @@ _QC_I18N = {
             "RESET": "↺ Ripristina tutto",
             "SAVE": "💾 Salva SRT revisionato",
             "SAVED": "salvato ✓",
+            "SRT_SAVED": "SRT salvato ✓",
             "LEG_WARN": "da ricontrollare",
             "LEG_BAD": "molto dubbio / scartato",
             "LEG_ADDED": "riga aggiunta a mano",
@@ -1690,6 +1730,7 @@ _QC_I18N = {
             "RESET": "↺ Reset all",
             "SAVE": "💾 Save reviewed SRT",
             "SAVED": "saved ✓",
+            "SRT_SAVED": "SRT saved ✓",
             "LEG_WARN": "to re-check",
             "LEG_BAD": "very doubtful / dropped",
             "LEG_ADDED": "line added by hand",

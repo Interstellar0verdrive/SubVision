@@ -45,6 +45,11 @@ PREVIEW_MAX_AGE = 7 * 86400     # seconds: older preview folders are removed
 TRY_FRACTIONS = (0.5, 0.2, 0.8)  # positions tried inside a zone (center, start, end)
 OCR_WORKERS = 4
 QUICK_MIN_CONF = 0.25           # confidence floor of the quick "is there text?" OCR
+# The quick OCR ("fast" level) only ever answers with confidence 0.3 or 0.5,
+# and what it invents on a frame without subtitles ("r", "i", "*", "(") gets
+# the same 0.5 as a real line: the confidence cannot tell them apart. The
+# length can: a reading counts as text from two letters/digits on.
+QUICK_MIN_CHARS = 2
 
 
 # re-exported for the callers (and the tests) that catch the stop here
@@ -98,6 +103,18 @@ def _duration(ffprobe: str, video: str) -> float:
 
 
 # ---------------------------------------------------------------- frames
+def looks_like_text(text: str) -> bool:
+    """
+    True when a quick reading is worth calling "text": at least
+    QUICK_MIN_CHARS letters or digits, or one ideograph/kana/hangul (a
+    one-character line is normal in Chinese, Japanese and Korean). A lone
+    Latin letter or a punctuation mark is what Vision sees in the texture
+    of a frame without subtitles.
+    """
+    chars = [c for c in text if c.isalnum()]
+    return len(chars) >= QUICK_MIN_CHARS or any(ord(c) >= 0x2E80 for c in chars)
+
+
 def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 3,
                 emit: Optional[EmitCallback] = None,
                 stop: Optional[threading.Event] = None,
@@ -106,8 +123,8 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
                 ) -> List[Dict[str, Any]]:
     """
     Samples `n` whole frames of `video`, one per zone, preferring the
-    timestamps where a quick OCR finds text in the dialogue band (or in the
-    signs band when params.top_band). Emits `preview.progress`
+    timestamps where a quick OCR finds text (see looks_like_text) in the
+    dialogue band (or in the signs band when params.top_band). Emits `preview.progress`
     {done, total, found} after every zone and returns the frames in order:
     [{path, band, has_text, width, height, ts}] (band: "bottom" | "top" |
     None). Raises EngineError("invalid_duration") when ffprobe cannot read
@@ -157,7 +174,7 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
 
     def quick_band(im: Image.Image, band: str) -> bool:
         txt, _ = core.ocr_conf(crop_band(im, params, band), langs, "fast", QUICK_MIN_CONF)
-        return bool(txt.strip())
+        return looks_like_text(txt)
 
     def probe_zone(i: int) -> Dict[str, Any]:
         a, b = edges[i], edges[i + 1]

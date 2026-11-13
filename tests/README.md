@@ -38,3 +38,23 @@ from the `demo-assets` release) are expected in `demo/` at the repo root; tests
 that need them skip when they are missing. ffmpeg/ffprobe come from `PATH` or
 `/opt/homebrew/bin`. The full run on the ita clip takes ~10 s from the second
 time; the very first Vision call on a Mac can take ~30 s.
+
+## Damaged videos
+
+Two repeatable recipes on a demo clip (`damage_head` / `damage_tail` in
+`conftest.py`, used by `test_batch.py` and `test_serve.py`; the same commands
+make the files for the "corrupted video" QA scenario of the app):
+
+```sh
+SRC=demo/sintel_ita_hardsub_demo.mp4
+# (a) refused by videos.probe: no index ("moov atom not found")
+tail -c +100001 "$SRC" > no-index.mp4
+# (b) accepted by the probe (55 s, 1280x544), fails in the middle of the
+#     extraction: the first MB of the clip, then zeros up to the same size
+{ head -c 1000000 "$SRC"; head -c $(( $(stat -f%z "$SRC") - 1000000 )) /dev/zero; } > damaged.mp4
+```
+
+(b) fails because ffmpeg gives up when more than 2/3 of the frames cannot be
+decoded (`batch.file.failed`, code `unknown`, tool `ffmpeg`, at
+`extract:bottom`). With less damage (zeros from the middle on, or a truncated
+file) ffmpeg ends well and the file is `done` with a shorter SRT.
