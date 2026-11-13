@@ -369,6 +369,8 @@
   "app.report.save_failed": "Non riesco a salvare l’SRT revisionato accanto all’originale",
   "app.report.save_failed_text": "La cartella non è scrivibile, o il suo disco non è collegato.",
   "app.report.saved": "SRT revisionato salvato · {name}",
+  "app.report.unreadable": "Non riesco a leggere il report: {name}.",
+  "app.report.unreadable_text": "Il file non è un report di revisione di SubVision, o non si può aprire.",
   "app.report.window_menu": "Report di revisione · {name}",
   "app.report.window_title": "{name}",
   "app.settings.appearance": "Aspetto",

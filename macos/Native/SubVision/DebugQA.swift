@@ -10,6 +10,10 @@
 //   drag-handle, try-ocr, wait-ocr, preview-state (see the block below)
 //   Sub fix (F5.3): fix-open <path> · fix-drop <path>[,<path>…] · fix-option merge|ignore|flash|minDuration <value>
 //   fix-run · wait-fix <s> · fix-state · fix-menu (the two ⌘↩ items and which one AppKit fires)
+//   report-open <path> · report-js <expression> · report-run <statements>
+//   report-export · report-confirm yes|no|ask · report-elsewhere <path>|cancel|ask
+//   report-windows · report-capture <path>
+//   report-close (the front report window; all with "all")
 
 #if DEBUG
 import AppKit
@@ -155,6 +159,44 @@ enum DebugQA {
         case "preview-select", "find-frames", "stop-frames", "wait-frames", "frame", "band-set", "drag-handle",
              "try-ocr", "wait-ocr", "preview-state":
             return await preview(command, argument, model)
+        // F5.4: the report windows (ReportWindow.swift, ReportBridge.swift).
+        case "report-open":
+            let front = model.openReport(URL(fileURLWithPath: argument))
+            _ = await wait(15) { front.session.phase != .loading }
+            return "\(front.session.phase) · \(front.session.name) · \(front.session.bridge.map { "\($0.file.kind)" } ?? "-")"
+        case "report-js", "report-run":
+            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
+            do {
+                let body = command == "report-js" ? "return (\(argument));" : argument
+                let value = try await bridge.call(body)
+                return reportValue(value)
+            } catch {
+                return "error: \(error)"
+            }
+        case "report-export":
+            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
+            let before = front.session.lastExport
+            _ = try? await bridge.call("await exportSrt();")
+            _ = await wait(5) { front.session.lastExport != before }
+            return front.session.lastExport.map(\.path) ?? "no export"
+        case "report-confirm":
+            ReportBridge.debugConfirm = argument == "yes" ? true : argument == "no" ? false : nil
+        case "report-elsewhere":
+            ReportSession.debugElsewhere = argument == "ask" ? nil : argument == "cancel" ? .some(nil) : .some(URL(fileURLWithPath: argument))
+        case "report-windows":
+            let windows = model.report.open.map { s in
+                "\(model.report.windows[s.url]?.window?.windowNumber ?? 0) \(s.phase) \(s.name)"
+            }
+            let menu = (NSApp.windowsMenu?.items ?? []).filter { !$0.isSeparatorItem && !$0.title.isEmpty }.map(\.title)
+            return "\(windows.count) report windows: " + windows.joined(separator: " | ") + " · window menu: " + menu.joined(separator: " | ")
+        case "report-capture":
+            guard let front = model.report.front else { return "no report window" }
+            let written = await DebugSnapshot.captureReport(front, argument, schemes: SVShell.DebugSnapshot.schemes(model.config))
+            return written.joined(separator: " ")
+        case "report-close":
+            let targets = argument == "all" ? Array(model.report.windows.values) : [model.report.front].compactMap { $0 }
+            guard !targets.isEmpty else { return "no report window" }
+            targets.forEach { $0.close() }
         default:
             return "unknown"
         }
@@ -327,6 +369,15 @@ enum DebugQA {
         try? await Task.sleep(for: .milliseconds(300))
         let ran = model.fix.running || model.fix.outcome != before
         return items.joined(separator: " · ") + " · key window \(key) · fix ran \(ran)"
+    }
+
+    /// A JavaScript value as one line: strings as they are, the rest as JSON.
+    private static func reportValue(_ value: Any?) -> String {
+        guard let value else { return "undefined" }
+        if let text = value as? String { return text }
+        if JSONSerialization.isValidJSONObject(value), let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+           let text = String(data: data, encoding: .utf8) { return text }
+        return "\(value)"
     }
 }
 #endif

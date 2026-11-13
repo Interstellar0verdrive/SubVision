@@ -31,9 +31,8 @@ struct AppCommands: Commands {
                 .keyboardShortcut("o", modifiers: .command)
             Button(model.t("app.menu.open_srt")) { model.openSRTPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            Button(model.t("app.menu.open_a_report")) {}
+            Button(model.t("app.menu.open_a_report")) { model.openReportPanel() }
                 .keyboardShortcut("o", modifiers: [.command, .option])
-                .disabled(true)   // F5.4
         }
         CommandGroup(after: .newItem) {
             Divider()

@@ -38,3 +38,15 @@ Catture della finestra vera (`DebugSnapshot.capture`, `cacheDisplay`) con `SUBVI
 - F2: dopo un `srt.fix` vero (nota verde con Mostra nel Finder e Apri, "Creato · 12 righe" con la spunta nella barra laterale); "Togli i flash" spento per mostrare Durata minima attenuata, come nella tavola.
 - F3: errore `no_valid_segments` (stato alimentato a mano dopo il run: la tavola mostra tre note insieme, nell'app ne compare una alla volta). `F3-unreadable`: SRT illeggibile (`bad_srt`, riga 214). `F3-notsrt`: trascinato un file che non è `.srt` (nota gialla).
 - `real/F2-window-dark.png`: la finestra vera con `screencapture -l`, aspetto scuro, finestra non attiva: gli interruttori accesi sono bianchi (resa di macOS per le finestre inattive; nella finestra attiva sono in accento, come nella F1 chiara).
+
+## Report (5.4)
+
+Finestra vera del report (`SUBVISION_SNAPSHOT_REPORT=<report.revisione.html>`), aperta sul report 2.0 generato dal motore sul clip demo `sintel_eng_hardsub_demo.mp4` (profilo veloce, lingua dell'interfaccia italiana) in una cartella temporanea. La WKWebView disegna fuori processo e `cacheDisplay` la lascia vuota: la cattura compone la cornice (`cacheDisplay`) con `takeSnapshot` della WKWebView e, quando c'è, l'avviso in basso reso di nuovo sopra (`ReportWindowController.capture`).
+
+- R1: report aperto, barra dell'app con nome del file, Mostra nel Finder e Apri nel browser; la pagina segue l'aspetto dell'app (`prefers-color-scheme` dalla `NSApp.appearance`, non dal sistema).
+- R2: dopo Salva SRT revisionato passato dal ponte: l'SRT scritto accanto al report, l'avviso in basso con il nome e Mostra nel Finder (sparisce da solo dopo 6 s). Il report mostra il suo "SRT salvato ✓ (percorso)" nella barra in alto, che con un percorso lungo manda a capo i controlli per un paio di secondi (vedi il resoconto: richiesta al motore).
+- R3-gone: il file non c'è più, nota rossa con Chiudi; Mostra nel Finder e Apri nel browser disabilitati.
+- R3-loading: lo spinner con "Carico il report…" mentre la pagina carica (la WKWebView è nascosta fino a `didFinish`).
+- R3-savefail: l'avviso del salvataggio impossibile accanto all'originale, reso da solo con `ImageRenderer` (`SVAlertCard`): è modale, e nella finestra vera la cattura non lo raggiunge. Il flusso vero (rifiuto della promessa al report, Scegli dove salvarlo… → pannello Salva → risposta `{ok, path}`) è provato con `report-elsewhere` di `DebugQA` su una cartella in sola lettura.
+
+Le luci della finestra sono grigie perché l'app non è in primo piano durante la cattura.
