@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT
-// Process, the home (design boards E0–E7): the header, the notes, the list
-// of videos (rows in `ProcessRows.swift`), the drop strip, the bottom bar in
-// its three states (ready, batch running, finished) and the end-of-batch
-// sheet (`FinishedSheet.swift`).
+// Video, the home (design boards E0–E7, C2-V1–V5, N1): the header, the
+// notes, the list of videos (rows in `ProcessRows.swift`), the drop area
+// under it that fills the rest of the page (design note 60), the bottom bar
+// in its four states (ready, a selection, batch running, finished), the
+// parameters panel fixed on the right and the end-of-batch sheet
+// (`FinishedSheet.swift`).
 
 import AppKit
 import SVShell
@@ -14,8 +16,9 @@ struct ProcessView: View {
     @Environment(\.svChrome) private var chrome
     @Environment(\.svWindowWidth) private var windowWidth
     @State private var dropTargeted = false
-    /// The height the list's scroll view shows: its content fills it, so a click under the rows deselects.
+    /// The height the list's scroll view shows, and the list's own: the drop area takes the rest.
     @State private var viewport: CGFloat = 0
+    @State private var listHeight: CGFloat = 0
     @State private var escMonitor: Any?
 
     var body: some View {
@@ -30,15 +33,10 @@ struct ProcessView: View {
     private var page: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                PageTop(title: model.t("app.process.title"), intro: compact ? nil : model.t("app.process.intro")) {
-                    if !model.videos.isEmpty {
-                        Button { model.openVideos() } label: { Label(model.t("app.process.open"), systemImage: "folder") }
-                            .svButton(.secondary, .regular)
-                    }
-                    // In a narrow window the top bar holds the inspector button (board N1);
-                    // with the inspector open the button stays, to close it (review note 1).
-                    if windowWidth >= chrome.collapseBelow { InspectorButton() }
-                }
+                // No Open Videos… here (design note 60: the drop area under the list adds), no
+                // panel button: the panel is fixed beside a wide page, and a narrow window has
+                // its button in the top bar (board N1).
+                PageTop(title: model.t("app.process.title"), intro: narrow ? nil : model.t("app.process.intro")) { EmptyView() }
                 .padding(.bottom, 18)
                 if model.videos.isEmpty {
                     ProcessEmptyView()
@@ -88,9 +86,8 @@ struct ProcessView: View {
 
     // MARK: - List
 
-    /// The columns shrink with the inspector open or a narrow window (design note 26); the size
-    /// column follows the list's own width (`VideoList.sizeColumnFrom`, design note 59).
-    private var compact: Bool { model.inspectorOpen || windowWidth < chrome.collapseBelow }
+    /// A narrow window (the top bar instead of the sidebar): the title alone (board N1).
+    private var narrow: Bool { windowWidth < chrome.collapseBelow }
 
     private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -112,11 +109,15 @@ struct ProcessView: View {
                 }
                 .padding(.bottom, 14)
             }
+            // The list and the drop area scroll together: the area takes what the list leaves of
+            // the page, at least 140 pt; with a long list it waits at the end (boards C2-V1, V4).
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    VideoList(compact: compact)
-                    DropStrip(targeted: dropTargeted)
-                        .padding(.top, 10)
+                    VideoList()
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
+                    VideoDropArea(targeted: dropTargeted)
+                        .frame(height: max(140, viewport - listHeight - 12 - 16))
+                        .padding(.top, 12)
                 }
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity, minHeight: viewport, alignment: .topLeading)
@@ -157,7 +158,9 @@ struct ProcessView: View {
         HStack(alignment: .center, spacing: 14) {
             let ready = model.readyVideos
             let finished = model.finishedVideos
-            if model.batch.running {
+            if !model.batch.running, !model.selection.isEmpty {
+                selectionBar
+            } else if model.batch.running {
                 Text(runningText).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
                 if !ready.isEmpty {
                     StatusChip(model.tn("app.process.bar.next_batch", ready.count))
@@ -172,8 +175,10 @@ struct ProcessView: View {
                 } else {
                     Text(model.tn("app.process.bar.ready", ready.count, ["t": model.durationText(model.totalDuration)]))
                         .svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
-                    OutputsNote(text: model.t("app.process.bar.outputs"))
-                        .layoutPriority(1)
+                    if !narrow {
+                        OutputsNote(text: model.t("app.process.bar.outputs"))
+                            .layoutPriority(1)
+                    }
                 }
                 Spacer(minLength: 8)
                 if !finished.isEmpty {
@@ -190,6 +195,29 @@ struct ProcessView: View {
         .frame(maxWidth: .infinity)
         .background(SV.bg)
         .overlay(alignment: .top) { Rectangle().fill(SV.line).frame(height: 1) }
+    }
+
+    /// A selection (design note 58, board C2-V2): what to do with it, in place of the count;
+    /// how to leave it on the right, before Start.
+    @ViewBuilder private var selectionBar: some View {
+        Text(model.tn("app.process.bar.selected", model.selection.count)).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
+        Button { model.showInFinder(model.selection) } label: {
+            Label(model.t("app.common.show_in_finder"), systemImage: "macwindow")
+        }
+        .svButton(.secondary, .small)
+        .help(model.t("app.process.bar.show_in_finder_help"))
+        Button { model.removeSelection() } label: { Label(model.t("app.process.bar.remove"), systemImage: "minus") }
+            .svButton(.secondary, .small)
+            .disabled(!model.canRemoveSelection)
+            .help(model.t("app.process.bar.remove_help"))
+        Spacer(minLength: 8)
+        if !narrow {
+            Text(model.t("app.process.bar.deselect_hint")).svSmall(SV.text3).lineLimit(1)
+        }
+        Button { model.startBatch() } label: { Label(model.t("app.process.bar.start"), systemImage: "play.fill") }
+            .svButton(.primary, .regular)
+            .disabled(!model.canStart)
+            .help(model.t("app.process.bar.start_help"))
     }
 
     /// "File 2 di 3 · fine verso le 14:20" (or without the end, before any estimate).
@@ -241,19 +269,33 @@ struct OutputsNote: View {
     }
 }
 
-/// "+ Drop more videos or folders here" under the list (E1).
-struct DropStrip: View {
+/// Under the list, the drop area of E0 (design note 60): drop videos or folders, or
+/// Choose Videos… (⌘O), which adds them at the end. During a batch it stays: what
+/// is added goes to the next batch (board C2-V3).
+struct VideoDropArea: View {
     @Environment(AppModel.self) private var model
     var targeted: Bool
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "plus").svFont(12, .medium)
-            Text(model.t("app.process.list.drop_more")).svFont(12)
+        VStack(spacing: 8) {
+            Image(systemName: "film").svFont(34, .light).foregroundStyle(targeted ? SV.primaryText : SV.text3)
+                .frame(height: 40)
+            Text(model.t("app.process.list.drop_more")).svFont(14, .semibold).foregroundStyle(targeted ? SV.primaryText : SV.text)
+            HStack(spacing: 8) {
+                Text(model.t("app.process.empty.or_open")).svFont(13).foregroundStyle(SV.text2)
+                Button { model.openVideos() } label: { Label(model.t("app.process.list.choose"), systemImage: "folder") }
+                    .svButton(.secondary, .regular)
+                    .help(model.t("app.process.list.choose_help"))
+            }
+            if model.batch.running {
+                Text(model.t("app.process.list.next_batch")).svFont(11).foregroundStyle(SV.text3)
+            } else {
+                Text(model.t("app.process.list.formats")).svFont(11, mono: true).foregroundStyle(SV.text3)
+            }
         }
-        .foregroundStyle(targeted ? SV.primaryText : SV.text2)
-        .frame(maxWidth: .infinity)
-        .frame(height: 44)
+        .multilineTextAlignment(.center)
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .svDropFrame(targeted: targeted)
     }
 }
@@ -261,21 +303,20 @@ struct DropStrip: View {
 /// The list of videos: a header row and one row per video in a surface box.
 struct VideoList: View {
     @Environment(AppModel.self) private var model
-    var compact: Bool
-    /// The list's own width: the size column needs room, whatever the inspector does (design note 59).
+    /// The list's own width: the size column needs room (design note 59 and the C2 boards).
     @State private var width: CGFloat = 0
 
     /// From this width of the list on, the size column shows; under it the size goes next to the folder.
     static let sizeColumnFrom: CGFloat = 760
 
-    /// Column widths of the boards: duration, fps, size, actions (E1; narrower with the inspector or in a narrow window).
-    var widths: (duration: CGFloat, fps: CGFloat, size: CGFloat?, actions: CGFloat) {
-        let size: CGFloat? = width >= Self.sizeColumnFrom ? (compact ? 78 : 86) : nil
-        return compact ? (66, 56, size, 200) : (74, 62, size, 236)
-    }
-
     /// No row has a state yet (a new list): no circle column, the names start at the left (design note 63).
     private var showsStatus: Bool { model.videos.contains { $0.circle != nil } }
+
+    /// Column widths of the boards (`.c-nost`, `.c-st`, `.c-stdim`): duration, fps, size, actions.
+    var widths: VideoRow.Widths {
+        if width >= Self.sizeColumnFrom { return .init(duration: 74, fps: 62, size: 96, actions: 150) }
+        return .init(duration: 66, fps: 62, size: nil, actions: showsStatus ? 136 : 116)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
