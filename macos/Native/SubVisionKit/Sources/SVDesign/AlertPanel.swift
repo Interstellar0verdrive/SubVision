@@ -247,8 +247,9 @@ public final class SVAlertPresentation {
 
 /// A borderless, see-through panel: the card draws its own shape and shadow.
 final class AlertWindow: NSPanel {
-    /// Room around the card for its 60 pt shadow.
-    static let margin: CGFloat = 48
+    /// Room around the card for its shadow (blur 60, 24 down): with less, the panel's edge cuts it
+    /// into a hard grey rectangle, visible in light.
+    static let margin: CGFloat = 84
     let cancelIndex: Int
     /// Set by `present`: a press (Esc here, the buttons through the card) without a modal loop.
     var onPress: ((Int) -> Void)?

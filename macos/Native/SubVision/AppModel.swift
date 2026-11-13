@@ -148,7 +148,7 @@ final class AppModel {
     }
 
     var theme: String {
-        get { defaults.string(forKey: DefaultsKey.theme) ?? "system" }
+        get { access(keyPath: \.theme); return defaults.string(forKey: DefaultsKey.theme) ?? "system" }
         set {
             withMutation(keyPath: \.theme) {
                 defaults.set(newValue, forKey: DefaultsKey.theme)
@@ -158,12 +158,12 @@ final class AppModel {
     }
 
     var notifications: Bool {
-        get { defaults.object(forKey: DefaultsKey.notifications) as? Bool ?? true }
+        get { access(keyPath: \.notifications); return defaults.object(forKey: DefaultsKey.notifications) as? Bool ?? true }
         set { withMutation(keyPath: \.notifications) { defaults.set(newValue, forKey: DefaultsKey.notifications) } }
     }
 
     var dockProgress: Bool {
-        get { defaults.object(forKey: DefaultsKey.dockProgress) as? Bool ?? true }
+        get { access(keyPath: \.dockProgress); return defaults.object(forKey: DefaultsKey.dockProgress) as? Bool ?? true }
         set {
             withMutation(keyPath: \.dockProgress) {
                 defaults.set(newValue, forKey: DefaultsKey.dockProgress)
@@ -173,12 +173,12 @@ final class AppModel {
     }
 
     var autoCheckUpdates: Bool {
-        get { defaults.object(forKey: DefaultsKey.autoCheckUpdates) as? Bool ?? true }
+        get { access(keyPath: \.autoCheckUpdates); return defaults.object(forKey: DefaultsKey.autoCheckUpdates) as? Bool ?? true }
         set { withMutation(keyPath: \.autoCheckUpdates) { defaults.set(newValue, forKey: DefaultsKey.autoCheckUpdates) } }
     }
 
     var includeSubfolders: Bool {
-        get { defaults.object(forKey: DefaultsKey.includeSubfolders) as? Bool ?? true }
+        get { access(keyPath: \.includeSubfolders); return defaults.object(forKey: DefaultsKey.includeSubfolders) as? Bool ?? true }
         set { withMutation(keyPath: \.includeSubfolders) { defaults.set(newValue, forKey: DefaultsKey.includeSubfolders) } }
     }
 
