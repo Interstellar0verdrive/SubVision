@@ -745,7 +745,8 @@ public struct UnderlineLink: View {
     public var body: some View {
         Button(action: action) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                if let symbol { Image(systemName: symbol).svFont(10, .medium) }
+                // The symbol on the middle of the capitals (on the baseline it sat half a point high).
+                if let symbol { Image(systemName: symbol).svFont(10, .medium).svOnCapsMiddle(12.5) }
                 Text(title)
                     .underline(true, color: tone.text.opacity(hover ? 1 : 0.55))
             }
@@ -786,12 +787,14 @@ public struct TopBarSegment: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 // While the page works the spinner takes the icon's place, before the word (board N1).
+                // Natural line boxes (`svControlFont`), centred: the fixed line box of `svFont` put
+                // the word 0.75 pt under the segment's centre and under the symbol (measured at 2x).
                 if busy {
                     Spinner(size: 10, tint: selected ? SV.onPrimary : SV.primary).frame(width: 12)
                 } else {
-                    Image(systemName: symbol).svFont(12)
+                    Image(systemName: symbol).svControlFont(12)
                 }
-                Text(title).svFont(12.5, selected ? .semibold : .regular).lineLimit(1)
+                Text(title).svControlFont(12.5, selected ? .semibold : .regular).lineLimit(1)
                 // The number stays while the batch works.
                 if let count {
                     // A neutral capsule, glass on the bar, a darker veil on the current segment.
@@ -940,8 +943,9 @@ public struct StatusLink: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 if busy { Spinner(size: size - 1) } else { StatusDot(tone) }
-                Text(title).svFont(size).lineLimit(1)
-                Image(systemName: "chevron.right").svFont(8, .semibold)
+                // The font's own line box: centred on the dot and the chevron.
+                Text(title).svControlFont(size).lineLimit(1)
+                Image(systemName: "chevron.right").svControlFont(8, .semibold)
             }
             .foregroundStyle(tone.text)
             .padding(.horizontal, 4).padding(.vertical, 2)

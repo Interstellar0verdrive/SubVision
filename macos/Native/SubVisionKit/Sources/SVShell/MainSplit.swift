@@ -212,7 +212,8 @@ public struct TopBarChip: View {
                 if !outline {
                     if busy { Spinner(size: 10) } else { StatusDot(tone) }
                 }
-                Text(title).svFont(11.5, outline ? .medium : .regular).lineLimit(1)
+                // The font's own line box: `svFont` set the words half a point low in the capsule.
+                Text(title).svControlFont(11.5, outline ? .medium : .regular).lineLimit(1)
             }
             .foregroundStyle(tone.text)
             .padding(.horizontal, outline ? 10 : 9)

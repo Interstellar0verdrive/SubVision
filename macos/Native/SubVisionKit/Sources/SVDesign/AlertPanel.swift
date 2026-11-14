@@ -352,7 +352,8 @@ struct AlertCheckbox: View {
                     }
                 }
                 .frame(width: 15, height: 15)
-                Text(title).svFont(12).foregroundStyle(SV.text2)
+                // The font's own line box: centred on the box (`svFont` set it half a point low).
+                Text(title).svControlFont(12).foregroundStyle(SV.text2)
             }
             .contentShape(Rectangle())
         }
