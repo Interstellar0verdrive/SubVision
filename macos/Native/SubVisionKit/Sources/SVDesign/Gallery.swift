@@ -37,10 +37,8 @@ public struct SVDesignGallery: View {
                 }
                 .frame(width: 560, alignment: .leading)
             }
-            HStack(alignment: .top, spacing: 24) {
-                alerts
-                navigation
-            }
+            alerts
+            navigation
         }
         .padding(28)
         .frame(width: Self.width, alignment: .topLeading)
@@ -232,6 +230,7 @@ public struct SVDesignGallery: View {
                     TopBarSegment(symbol: "doc.text.magnifyingglass", title: "Review", selected: false) {}
                     TopBarSegment(symbol: "text.badge.checkmark", title: "Sub fix", selected: false) {}
                 }
+                .fixedSize()
                 ChromeIconButton("sidebar.right", help: "Parameters", on: true) {}
                 ChromeIconButton("gearshape", help: "Settings") {}
             }
@@ -239,7 +238,7 @@ public struct SVDesignGallery: View {
                       backHelp: "Back to the list · ⌘[", back: {}) {
                 Button("Show in Finder") {}.svButton(.secondary, .small)
             }
-            .frame(width: 560)
+            .frame(width: 760)
             HStack(spacing: 14) {
                 HeaderCheckbox(.off, help: "None") {}
                 HeaderCheckbox(.mixed, help: "Some") {}
@@ -247,7 +246,7 @@ public struct SVDesignGallery: View {
                 SVCheckbox(isOn: true) {}.disabled(true)
             }
         }
-        .padding(.vertical, 40)
+        .padding(.bottom, 12)
     }
 
     private static func alert(icon: String, tone: SVTone, title: String, text: String,
