@@ -187,8 +187,8 @@ struct VideoRow: View {
     }
 
     private var waitingText: String {
-        if let last = model.run.lastFileElapsed {
-            return model.t("app.process.row.waiting_est", ["t": model.durationText(last)])
+        if let estimate = model.waitingEstimate(video) {
+            return model.t("app.process.row.waiting_est", ["t": model.durationText(estimate)])
         }
         return model.t("app.process.row.waiting")
     }
