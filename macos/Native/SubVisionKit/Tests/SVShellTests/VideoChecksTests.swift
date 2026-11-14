@@ -82,12 +82,44 @@ struct VideoChecksTests {
         #expect(VideoChecks.summary(checked: 0, seconds: nil, done: 0, noSubs: 0, failed: 0, stopped: 0) == .nothingChecked)
     }
 
-    @Test func retryStartsAtOnceOnlyWhenNothingElseWaits() {
-        #expect(VideoChecks.retry(batchRunning: false, othersChecked: 0) == .startNow)
-        // E5: two others are checked for the next batch: it joins them.
-        #expect(VideoChecks.retry(batchRunning: false, othersChecked: 2) == .check)
-        // During a batch: the next one.
-        #expect(VideoChecks.retry(batchRunning: true, othersChecked: 0) == .check)
+    @Test func retryStartsAtOnceWithoutABatchAndQueuesDuringOne() {
+        // No batch: that file alone, now (the other checked rows wait for later).
+        #expect(VideoChecks.retry(batchRunning: false) == .startNow)
+        // A batch runs: the file goes "In coda, dopo il lotto".
+        #expect(VideoChecks.retry(batchRunning: true) == .queue)
+    }
+
+    @Test func theRetryQueueKeepsTheClickOrderOnce() {
+        var queue = RetryQueue<Int>()
+        #expect(queue.isEmpty)
+        let first = queue.add(3), second = queue.add(1)
+        #expect(first && second)
+        // A second click on the same row does not queue it twice.
+        let again = queue.add(3)
+        #expect(!again)
+        #expect(queue.ids == [3, 1])
+        #expect(queue.contains(1) && !queue.contains(2))
+        queue.remove(3)
+        #expect(queue.ids == [1])
+        #expect(RetryQueue([2, 2, 5]).ids == [2, 5])
+    }
+
+    @Test func afterTheBatchTheQueueStartsUnlessStopAll() {
+        // The batch ended by itself (or its last file was stopped alone): the queue starts, in order.
+        var queue = RetryQueue([4, 2, 7])
+        var started = queue.drain(stoppedAll: false) { _ in true }
+        #expect(started == [4, 2, 7])
+        #expect(queue.isEmpty)
+        // A row removed from the list (or whose file is gone) meanwhile is left out.
+        queue = RetryQueue([4, 2, 7])
+        started = queue.drain(stoppedAll: false) { $0 != 2 }
+        #expect(started == [4, 7])
+        #expect(queue.isEmpty)
+        // Stop All: nothing starts, and the queue is dropped all the same.
+        queue = RetryQueue([4, 2])
+        started = queue.drain(stoppedAll: true) { _ in true }
+        #expect(started.isEmpty)
+        #expect(queue.isEmpty)
     }
 
     @Test func theEstimateFollowsTheParameters() {
