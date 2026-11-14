@@ -476,7 +476,7 @@ public struct StatusCircle: View {
             case .waiting:
                 Circle().strokeBorder(SV.text3, style: StrokeStyle(lineWidth: 1.2, dash: [2.4, 2.6]))
             case .running:
-                Spinner(size: 16)
+                Spinner(size: 14)
             case .done:
                 Circle().fill(SV.greenBg)
                 Circle().strokeBorder(SV.greenLine)
