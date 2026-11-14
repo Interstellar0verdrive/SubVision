@@ -100,14 +100,14 @@ struct BatchRun: Equatable {
     }
 
     /// The file's fraction: by estimate when every step has one (a step that had nothing
-    /// to do in the previous file weighs 0), else one share each.
+    /// to do in the previous file weighs 0), else by the typical share of each step.
     var fileFraction: Double {
         guard !steps.isEmpty else { return 0 }
         let weights = steps.map { $0.estimate ?? 0 }
         let useWeights = steps.allSatisfy { $0.estimate != nil } && weights.reduce(0, +) > 0
         var total = 0.0, done = 0.0
         for (i, step) in steps.enumerated() {
-            let w = useWeights ? weights[i] : 1
+            let w = useWeights ? weights[i] : Self.typicalShare(step)
             total += w
             switch step.state {
             case .done: done += w
@@ -116,6 +116,21 @@ struct BatchRun: Equatable {
             }
         }
         return total > 0 ? done / total : 0
+    }
+
+    /// The share of a file's time a step usually takes, for the first file of a batch, when no
+    /// step has an estimate yet: measured on a 24-minute episode at the defaults (dialogues:
+    /// extraction 0.6 %, grouping 0.6 %, OCR 56 %, refinement 13 %; signs: 0.6 %, 0.5 %, 28 %, 1 %).
+    /// Counting the steps one share each put the bar at 25 % after the two quick ones.
+    static func typicalShare(_ step: StepRun) -> Double {
+        let top = step.band == "top"
+        switch step.key {
+        case "extract": return 0.6
+        case "group": return top ? 0.5 : 0.6
+        case "ocr": return top ? 28 : 56
+        case "refine": return top ? 1 : 13
+        default: return 1
+        }
     }
 
     /// Seconds left in this file, from the estimates (nil without them). The estimates
@@ -579,10 +594,13 @@ extension AppModel {
         // The step estimates come from the last file done: scaled to this file's duration.
         let source = measured.keys.filter { $0 < current }.max()
         let scale = source.map { weights[current] / weights[$0] } ?? 1
-        let left = run.fileRemaining(scale: scale)
+        // No step estimates yet (the first file): the time left by the estimate of the
+        // parameters, as the row says it ("finisce verso le …").
+        let left = run.fileRemaining(scale: scale) ?? runningFileEnds().map { max(0, $0.timeIntervalSinceNow) }
         // Nothing done yet: the step estimates, if any, stand for this file.
+        let stepsEstimate = run.steps.compactMap(\.estimate).reduce(0, +)
         let rate = BatchProgress.rate(weights: weights, measured: measured)
-            ?? run.steps.compactMap(\.estimate).reduce(0, +) / weights[current]
+            ?? (stepsEstimate > 0 ? stepsEstimate / weights[current] : runningVideo.flatMap { v in estimate(v).map { $0 / weights[current] } })
         let remaining = BatchProgress.remaining(weights: weights, current: current, currentLeft: left, rate: rate)
         batch.endsAround = remaining.map { Self.clockTime(Date().addingTimeInterval($0)) }
         updateDock()
