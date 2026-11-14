@@ -719,6 +719,7 @@ enum DebugQA {
                 && abs(thumbs.width - frame.width) < 0.5 && abs(dialogue.height - signs.height) < 0.5
                 && dialogue.height >= PreviewLayout.panelsMin - 1 && bottomGap >= PreviewLayout.bottom - 1
                 && abs(dialogue.minX - frame.minX) < 0.5 && abs(signs.maxX - frame.maxX) < 0.5
+                && frame.width <= PreviewLayout.maxFrameWidth + 0.5 && abs(frame.midX - content.midX) < 1
         } else {
             parts.append("placeholder \(size(frame))")
         }
