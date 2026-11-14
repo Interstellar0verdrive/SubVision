@@ -2,7 +2,7 @@
 
 Le tavole di riferimento sono quelle definitive e approvate del file di design: https://claude.ai/artifact/6hPbiA85ZJxGauwq1w4evQ (scuro = «Native screens», chiaro = «Native screens · light»). Le vecchie tavole HTML di F3 (`design/tavole/`) non sono più nel ramo.
 
-Catture a 2× delle finestre vere della build Debug (`cacheDisplay`, senza permessi), rifatte il 14/11/2026 sul ramo `c3-fix` dagli scenari `macos/Native/QA/14-c2-snapshots.txt` (nomi `C2-*`, i codici delle tavole del giro C2) e `macos/Native/QA/15-final-boards.txt` (nomi con il codice della tavola definitiva). Due clip demo copiate in una cartella temporanea (i percorsi nelle righe sono quelli), interfaccia in italiano, profilo veloce con la banda cartelli accesa: per questo il pannello segna «4–5 valori diversi dal predefinito» e la prova dice «OCR singolo». Le luci della finestra sono grigie e gli interruttori chiari perché l'app non era in primo piano durante le catture. PNG a 256 colori (median cut), stessa risoluzione.
+Catture a 2× delle finestre vere della build Debug (`cacheDisplay`, senza permessi), rifatte il 14/11/2026 sul ramo `c3-fix` dagli scenari `macos/Native/QA/14-c2-snapshots.txt` (nomi `C2-*`, i codici delle tavole del giro C2) e `macos/Native/QA/15-final-boards.txt` (nomi con il codice della tavola definitiva). Due clip demo copiate in una cartella temporanea (i percorsi nelle righe sono quelli), interfaccia in italiano, profilo veloce con la banda cartelli accesa: per questo il pannello segna «4–5 valori diversi dal predefinito» e la prova dice «OCR singolo». Le luci della finestra sono grigie e gli interruttori chiari perché l'app non era in primo piano durante le catture. Erano PNG a 256 colori (median cut); dal 14/11/2026 sono WebP, stessa risoluzione (vedi sotto).
 
 **Scenario 14 (giro C2):**
 
@@ -27,3 +27,5 @@ Catture a 2× delle finestre vere della build Debug (`cacheDisplay`, senza perme
 - `F0-*`, `F1-*`, `F2-*`, `F3-*`: Sub fix vuota, pronta, fatta, con l'errore di un SRT illeggibile; `F4-*`: a 760×780 (la tavola è a 1040 di altezza).
 
 Differenze note dalle tavole: le clip demo sono 1280×544 (2,35:1), quindi in Anteprima il fotogramma è più basso e i pannelli più alti che nelle tavole (16:9), e in A0 i tre passi non ci stanno; durante la ricerca le miniature non arrivano una per volta (il motore manda i fotogrammi alla fine: i posti delle zone fatte sono grigi); Revisione mostra «0» buchi perché le clip demo non ne hanno; i nomi dei file d'uscita hanno data e ora (`-fixed-20261114_…`), le tavole solo la data. I menu di O9 non sono catture: lo scenario 15 li legge come testo (`menu-dump`).
+
+Formato: WebP dal 14/11/2026 (prima PNG, convertite con `cwebp` per alleggerire il ramo): senza perdita (`-lossless -z 9`) quando il file scende sotto il 60 % del PNG o non supera quello con perdita, altrimenti `-q 90`; stessa risoluzione, il testo resta nitido. Gli scenari QA salvano ancora le catture nuove in PNG.

@@ -10,9 +10,9 @@ Con `SUBVISION_SNAPSHOT_ADD=<tre video>` e `SUBVISION_SNAPSHOT_PROCESS=1`.
 
 - E2, E3, E4, E5, I1, I2, I3, N1: cattura della finestra vera (`cacheDisplay`) con gli stati alimentati a mano (`DebugSnapshot.processStates`): un lotto sulle clip demo finisce in venti secondi, troppo in fretta per fermare ogni stato con i numeri delle tavole. I percorsi dei video sono quelli di una cartella temporanea; il terzo video è una copia della clip italiana.
 - I3: la variante centrale della tavola (lingua salvata che Vision non ha, nota gialla e menu evidenziato); la variante sinistra (inspector bloccato) è in E2; la destra (liste mancanti) non è riprodotta.
-- E6: il foglio di fine lotto reso con `ImageRenderer` (un foglio è un'altra finestra: `cacheDisplay` della principale non lo prende); `real/E6-window-dark.png` è la finestra vera con il foglio sopra (`screencapture -l`), alla fine di un lotto vero sulle due clip demo con il profilo veloce.
-- `real/E2-window-dark.png`, `real/E5-window-dark.png`: finestra vera durante un lotto di tre clip (OCR del secondo file in corso) e dopo Ferma sul secondo file e Ferma tutto sul terzo (`cacheDisplay`, scenario `DebugQA`).
-- `real/E3-window-dark.png`: finestra vera dopo il lotto, prima riga aperta (tempi e file).
+- E6: il foglio di fine lotto reso con `ImageRenderer` (un foglio è un'altra finestra: `cacheDisplay` della principale non lo prende); `real/E6-window-dark.webp` è la finestra vera con il foglio sopra (`screencapture -l`), alla fine di un lotto vero sulle due clip demo con il profilo veloce.
+- `real/E2-window-dark.webp`, `real/E5-window-dark.webp`: finestra vera durante un lotto di tre clip (OCR del secondo file in corso) e dopo Ferma sul secondo file e Ferma tutto sul terzo (`cacheDisplay`, scenario `DebugQA`).
+- `real/E3-window-dark.webp`: finestra vera dopo il lotto, prima riga aperta (tempi e file).
 
 Scenario `DebugQA` usato per le catture vere (comandi in `DebugQA.swift`): `params fast`, `add <clip>,<clip>`, `start`, `wait-step 1 ocr 90`, `capture …`, `stop-file`, `wait-file 1 30`, `wait-step 2 extract 60`, `stop-all`, `wait-batch 30`, `states`, `expand 0`, `capture …`.
 
@@ -27,7 +27,7 @@ Con `SUBVISION_SNAPSHOT_PREVIEW=1` sulla clip demo `sintel_ita_hardsub_demo.mp4`
 - A5: stato alimentato a mano, perché sulla demo non si riproduce: i fotogrammi senza testo (nota gialla), la durata non letta (nota rossa), un risultato della prova con la banda dialoghi vuota e i cartelli "IL MERCATO", superato da parametri cambiati.
 - A6: durante il lotto (`batch.running` forzato): nota blu, maniglie e prova spente, menu Video e ricerca disabilitati.
 - N2: finestra a 900 pt con l'inspector sovrapposto alla pagina Anteprima.
-- `real/A3-window-dark.png`, `real/A4-window-dark.png`: la finestra vera (`screencapture -l`) dopo lo scenario `DebugQA` (`find-frames`, `drag-handle`, `try-ocr`).
+- `real/A3-window-dark.webp`, `real/A4-window-dark.webp`: la finestra vera (`screencapture -l`) dopo lo scenario `DebugQA` (`find-frames`, `drag-handle`, `try-ocr`).
 
 Nota: i valori delle bande sono quelli di `UserDefaults` al momento della cattura (`ocr.bottomKeepPct`, `ocr.keepWPct`, `ocr.topBand`…), condivisi con l'inspector.
 
@@ -39,7 +39,7 @@ Catture della finestra vera (`DebugSnapshot.capture`, `cacheDisplay`) con `SUBVI
 - F1: file scelto, le quattro opzioni, nota sui parametri condivisi, Esegui.
 - F2: dopo un `srt.fix` vero (nota verde con Mostra nel Finder e Apri, "Creato · 12 righe" con la spunta nella barra laterale); "Togli i flash" spento per mostrare Durata minima attenuata, come nella tavola.
 - F3: errore `no_valid_segments` (stato alimentato a mano dopo il run: la tavola mostra tre note insieme, nell'app ne compare una alla volta). `F3-unreadable`: SRT illeggibile (`bad_srt`, riga 214). `F3-notsrt`: trascinato un file che non è `.srt` (nota gialla).
-- `real/F2-window-dark.png`: la finestra vera con `screencapture -l`, aspetto scuro, finestra non attiva: gli interruttori accesi sono bianchi (resa di macOS per le finestre inattive; nella finestra attiva sono in accento, come nella F1 chiara).
+- `real/F2-window-dark.webp`: la finestra vera con `screencapture -l`, aspetto scuro, finestra non attiva: gli interruttori accesi sono bianchi (resa di macOS per le finestre inattive; nella finestra attiva sono in accento, come nella F1 chiara).
 
 ## Report (5.4)
 
@@ -52,3 +52,5 @@ Finestra vera del report (`SUBVISION_SNAPSHOT_REPORT=<report.revisione.html>`), 
 - R3-savefail: l'avviso del salvataggio impossibile accanto all'originale, reso da solo con `ImageRenderer` (`SVAlertCard`): è modale, e nella finestra vera la cattura non lo raggiunge. Il flusso vero (rifiuto della promessa al report, Scegli dove salvarlo… → pannello Salva → risposta `{ok, path}`) è provato con `report-elsewhere` di `DebugQA` su una cartella in sola lettura.
 
 Le luci della finestra sono grigie perché l'app non è in primo piano durante la cattura.
+
+Formato: WebP dal 14/11/2026 (prima PNG, convertite con `cwebp` per alleggerire il ramo): senza perdita (`-lossless -z 9`) quando il file scende sotto il 60 % del PNG o non supera quello con perdita, altrimenti `-q 90`; stessa risoluzione, il testo resta nitido. Gli scenari QA salvano ancora le catture nuove in PNG.
