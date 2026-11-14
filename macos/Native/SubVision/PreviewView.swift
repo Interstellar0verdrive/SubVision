@@ -479,8 +479,10 @@ struct FrameBox: View {
             if let image = model.preview.frameImage {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
                     .frame(width: size.width, height: size.height)
-                    .clipShape(RoundedRectangle(cornerRadius: SV.Radius.field))
-                    .overlay(RoundedRectangle(cornerRadius: SV.Radius.field).strokeBorder(SV.line))
+                    // Square, as the bands over it (design note 89): a band at 100 % width
+                    // would leave the rounded corners showing inside its border.
+                    .clipShape(Rectangle())
+                    .overlay(Rectangle().strokeBorder(SV.line))
                 BandOverlay(size: size, editable: model.canDragBands, drag: $model.preview.drag)
             } else {
                 HStack(spacing: 6) {
