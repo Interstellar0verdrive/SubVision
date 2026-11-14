@@ -1,0 +1,119 @@
+# The to-do drawer's frames (C3-02, the owner's note on the empty boxes): five
+# frames of the video are taken as soon as it enters the list (`videos.thumbs`,
+# one video at a time, in the background) and the strip shows them as «Fotogrammi
+# del video»; once the Preview has found its own, «Dall'Anteprima» with the dots
+# and the count, as before. A file that is not a video keeps the empty boxes. A
+# video added during a batch waits for its end (the engine would be busy), then
+# gets its frames. The shimmer while they are taken is held by hand for the
+# captures (the demo clips take 0.3 s). Captures: video frames, the Preview's,
+# extracting, in dark and light, wide and narrow.
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" a.mp4 && cp "$DEMO/sintel_eng_hardsub_demo.mp4" b.mp4 && cp "$DEMO/sintel_ita_hardsub_demo.mp4" c.mp4 && printf 'nope' > bogus.mp4
+@launch
+wait-ready 600
+? ^ready
+lang it
+size 1360x860
+params fast
+inspector-set langHint it-IT
+inspector-tab read
+theme dark
+tab process
+add $WORK/a.mp4,$WORK/b.mp4,$WORK/bogus.mp4
+wait-strips 60
+? ^a\.mp4=video:5 b\.mp4=video:5 bogus\.mp4=none$
+! ls "$STATE"/tmp/thumbs/*/4.jpg | wc -l | grep -q 2
+# A video added during a batch waits for its end, then gets its frames
+check 1
+start
+? status ready
+add $WORK/c.mp4
+strips
+? c\.mp4=none$
+wait-batch 900
+? ^batch done · done 1 failed 0
+summary-seen
+wait-strips 60
+? ^a\.mp4=video:5 b\.mp4=video:5 bogus\.mp4=none c\.mp4=video:5$
+# The drawer of a video to do with the frames of the video (the done row's drawer closed)
+drawer 0 close
+drawer 1 open
+capture $OUT/strip-video-dark.png
+? strip-video-dark\.png$
+screen-shot $OUT/strip-video-screen-dark.png
+? strip-video-screen-dark\.png$
+theme light
+capture $OUT/strip-video-light.png
+screen-shot $OUT/strip-video-screen-light.png
+theme dark
+# A click on one of the frames opens the Preview on that video (its search starts)
+mouse click 264,473 main
+? ^click
+preview-nav
+? ^video 2 di 4
+preview-close
+? ^ok · tab process
+# While they are taken (held by hand)
+strip-hold 3
+? c\.mp4=extracting$
+drawer 1 close
+drawer 3 open
+capture $OUT/strip-extracting-dark.png
+? strip-extracting-dark\.png$
+theme light
+capture $OUT/strip-extracting-light.png
+theme dark
+strip-hold off
+? c\.mp4=video:5$
+drawer 3 close
+# The Preview's own frames take the place of the video's
+preview-open 1
+? ^ok · b\.mp4
+wait-frames 300
+? ^20 frames
+preview-close
+? ^ok · tab process
+strips
+? ^a\.mp4=video:5 b\.mp4=preview:20 bogus\.mp4=none c\.mp4=video:5$
+drawer 1 open
+? ^open b\.mp4$
+capture $OUT/strip-preview-dark.png
+? strip-preview-dark\.png$
+screen-shot $OUT/strip-preview-screen-dark.png
+theme light
+capture $OUT/strip-preview-light.png
+theme dark
+# A click on one of the Preview's frames opens the page on that frame
+mouse click 220,473 main
+? ^click
+preview-state
+? ^page shown · video b\.mp4
+preview-close
+? ^ok · tab process
+# The narrow window (tall enough to show the strip): the frames without the line beside them
+size 760x940
+capture $OUT/strip-narrow-preview-dark.png
+? strip-narrow-preview-dark\.png$
+theme light
+capture $OUT/strip-narrow-preview-light.png
+theme dark
+drawer 1 close
+drawer 3 open
+? ^open c\.mp4$
+capture $OUT/strip-narrow-video-dark.png
+theme light
+capture $OUT/strip-narrow-video-light.png
+theme dark
+size 1360x860
+# Launched again: the frames come back from the engine's cache
+@quit
+@launch
+wait-ready 120
+? ^ready
+wait-strips 60
+? ^a\.mp4=video:5 b\.mp4=video:5 bogus\.mp4=none c\.mp4=video:5$
+! grep -c "videos.thumbs: .*(cached)" "$STATE/records/app.log" | grep -qE '^[3-9]'
+drawer 1 close
+drawer 3 close
+theme system
+params default
+inspector-tab read

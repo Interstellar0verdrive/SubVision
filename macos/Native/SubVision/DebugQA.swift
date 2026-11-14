@@ -48,7 +48,7 @@
 //   C3 · the frame: batch-bar (the window's batch bar: hidden, or its line, segments and percentage) ·
 //   summary-sheet (the end-of-batch sheet: its title, the page under it and each row's outcome)
 //   C3 · the list of Video: checks, check, header, drawer, drawers, retry, row-menu, row-menu-shot,
-//   video-fake (see DebugVideo.swift)
+//   video-fake, strips, wait-strips, strip-hold (see DebugVideo.swift)
 //   F6 · the QA scenarios (macos/Native/QA):
 //   status                         engine status, Vision, tools phase and rows, window, language, tab
 //   wait-ready <s>                 until the engine is ready and the tools window is gone (first launch: downloads)

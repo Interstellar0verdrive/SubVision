@@ -18,6 +18,12 @@
 //   video-fake before|drawers|batch|failed|outcomes|stopped|off
 //                                  the first three videos of the list in the states of the boards, fed by hand
 //                                  (a batch on the demo clips is over too fast to catch); off puts them back
+//   strips                         what each to-do drawer's strip shows: "a.mp4=video:5 b.mp4=preview:20 c.mp4=none"
+//                                  (none: the empty boxes; extracting: the shimmer; video:<n>: the frames of the
+//                                  video taken; preview:<n>: the frames the Preview found)
+//   wait-strips <s>                until no strip is extracting any more, then as strips
+//   strip-hold <idx>|off           that row's strip shown as extracting whatever it has (a capture of the
+//                                  shimmer: the demo clips take 0.3 s); off lets every row go
 
 #if DEBUG
 import AppKit
@@ -66,6 +72,21 @@ enum DebugVideo {
             return await rowMenu(model, idx, shot: args[1])
         case "video-fake":
             return fake(argument, model)
+        case "strips":
+            return strips(model)
+        case "wait-strips":
+            let settled = await DebugQA.wait(Double(argument) ?? 60) {
+                model.videos.allSatisfy { if case .extracting = model.drawerStrip($0) { return false } else { return true } }
+            }
+            return (settled ? "" : "timeout · ") + strips(model)
+        case "strip-hold":
+            if argument == "off" {
+                model.videoFrames.heldExtracting = []
+                return strips(model)
+            }
+            guard let idx = Int(argument), model.videos.indices.contains(idx) else { return "usage: strip-hold <idx>|off" }
+            model.videoFrames.heldExtracting.insert(model.videos[idx].id)
+            return strips(model)
         case "screen-shot":
             // The main window as the screen shows it (`screencapture`), not drawn again by `capture`.
             guard !argument.isEmpty else { return "usage: screen-shot <path>" }
@@ -94,6 +115,11 @@ enum DebugVideo {
     static func queued(_ model: AppModel) -> String {
         let names = model.videos.filter { model.retryQueued($0.id) }.map(\.name)
         return "queued " + (names.isEmpty ? "-" : names.joined(separator: " "))
+    }
+
+    /// "a.mp4=video:5 b.mp4=preview:20 c.mp4=none".
+    static func strips(_ model: AppModel) -> String {
+        model.videos.map { "\($0.name)=\(model.drawerStrip($0).debugName)" }.joined(separator: " ")
     }
 
     static func drawers(_ model: AppModel) -> String {
