@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-// Review (design note 80, board C2-R1): the videos of the list that were
-// processed (done, or without subtitles), with what is left to check: lines,
-// lines dropped into the report, long gaps without subtitles, when it ran.
-// Review opens the file's review report ("Revisione · <video>"); a click on a
-// row opens its times and files (the detail of E3) with the gaps in a note.
+// Review (C3-06, board RV1): the list of the videos processed, each with its
+// lines, its gaps and when it ran, «Apri» and ⋯; the chevron says a row goes
+// in. A click on a row (or «Apri») brings its report into the same page
+// (C3-07, ReportPage.swift), sliding in from the right over the list, which
+// keeps its place for the way back. Under the list the totals and Show SRTs
+// in Finder.
 
 import AppKit
 import SVShell
@@ -14,37 +15,24 @@ extension AppModel {
     /// order (also the ones processed in an earlier session, while they stay in the list).
     var reviewVideos: [VideoItem] { videos.filter { $0.state == .done || $0.state == .noSubs } }
 
-    /// The review row selected (⌘R opens it), if still there.
+    /// The review row last opened (⌘R on the list opens it again), if still there.
     var selectedReview: VideoItem? { reviewVideos.first { $0.id == reviewSelection } }
 
     /// "oggi 22:43" · "ieri 18:02" · "13/11 22:43" in the app's language.
     func processedWhen(_ date: Date) -> String {
         let time = Self.clockTime(date)
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) { return t("app.review.today", ["time": time]) }
-        if calendar.isDateInYesterday(date) { return t("app.review.yesterday", ["time": time]) }
-        let f = DateFormatter()
-        f.locale = Locale(identifier: language)
-        f.setLocalizedDateFormatFromTemplate("dM")
-        return "\(f.string(from: date)) \(time)"
-    }
-
-    /// "00:00:41 → 00:00:49".
-    func gapText(_ gap: [Double]) -> String {
-        func hms(_ s: Double) -> String {
-            let t = max(0, Int(s.rounded(.down)))
-            return String(format: "%02d:%02d:%02d", t / 3600, t / 60 % 60, t % 60)
+        switch ReviewData.day(of: date) {
+        case .today: return t("app.review.today", ["time": time])
+        case .yesterday: return t("app.review.yesterday", ["time": time])
+        case .earlier: return "\(shortDate(date)) \(time)"
         }
-        guard gap.count == 2 else { return "" }
-        return "\(hms(gap[0])) → \(hms(gap[1]))"
     }
 
-    /// The reviewed SRT the report exported next to the video (`<stem>-reviewed-<date>.srt`): the chip of the row.
+    /// A reviewed SRT the report saved next to the video (`<stem>-reviewed-<date>.srt`): the chip of the row.
     func hasReviewedSRT(_ video: VideoItem) -> Bool {
         let folder = video.url.deletingLastPathComponent()
-        let stem = video.url.deletingPathExtension().lastPathComponent + "-reviewed-"
         let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
-        return names.contains { $0.hasPrefix(stem) && $0.hasSuffix(".srt") }
+        return names.contains { ReviewData.isReviewedSRT($0, of: video.name) }
     }
 
     /// Show SRTs in Finder (the Review page): the SRTs of every row, selected.
@@ -53,9 +41,39 @@ extension AppModel {
         guard !urls.isEmpty else { return }
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
+
+    /// "3 video elaborati · 38 righe · 9 buchi" (RV1).
+    var reviewTotals: String {
+        let totals = ReviewData.totals(reviewVideos.map { (lines: $0.segments, gaps: $0.gaps?.count) })
+        var parts = [tn("app.review.sum.videos", totals.videos), tn("app.review.sum.lines", totals.lines)]
+        if let gaps = totals.gaps { parts.append(tn("app.review.sum.gaps", gaps)) }
+        return join(parts)
+    }
 }
 
+/// The page: the list, and the report over it while one is open.
 struct ReviewPage: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        ZStack {
+            // The list stays under the report, so the way back finds it where it was.
+            ReviewListPage()
+                .allowsHitTesting(model.report.session == nil)
+                .accessibilityHidden(model.report.session != nil)
+            if let session = model.report.session {
+                ReportPage(session: session)
+                    .transition(.move(edge: .trailing))
+                    .zIndex(1)
+            }
+        }
+        .clipped()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// RV1: the title, the list (or the empty state), the totals at the bottom.
+struct ReviewListPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.svPageTop) private var top
     @Environment(\.svChrome) private var chrome
@@ -85,6 +103,7 @@ struct ReviewPage: View {
             if !model.reviewVideos.isEmpty { bottomBar }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(SV.bg)
     }
 
     /// Nothing processed yet: what will come here, and the way to Video.
@@ -102,17 +121,10 @@ struct ReviewPage: View {
         .padding(.bottom, 28)
     }
 
-    /// "2 video elaborati · 37 righe · 2 scartate · 1 buco" and Show SRTs in Finder.
+    /// "3 video elaborati · 38 righe · 9 buchi" and Show SRTs in Finder.
     private var bottomBar: some View {
-        let rows = model.reviewVideos
-        let lines = rows.compactMap(\.segments).reduce(0, +)
-        let dropped = rows.compactMap(\.dropped).reduce(0, +)
-        let gaps = rows.compactMap { $0.gaps?.count }.reduce(0, +)
-        var parts = [model.tn("app.review.sum.videos", rows.count), model.tn("app.process.finished.lines", lines),
-                     model.tn("app.review.sum.dropped", dropped)]
-        if rows.contains(where: { $0.gaps != nil }) { parts.append(model.tn("app.review.sum.gaps", gaps)) }
-        return HStack(spacing: 14) {
-            Text(model.join(parts)).svFont(13, .semibold).foregroundStyle(SV.text).lineLimit(1)
+        HStack(spacing: 14) {
+            Text(model.reviewTotals).svFont(12.5, .semibold).foregroundStyle(SV.text).lineLimit(1)
             Spacer(minLength: 8)
             Button { model.showReviewSRTs() } label: {
                 Label(model.t("app.process.finished.show_all"), systemImage: "macwindow")
@@ -120,24 +132,24 @@ struct ReviewPage: View {
             .svButton(.secondary, .regular)
         }
         .padding(.horizontal, 28)
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(SV.bg)
         .overlay(alignment: .top) { Rectangle().fill(SV.line).frame(height: 1) }
     }
 }
 
-/// The list of the Review page (`.c-rev`): the circle, the video, lines, dropped, gaps,
-/// when, and Review with ⋯.
+/// The list of the Review page (`.c3r` of RV1): the circle, the video, lines, gaps,
+/// when, «Apri», ⋯ and the chevron.
 struct ReviewList: View {
     @Environment(AppModel.self) private var model
     @State private var width: CGFloat = 0
 
-    /// Under this width of the list the "processed" column goes into the row's third line.
+    /// Under this width of the list the "processed" column goes into the row's second line.
     static let whenColumnFrom: CGFloat = 760
 
     var widths: ReviewRow.Widths {
-        .init(lines: 62, dropped: 72, gaps: 56, when: width >= Self.whenColumnFrom ? 110 : nil, actions: 150)
+        .init(lines: 56, gaps: 52, when: width >= Self.whenColumnFrom || width == 0 ? 104 : nil, open: 64)
     }
 
     var body: some View {
@@ -155,16 +167,17 @@ struct ReviewList: View {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: ReviewRow.gap) {
             Color.clear.frame(width: StatusCircle.size)
             label(model.t("app.process.list.name")).frame(maxWidth: .infinity, alignment: .leading)
             label(model.t("app.review.col.lines")).frame(width: widths.lines, alignment: .trailing)
-            label(model.t("app.review.col.dropped")).frame(width: widths.dropped, alignment: .trailing)
             label(model.t("app.review.col.gaps")).frame(width: widths.gaps, alignment: .trailing)
             if let when = widths.when {
                 label(model.t("app.review.col.when")).frame(width: when, alignment: .trailing)
             }
-            Color.clear.frame(width: widths.actions)
+            Color.clear.frame(width: widths.open)
+            Color.clear.frame(width: ReviewRow.moreWidth)
+            Color.clear.frame(width: ReviewRow.chevronWidth)
         }
         .padding(.leading, 13 + 3)
         .padding(.trailing, 16)
@@ -172,148 +185,118 @@ struct ReviewList: View {
     }
 
     private func label(_ text: String) -> some View {
-        Text(text.uppercased()).svFont(10.5, .semibold).foregroundStyle(SV.text3).tracking(0.3).lineLimit(1)
+        Text(text.uppercased()).svFont(10.5, .semibold).foregroundStyle(SV.text3).tracking(0.4).lineLimit(1)
     }
 }
 
-/// One processed video: a click selects it and opens its times and files (E3), with the gaps.
+/// One processed video. A click anywhere but on its buttons opens the report in the page;
+/// the chevron says so (no drawer here: the times and files are on Video).
 struct ReviewRow: View {
     struct Widths: Equatable {
         var lines: CGFloat
-        var dropped: CGFloat
         var gaps: CGFloat
         var when: CGFloat?
-        var actions: CGFloat
+        var open: CGFloat
     }
+
+    static let gap: CGFloat = 12
+    static let moreWidth: CGFloat = 22
+    static let chevronWidth: CGFloat = 16
 
     @Environment(AppModel.self) private var model
     var video: VideoItem
     var widths: Widths
     @State private var hover = false
 
-    private var selected: Bool { model.reviewSelection == video.id }
-    private var expanded: Bool { model.run.expanded.contains(video.id) }
-    private var textInset: CGFloat { StatusCircle.size + 14 }
+    private var hasReport: Bool { video.reviewReport != nil }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 14) {
-                StatusCircle(video.state == .noSubs ? .warning : .done)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
-                        if model.hasReviewedSRT(video) {
-                            StatusChip(model.t("app.review.reviewed"), tone: .green)
-                                .help(model.t("app.review.reviewed_help"))
-                        }
+        HStack(alignment: .center, spacing: Self.gap) {
+            StatusCircle(video.state == .noSubs ? .warning : .done)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
+                    if model.hasReviewedSRT(video) {
+                        StatusChip(model.t("app.review.reviewed"), tone: .green)
+                            .help(model.t("app.review.reviewed_help"))
                     }
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(video.folder).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
-                        if let size = video.size {
-                            Text("· \(size)").svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).fixedSize()
-                        }
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(video.folder).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
+                    ForEach(secondLine, id: \.self) { piece in
+                        Text("· \(piece)").svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).fixedSize()
                     }
-                    Text(meta).svFont(11.5).foregroundStyle(video.state == .noSubs ? SV.yellowText : SV.text2).lineLimit(1)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                number(video.segments.map(String.init)).frame(width: widths.lines, alignment: .trailing)
-                number(video.dropped.map(String.init)).frame(width: widths.dropped, alignment: .trailing)
-                number(video.gaps.map { String($0.count) }, tint: (video.gaps?.count ?? 0) > 0 ? SV.yellowText : nil)
-                    .frame(width: widths.gaps, alignment: .trailing)
-                if let when = widths.when {
-                    number(video.finished.map(model.processedWhen)).frame(width: when, alignment: .trailing)
-                }
-                actions.frame(width: widths.actions, alignment: .trailing)
             }
-            .padding(.vertical, 8)
-            .frame(minHeight: 52)
-            if expanded { detail }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            number(video.segments.map(String.init)).frame(width: widths.lines, alignment: .trailing)
+            number(video.gaps.map { String($0.count) }, tint: (video.gaps?.count ?? 0) > 0 ? SV.yellowText : nil)
+                .frame(width: widths.gaps, alignment: .trailing)
+            if let when = widths.when {
+                number(video.finished.map(model.processedWhen)).frame(width: when, alignment: .trailing)
+            }
+            Button { model.review(video) } label: { Text(model.t("app.review.open")) }
+                .svButton(.primary, .small)
+                .disabled(!hasReport)
+                .help(model.t(hasReport ? "app.review.open_help" : "app.review.no_report"))
+                .frame(width: widths.open, alignment: .trailing)
+            PopupMenu({ menuItems }) {
+                Image(systemName: "ellipsis").svFont(13, .semibold).foregroundStyle(SV.text2)
+                    .frame(width: Self.moreWidth, height: 22).contentShape(Rectangle())
+            }
+            .frame(width: Self.moreWidth)
+            .help(model.t("app.process.row.more"))
+            .accessibilityLabel(model.t("app.process.row.more"))
+            Image(systemName: "chevron.right").svFont(13, .medium).foregroundStyle(SV.text3)
+                .frame(width: Self.chevronWidth)
+                .opacity(hasReport ? 1 : 0.4)
+                .accessibilityHidden(true)
         }
+        .padding(.vertical, 8)
+        .frame(minHeight: 52)
         .padding(.leading, 13)
         .padding(.trailing, 16)
-        .background(selected ? SV.selSoft : hover ? SV.hoverVeil : .clear)
+        .background(hover && hasReport ? SV.hoverVeil : .clear)
         .overlay(alignment: .leading) { Rectangle().fill(video.state == .noSubs ? SV.yellow : SV.green).frame(width: 3) }
         .contentShape(Rectangle())
         .onHover { hover = $0 }
-        .onTapGesture { toggle() }
+        .onTapGesture { if hasReport { model.review(video) } }
         .contextMenu { menuButtons }
         .help(video.path)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { model.review(video) }
     }
 
-    /// "elaborato in 01:54 · Italiano · 12 fps" (and the date when its column is not shown).
-    private var meta: String {
-        if video.state == .noSubs { return model.t("app.process.row.no_subs") }
-        var parts: [String] = []
-        if let elapsed = video.elapsed { parts.append(model.t("app.process.finished.took_file", ["t": Localizer.clock(elapsed)])) }
-        if let lang = video.ocrLang { parts.append(model.languageName(lang)) }
-        if let fps = video.ocrFPS { parts.append(model.t("app.review.fps", ["fps": model.localizer.number(fps)])) }
-        if widths.when == nil, let finished = video.finished { parts.append(model.processedWhen(finished)) }
-        return model.join(parts)
+    /// "1280×544", and the time processed when its column does not fit (narrow window).
+    private var secondLine: [String] {
+        var pieces: [String] = []
+        if let size = video.size { pieces.append(size) }
+        if widths.when == nil, let finished = video.finished { pieces.append(model.processedWhen(finished)) }
+        return pieces
     }
 
     private func number(_ text: String?, tint: Color? = nil) -> some View {
-        Text(text ?? "—").svFont(SVFont.numbers).foregroundStyle(tint ?? SV.textCode).lineLimit(1)
+        Text(text ?? "—").svFont(12, mono: true).foregroundStyle(tint ?? SV.textCode).lineLimit(1)
     }
 
-    private var actions: some View {
-        HStack(spacing: 6) {
-            Button { model.review(video) } label: { Label(model.t("app.process.row.review"), systemImage: "doc.text.magnifyingglass") }
-                .svButton(.secondary, .small)
-                .disabled(video.outputReport == nil)
-                .help(model.t(video.outputReport == nil ? "app.process.row.review_none" : "app.process.row.review_help"))
-            PopupMenu({ menuItems }) {
-                Image(systemName: "ellipsis").svFont(13, .semibold).foregroundStyle(SV.text2)
-                    .frame(width: 22, height: 22).contentShape(Rectangle())
-            }
-            .help(model.t("app.process.row.more"))
-            .accessibilityLabel(model.t("app.process.row.more"))
-        }
-    }
-
+    /// The ⋯ menu (C3-06): where the files are, the report in the browser, the file's log.
     private var menuItems: [SVMenuItem] {
         [.item(model.t("app.common.show_in_finder")) { model.showInFinder([video.id]) },
-         .item(model.t("app.process.row.open_srt"), enabled: FileManager.default.fileExists(atPath: video.outputSRT.path)) { model.openSRT(video) },
-         .item(model.t("app.process.row.open_log"), enabled: video.logExists) { model.openLog(video) },
-         .item(model.t("app.process.row.open_in_preview"), enabled: model.canPreview(video)) { model.openInPreview(video.id) },
-         .separator,
-         .item(model.t("app.process.row.remove"), enabled: !video.state.inBatch) { model.removeWithUndo([video.id]) }]
+         .item(model.t("app.report.open_browser"), enabled: video.outputReport != nil) {
+             if let url = video.outputReport { model.openReportInBrowser(url) }
+         },
+         .item(model.t("app.process.row.open_log"), enabled: video.logExists) { model.openLog(video) }]
     }
 
     @ViewBuilder private var menuButtons: some View {
-        Button(model.t("app.process.row.review")) { model.review(video) }.disabled(video.outputReport == nil)
-        Button(model.t("app.common.show_in_finder")) { model.showInFinder([video.id]) }
-        Button(model.t("app.process.row.open_srt")) { model.openSRT(video) }
-            .disabled(!FileManager.default.fileExists(atPath: video.outputSRT.path))
-        Button(model.t("app.process.row.open_log")) { model.openLog(video) }.disabled(!video.logExists)
-        Button(model.t("app.process.row.open_in_preview")) { model.openInPreview(video.id) }.disabled(!model.canPreview(video))
+        Button(model.t("app.review.open")) { model.review(video) }.disabled(!hasReport)
         Divider()
-        Button(model.t("app.process.row.remove")) { model.removeWithUndo([video.id]) }
-    }
-
-    /// The times and the files (E3), then the gaps the report lists, in a yellow note.
-    private var detail: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            FinishedDetail(video: video)
-            if let gaps = video.gaps, !gaps.isEmpty {
-                NoteView(.yellow, text: gapNote(gaps))
-            }
+        Button(model.t("app.common.show_in_finder")) { model.showInFinder([video.id]) }
+        Button(model.t("app.report.open_browser")) {
+            if let url = video.outputReport { model.openReportInBrowser(url) }
         }
-        .padding(.top, 10)
-        .padding(.bottom, 12)
-        .overlay(alignment: .top) { Rectangle().fill(SV.detailLine).frame(height: 1).padding(.trailing, -16) }
-        .padding(.leading, textInset)
-    }
-
-    /// "1 buco senza sottotitoli oltre 6 s (00:00:41 → 00:00:49): controllalo con Rivedi."
-    private func gapNote(_ gaps: [[Double]]) -> String {
-        var ranges = gaps.prefix(3).map(model.gapText).joined(separator: ", ")
-        if gaps.count > 3 { ranges += ", …" }
-        let seconds = model.localizer.number(video.gapWarn ?? model.ocrParams.qcGapWarn)
-        return model.tn("app.review.gap_note", gaps.count, ["s": seconds, "ranges": ranges])
-    }
-
-    private func toggle() {
-        model.reviewSelection = video.id
-        if expanded { model.run.expanded.remove(video.id) } else { model.run.expanded.insert(video.id) }
+        .disabled(video.outputReport == nil)
+        Button(model.t("app.process.row.open_log")) { model.openLog(video) }.disabled(!video.logExists)
     }
 }

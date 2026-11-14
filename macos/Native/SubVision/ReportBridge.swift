@@ -2,11 +2,13 @@
 // The bridge between the review report (HTML in a WKWebView) and the app
 // (F5.4, spike S2). The report posts to the script message handler
 // `subvision`: `{type:"export", name, srt}` becomes `<name>` next to the
-// report and gets `{ok, path, bytes}` back; `{type:"state", json}` becomes
-// `<name>.review.json` next to it. At load the saved state is injected
+// report and gets `{ok, path, name, bytes}` back; `{type:"state", json}` becomes
+// `<name>.review.json` next to it; `{type:"confirm", title, text, confirm,
+// cancel, destructive}` ("Reset all…", board R4) is the app's alert, answered
+// with `{confirmed}`. At load the saved state is injected
 // as `window.__subvisionState` and the app's language as
 // `window.__subvisionLang` (the report carries Italian and English; a change
-// of language while the window is open goes to `window.__subvisionSetLang`);
+// of language while the report is open goes to `window.__subvisionSetLang`);
 // a report written by the 1.x (no bridge of its own) gets one from a user
 // script. `<a download>` is the safety net.
 
@@ -21,6 +23,8 @@ struct ReportFile {
     var kind: Kind
     /// `DATA.srtName` of the report: the `localStorage` key of the 1.x is built on it.
     var srtName: String?
+    /// Lines, lines to re-check and gaps from the report's data (the title band, R1).
+    var counts: ReviewData.Counts?
 
     /// Reads the file; nil when it cannot be read or is not a review report.
     init?(url: URL) {
@@ -28,6 +32,7 @@ struct ReportFile {
               let html = String(data: data, encoding: .utf8), html.contains("id=\"qcdata\"") else { return nil }
         self.url = url
         kind = html.contains("messageHandlers.subvision") ? .bridged : .legacy
+        counts = ReviewData.counts(html: html)
         if let m = html.firstMatch(of: /"srtName":\s*"((?:[^"\\]|\\.)*)"/) {
             srtName = String(m.1).replacingOccurrences(of: "\\\"", with: "\"").replacingOccurrences(of: "\\\\", with: "\\")
         }
@@ -45,10 +50,10 @@ struct ReportFile {
     }
 }
 
-/// The outcome of an export the bridge wants the window to show.
+/// The outcome of an export the bridge tells the page about.
 enum ReportSaveOutcome {
     case saved(URL)
-    /// Writing next to the original failed: the window asks where else (R3).
+    /// Writing next to the original failed: the page asks where else (R3).
     case failed(name: String, error: String)
 }
 
@@ -56,7 +61,8 @@ enum ReportSaveOutcome {
 final class ReportBridge: NSObject {
     static let handlerName = "subvision"
     #if DEBUG
-    /// Debug: answers the report's `confirm()` without a dialog (`report-confirm yes|no`).
+    /// Debug: answers the report's questions without a dialog (`report-confirm yes|no`):
+    /// the `confirm` message of "Reset all…", `confirm()`, the overwrite question.
     static var debugConfirm: Bool?
     #endif
 
@@ -79,7 +85,7 @@ final class ReportBridge: NSObject {
     private(set) var lastStateWritten: Date?
     /// The downloads in flight, by identity, with their destination.
     private var downloads: [ObjectIdentifier: URL] = [:]
-    /// The alert of the page that is up (a `confirm()`, the overwrite question), for the debug commands.
+    /// The alert of the page that is up ("Reset all…", a `confirm()`, the overwrite question), for the debug commands.
     private(set) var pageAlert: SVAlertPresentation?
 
     /// The app's language ("it" | "en"): the report shows its texts in it.
@@ -92,7 +98,7 @@ final class ReportBridge: NSObject {
         super.init()
         let config = WKWebViewConfiguration()
         config.userContentController = controller
-        // The page's own memory (localStorage, keyed by the SRT's name) must not outlive the window:
+        // The page's own memory (localStorage, keyed by the SRT's name) must not outlive the report:
         // the review state is `<name>.review.json`, and a report made again for the same video
         // would otherwise start from the old choices.
         config.websiteDataStore = .nonPersistent()
@@ -103,7 +109,7 @@ final class ReportBridge: NSObject {
         webView.underPageBackgroundColor = .clear
     }
 
-    /// Breaks the cycle with the content controller when the window closes.
+    /// Breaks the cycle with the content controller when the page goes back to the list.
     func detach() {
         // An alert still up answers Cancel first: WebKit wants its completion handler called.
         if let open = pageAlert, open.isOpen { open.press(open.alert.buttons.count - 1) }
@@ -276,6 +282,26 @@ final class ReportBridge: NSObject {
         }
     }
 
+    /// "Reset all…" of the report (board R4): its title and text, the destructive button
+    /// and Cancel, which is the default (Return cancels: a key pressed by mistake loses nothing).
+    /// Not modal; `answer` gets true for the destructive button.
+    func confirmMessage(title: String, text: String, confirm: String, cancel: String, destructive: Bool,
+                        answer: @escaping @MainActor (Bool) -> Void) {
+        #if DEBUG
+        if let reply = Self.debugConfirm {
+            answer(reply)
+            return
+        }
+        #endif
+        let a = SVAlert(icon: AlertIconName.info, tone: destructive ? .red : .accent, title: title, text: text)
+        a.button(cancel.isEmpty ? t("app.common.cancel", [:]) : cancel, role: .primary, cancel: true)
+        a.button(confirm.isEmpty ? t("app.common.ok", [:]) : confirm, role: destructive ? .destructive : .secondary)
+        pageAlert = a.present(over: webView.window) { [weak self] index in
+            self?.pageAlert = nil
+            answer(index == 1)
+        }
+    }
+
     private func writeState(_ json: String) {
         do {
             try Data(json.utf8).write(to: file.stateURL, options: .atomic)
@@ -292,7 +318,7 @@ final class ReportBridge: NSObject {
 
 extension ReportBridge {
     /// Writes the export and answers the report; when the folder cannot be
-    /// written the window asks for another place (R3).
+    /// written the page asks for another place (R3).
     private func export(name: String, srt: String, replyHandler: @escaping (Any?, String?) -> Void) {
         do {
             let url = try writeExport(name: name, srt: srt)
@@ -344,6 +370,13 @@ extension ReportBridge: WKScriptMessageHandlerWithReply {
             } else {
                 export(name: name, srt: srt, replyHandler: replyHandler)
             }
+        case "confirm":
+            confirmMessage(title: body["title"] as? String ?? "", text: body["text"] as? String ?? "",
+                           confirm: body["confirm"] as? String ?? "", cancel: body["cancel"] as? String ?? "",
+                           destructive: body["destructive"] as? Bool ?? false) { [self] confirmed in
+                log.info("report confirm \(confirmed ? "yes" : "no")")
+                replyHandler(["confirmed": confirmed], nil)
+            }
         case "state":
             guard let json = body["json"] as? String else {
                 replyHandler(nil, "bad state")
@@ -376,7 +409,7 @@ extension ReportBridge: WKNavigationDelegate {
                 return
             }
             if navigationAction.navigationType == .linkActivated || !url.isFileURL {
-                // Links leave the window: the browser handles them.
+                // Links leave the app: the browser handles them.
                 NSWorkspace.shared.open(url)
                 decisionHandler(.cancel, preferences)
                 return

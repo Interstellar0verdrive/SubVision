@@ -15,16 +15,23 @@
 //   drag-handle, try-ocr, wait-ocr, preview-state (see the block below)
 //   Sub fix (F5.3): fix-open <path> · fix-drop <path>[,<path>…] · fix-option merge|ignore|flash|minDuration <value>
 //   fix-run · wait-fix <s> · fix-state · fix-menu (the two ⌘↩ items and which one AppKit fires)
-//   report-open <path> · report-js <expression> · report-run <statements>
-//   report-export · report-confirm yes|no|ask · report-elsewhere <path>|cancel|ask
-//   report-windows · report-capture <path>
-//   report-close (the front report window; all with "all")
-//   report-lock on|off             the front report's folder read-only (chmod 555) or writable again (755):
+//   The report in the Review page (C3-07; `capture` draws its web view in too):
+//   report-open <path> (File › Open a Review…) · report-js <expression> · report-run <statements>
+//   report-page                    "list · …", or "Revisione di <video> · <details> · <phase> · back on · save on"
+//   report-back · report-close     the band's round ‹ (View › Back, ⌘[) / back to the list from code
+//   report-key-back                ⌘[ pressed (the key View › Back has on this keyboard), then report-page
+//   report-export · report-save    the report bar's "Save reviewed SRT" / File › Save Reviewed SRT (⌘S)
+//   report-confirm yes|no|ask      answers "Reset all…" (the confirm message), confirm() and the overwrite question
+//   report-elsewhere <path>|cancel|ask
+//   report-windows · report-capture <path>   the app's windows and the Window menu (no report window) / a capture
+//   report-lock on|off             the report's folder read-only (chmod 555) or writable again (755):
 //                                  with it locked, a change in the report cannot be saved (the yellow notice)
 //                                  and an export asks where else to save
 //   report-state                   whether the "changes are not being saved" notice is up, and the last state write
-//   report-alert                   the alert of the report that is up (the overwrite question, a confirm()): title, window
-//   report-alert-press <n>         presses its button n (0 = Replace / OK, 1 = Cancel)
+//   report-alert                   the alert of the report that is up ("Reset all…", the overwrite question, a confirm()):
+//                                  title, window, buttons
+//   report-alert-press <n>         presses its button n (0 = Replace / OK / Cancel of "Reset all…", 1 = the other)
+//   report-alert-key return|esc    the key, sent to that alert's panel as a real key event
 //   engine-event <name> <json>     an engine event fed by hand to the batch's own handler, e.g.
 //                                  engine-event batch.file.failed {"idx":0,"error":"unknown (X: y)","at_step":"ocr:bottom","code":"unknown","text":"y","detail":"X: y","log":"/path/name.log"}
 //   The stop alerts (F6; O1 and O2 are not modal, the commands keep running under them):
@@ -37,7 +44,7 @@
 //                                  without it, the file in progress whatever it is. Replies with the engine's answer.
 //   C2 · Video, Review and the panel: inspector-tab read|bands|lines · params-reset (undoable) ·
 //   select <idx>[,<idx>…] (rows of Video; empty deselects) · bottom-bar · remove-selection ·
-//   review-state · review-select <idx> (opens the row of Review) · review <idx> (its report window's title)
+//   review-state · review-select <idx> (the Review list, that row last opened) · review <idx> (its report in the page)
 //   C3 · the frame: batch-bar (the window's batch bar: hidden, or its line, segments and percentage) ·
 //   summary-sheet (the end-of-batch sheet: its title, the page under it and each row's outcome)
 //   F6 · the QA scenarios (macos/Native/QA):
@@ -141,7 +148,10 @@ enum DebugQA {
             let main = WindowSizer.main(model.config)
             return NSApp.windows.first { $0.isVisible && $0 !== main && $0.title.count > 0 }.map { "\($0.windowNumber) \($0.title)" } ?? "no window"
         case "capture":
-            let written = await SVShell.DebugSnapshot.capture(model.config, schemes: SVShell.DebugSnapshot.schemes(model.config), argument)
+            // With a report in front its web view (drawn out of process) is drawn in by hand.
+            let schemes = SVShell.DebugSnapshot.schemes(model.config)
+            let written = model.reportShown ? await DebugSnapshot.captureMain(model, argument, schemes: schemes)
+                : await SVShell.DebugSnapshot.capture(model.config, schemes: schemes, argument)
             return written.joined(separator: " ")
         case "settings":
             // The app menu's Settings… item (⌘,), as the person would press it.
@@ -307,31 +317,45 @@ enum DebugQA {
         case "review-state":
             return reviewState(model)
         case "review-select":
+            // The Review list with that row as the one last opened (⌘R), the report closed.
             guard let idx = Int(argument), model.reviewVideos.indices.contains(idx) else { return "bad index" }
             let video = model.reviewVideos[idx]
             model.tab = .review
             model.reviewSelection = video.id
-            model.run.expanded.insert(video.id)
+            if model.report.session != nil { model.closeReport() }
+            try? await Task.sleep(for: .milliseconds(450))
             return "ok · \(video.name)"
         case "review":
+            // The row's «Apri» on Review (as Review on Video, ⌘R, the sheet): the report in the page.
             guard let idx = Int(argument), model.reviewVideos.indices.contains(idx) else { return "bad index" }
             let video = model.reviewVideos[idx]
-            guard video.outputReport != nil else { return "no report" }
+            guard video.reviewReport != nil else { return "no report" }
             model.review(video)
-            _ = await wait(20) { model.report.front?.session.phase == .ready }
-            return model.report.front?.window?.title ?? "no window"
+            _ = await wait(20) { model.report.session?.phase != .loading }
+            try? await Task.sleep(for: .milliseconds(400))
+            return reportPage(model)
         // F5.2 · Preview (the commands are in `preview(_:_:_:)` below).
         case "preview-open", "preview-close", "preview-layout", "preview-select", "preview-video", "preview-nav",
              "frames", "frame-bands", "retry-frames", "stop-frames", "frames-progress", "wait-frames", "frame", "band-set", "drag-handle",
              "try-ocr", "wait-ocr", "preview-state":
             return await preview(command, argument, model)
-        // F5.4: the report windows (ReportWindow.swift, ReportBridge.swift).
+        // F5.4, C3-07: the report in the Review page (ReportPage.swift, ReportBridge.swift).
         case "report-open":
-            let front = model.openReport(URL(fileURLWithPath: argument))
-            _ = await wait(15) { front.session.phase != .loading }
-            return "\(front.session.phase) · \(front.session.name) · \(front.session.bridge.map { "\($0.file.kind)" } ?? "-")"
+            // File › Open a Review… without the panel.
+            model.openReport(URL(fileURLWithPath: argument))
+            guard let session = model.report.session else { return "no report" }
+            _ = await wait(15) { session.phase != .loading }
+            return "\(session.phase) · \(session.name) · \(session.bridge.map { "\($0.file.kind)" } ?? "-")"
+        case "report-page":
+            return reportPage(model)
+        case "report-back":
+            // The band's round ‹ (View › Back and ⌘[ run the same `backAction`).
+            guard let back = model.backAction else { return "no back" }
+            back()
+            try? await Task.sleep(for: .milliseconds(450))
+            return reportPage(model)
         case "report-js", "report-run":
-            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
+            guard let bridge = model.report.session?.bridge else { return "no report" }
             do {
                 let body = command == "report-js" ? "return (\(argument));" : argument
                 let value = try await bridge.call(body)
@@ -339,17 +363,23 @@ enum DebugQA {
             } catch {
                 return "error: \(error)"
             }
-        case "report-export":
-            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
-            let before = front.session.lastExport
-            // Not awaited: with the overwrite question up (`report-confirm ask`) the export waits for its answer.
-            Task { _ = try? await bridge.call("await exportSrt();") }
-            _ = await wait(5) { front.session.lastExport != before || bridge.pageAlert?.isOpen == true }
+        case "report-export", "report-save":
+            // report-export: the report bar's "Save reviewed SRT"; report-save: File › Save Reviewed SRT (⌘S).
+            guard let session = model.report.session, let bridge = session.bridge else { return "no report" }
+            let before = session.lastExport
+            if command == "report-save" {
+                guard model.canSaveReview else { return "menu item off" }
+                model.saveReviewedSRT()
+            } else {
+                // Not awaited: with the overwrite question up (`report-confirm ask`) the export waits for its answer.
+                Task { _ = try? await bridge.call("await exportSrt();") }
+            }
+            _ = await wait(5) { session.lastExport != before || bridge.pageAlert?.isOpen == true }
             if bridge.pageAlert?.isOpen == true { return "asking: \(bridge.pageAlert?.alert.title ?? "")" }
-            return front.session.lastExport.map(\.path) ?? "no export"
+            return session.lastExport.map(\.path) ?? "no export"
         case "report-lock":
-            guard let front = model.report.front else { return "no report window" }
-            let folder = front.session.url.deletingLastPathComponent()
+            guard let session = model.report.session else { return "no report" }
+            let folder = session.url.deletingLastPathComponent()
             do {
                 try FileManager.default.setAttributes([.posixPermissions: argument == "on" ? 0o555 : 0o755], ofItemAtPath: folder.path)
             } catch {
@@ -357,30 +387,64 @@ enum DebugQA {
             }
             return "\(argument == "on" ? "read-only" : "writable") · \(folder.path)"
         case "report-state":
-            guard let front = model.report.front else { return "no report window" }
-            let written = front.session.bridge?.lastStateWritten.map { "\(Int(Date().timeIntervalSince($0))) s ago" } ?? "never"
-            return "state warning \(front.session.stateWarning ? "shown" : "none") · last write \(written) · toast \(front.session.toast?.lastPathComponent ?? "none")"
+            guard let session = model.report.session else { return "no report" }
+            let written = session.bridge?.lastStateWritten.map { "\(Int(Date().timeIntervalSince($0))) s ago" } ?? "never"
+            return "state warning \(session.stateWarning ? "shown" : "none") · last write \(written) · last export \(session.lastExport?.lastPathComponent ?? "none")"
         case "report-alert", "report-alert-press":
-            guard let front = model.report.front, let bridge = front.session.bridge else { return "no report window" }
+            guard let bridge = model.report.session?.bridge else { return "no report" }
+            // The report asks through a message: its alert may come a moment after the command before.
+            if command == "report-alert" { _ = await wait(2) { bridge.pageAlert?.isOpen == true } }
             guard let open = bridge.pageAlert, open.isOpen else { return "none" }
             let state = "\(open.alert.title) · \(open.alert.texts.joined(separator: " ")) · window \(open.windowNumber) · buttons \(open.alert.buttons.map(\.title).joined(separator: "|"))"
             guard command == "report-alert-press" else { return state }
             guard let n = Int(argument), open.alert.buttons.indices.contains(n) else { return "bad button" }
             open.press(n)
             return "pressed \(open.alert.buttons[n].title)"
+        case "report-key-back":
+            // ⌘[ as the person presses it: the key of View › Back as the menu has it (SwiftUI adapts
+            // "[" to the keyboard: "ò" on an Italian one), posted to the main window's event queue.
+            let items = NSApp.mainMenu?.items.compactMap(\.submenu).flatMap(\.items) ?? []
+            guard let item = items.first(where: { $0.title == model.t("app.menu.back") }), let window = WindowSizer.main(model.config)
+            else { return "no menu item" }
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            try? await Task.sleep(for: .milliseconds(300))
+            let key = item.keyEquivalent
+            for type in [NSEvent.EventType.keyDown, .keyUp] {
+                guard let event = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: item.keyEquivalentModifierMask,
+                                                   timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                   context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: 33)
+                else { return "no event" }
+                NSApp.postEvent(event, atStart: false)
+            }
+            try? await Task.sleep(for: .milliseconds(700))
+            return "key ⌘\(key) · " + reportPage(model)
+        case "report-alert-key":
+            // Return or Esc sent to the report's alert as a real key ("Reset all…": both are Cancel).
+            guard let open = model.report.session?.bridge?.pageAlert, open.isOpen else { return "no alert" }
+            guard let code: UInt16 = ["return": 36, "esc": 53][argument] else { return "unknown key" }
+            let characters = argument == "return" ? "\r" : "\u{1b}"
+            guard let window = NSApp.window(withWindowNumber: open.windowNumber),
+                  let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                               windowNumber: window.windowNumber, context: nil, characters: characters,
+                                               charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
+            else { return "no event" }
+            window.makeKey()
+            window.sendEvent(event)
+            try? await Task.sleep(for: .milliseconds(300))
+            return open.isOpen ? "still open" : "closed"
         case "report-confirm":
             ReportBridge.debugConfirm = argument == "yes" ? true : argument == "no" ? false : nil
         case "report-elsewhere":
             ReportSession.debugElsewhere = argument == "ask" ? nil : argument == "cancel" ? .some(nil) : .some(URL(fileURLWithPath: argument))
         case "report-windows":
-            let windows = model.report.open.map { s in
-                "\(model.report.windows[s.url]?.window?.windowNumber ?? 0) \(s.phase) \(s.name)"
-            }
+            // No window of its own any more (C3-06): the app's windows and the Window menu.
+            let windows = NSApp.windows.filter { $0.isVisible && $0.level == .normal }.map { $0.identifier?.rawValue ?? $0.title }
             let menu = (NSApp.windowsMenu?.items ?? []).filter { !$0.isSeparatorItem && !$0.title.isEmpty }.map(\.title)
-            return "\(windows.count) report windows: " + windows.joined(separator: " | ") + " · window menu: " + menu.joined(separator: " | ")
+            return "\(windows.count) windows: " + windows.joined(separator: " | ") + " · window menu: " + menu.joined(separator: " | ")
         case "report-capture":
-            guard let front = model.report.front else { return "no report window" }
-            let written = await DebugSnapshot.captureReport(front, argument, schemes: SVShell.DebugSnapshot.schemes(model.config))
+            // The main window with the report's web view and the alert over it drawn in (`capture` does the same).
+            let written = await DebugSnapshot.captureMain(model, argument, schemes: SVShell.DebugSnapshot.schemes(model.config))
             return written.joined(separator: " ")
         case "status":
             return statusLine(model)
@@ -434,9 +498,10 @@ enum DebugQA {
         case "lang-menu":
             return await languageMenu(model)
         case "report-close":
-            let targets = argument == "all" ? Array(model.report.windows.values) : [model.report.front].compactMap { $0 }
-            guard !targets.isEmpty else { return "no report window" }
-            targets.forEach { $0.close() }
+            // Back to the list, as the round ‹ does.
+            guard model.report.session != nil else { return "no report" }
+            model.closeReport()
+            try? await Task.sleep(for: .milliseconds(450))
         default:
             // The F6 design snapshots (DebugCapture.swift).
             return await DebugCapture.run(command, argument, model) ?? "unknown"
@@ -453,6 +518,16 @@ enum DebugQA {
         }
         if model.batch.running { return "running \(model.batch.index) of \(model.batch.total)" }
         return "ready \(model.readyVideos.count) · finished \(model.finishedVideos.count)"
+    }
+
+    /// The report in the Review page: "Revisione di a.mp4 · 12 righe · … · ready · back on · save on",
+    /// or "list" when the page shows the list.
+    private static func reportPage(_ model: AppModel) -> String {
+        guard let session = model.report.session else {
+            return "list · tab \(model.tab.rawValue) · back \(model.canGoBack ? "on" : "off")"
+        }
+        return "\(model.t("app.review.report.of")) \(session.title) · \(model.reportDetails(session)) · \(session.phase)"
+            + " · tab \(model.tab.rawValue) · back \(model.canGoBack ? "on" : "off") · save \(model.canSaveReview ? "on" : "off")"
     }
 
     /// The Review page: "review 2 · a.mp4 lines 12 dropped 0 gaps 1 lang it-IT fps 6 reviewed no · …".
@@ -848,7 +923,7 @@ enum DebugQA {
             "return": (36, "\r"), "esc": (53, "\u{1b}"), "tab": (48, "\t"), "space": (49, " "), "delete": (51, "\u{7f}"), "backspace": (51, "\u{8}"),
             "left": (123, String(UnicodeScalar(NSLeftArrowFunctionKey)!)), "right": (124, String(UnicodeScalar(NSRightArrowFunctionKey)!)),
             "down": (125, String(UnicodeScalar(NSDownArrowFunctionKey)!)), "up": (126, String(UnicodeScalar(NSUpArrowFunctionKey)!)),
-            ".": (47, "."), ",": (43, ","),
+            ".": (47, "."), ",": (43, ","), "[": (33, "["),
         ]
         let letters: [Character: UInt16] = [
             "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
