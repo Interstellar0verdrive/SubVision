@@ -420,3 +420,20 @@ Ramo `c3-video` (da `native-2.0`): la lista di Video di C3-02–C3-05, E1–E10,
 - La tabella dei tempi chiama la lettura «Lettura OCR ×N» con N dei parametri di ora, non di quelli del file.
 
 **Verifiche:** build Debug pulita; `swift test` verde (7 test nuovi); `tools/check_locales.py` OK; `pytest` 119 verdi, 4 saltati, 1 rosso non legato al ramo (`test_launcher_marker_decides_the_sync`: la venv di sviluppo punta a un'altra copia del codice); QA 18 su 18 (il 10 saltato). Catture in chiaro e scuro (C3-02–C3-05, E3, E5, E8 col menu ⋯, N1, N2) nella scratchpad della sessione, cartella `c3-video-shots`.
+
+## C3 · rami uniti (14/11)
+
+I cinque rami di C3 sono in `native-2.0`: report v2 (`3ba702d`), fondamenta (`96392e3`), Anteprima dentro Video (`415a90c`), Revisione (`5340738`), lista di Video (`6c0eb96`). Dopo l'ultimo merge: l'Anteprima ricorda il fuoco della lista invece della selezione (che non c'è più), le miniature della tendina passano da `thumbnail(i)`, i tasti della lista sono spenti sotto l'Anteprima (`1527996`); lo scenario 11 controlla il fuoco con il nuovo comando `focused` (`9c70e74`).
+
+Verifiche sul ramo unito: `swift test` verde, `pytest` 122 superati e 4 saltati, `check_locales` OK, QA 18 superati e 1 saltato (il 10, servono i video del proprietario). Catture dell'app unita confrontate con le tavole (V2, V3, V5, RV1, R1, R2, A3, N1): corrispondono.
+
+**Da decidere (dai resoconti degli agenti):**
+- **Buchi:** le tavole dicono «oltre 3 s», il motore usa 6 s di soglia predefinita; il report scrive la soglia usata nel lotto.
+- **Aggiornamento disponibile:** capsula gialla nella barra in alto (prima stava nella barra laterale), non disegnata nelle tavole.
+- **Finestra stretta:** il pannello parte chiuso ogni volta, lo stato non si salva.
+- **⌘[ con la tastiera italiana:** il menu mostra «⌘Ò» (lo decide macOS); la fascia scrive «⌘[».
+- **«Vai a Revisione»** del foglio di fine lotto: un video → il suo report, più video → l'elenco.
+- **⌘S «Salva SRT revisionato»** nel menu File dopo «Rivedi» (non è nella tavola O9).
+- **Riprova** rielabora subito solo senza lotto in corso e senza altro spuntato; altrimenti spunta il file per il prossimo lotto.
+- **Stima prima del primo file:** 4 s di lavoro per secondo di video ai predefiniti, poi impara dai file fatti.
+- **Anteprima dopo «Ferma»:** testo aggiunto «Hai fermato la ricerca. «Riprova» la riprende da dove si era fermata.»
