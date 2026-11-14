@@ -256,7 +256,7 @@ struct ListsSettings: View {
 
     private var folderText: String {
         let path = model.configuration.stateFolder.path
-        let home = NSHomeDirectory()
+        let home = DisplayHome.path
         return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
 

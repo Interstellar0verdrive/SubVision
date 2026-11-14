@@ -9,6 +9,23 @@ import AppKit
 import SVShell
 import UniformTypeIdentifiers
 
+/// The home folder the paths on screen are shortened against ("~/Movies/…").
+/// Debug only: `display-home <folder>` (DebugQA) puts another folder in its
+/// place, so the README captures show "~/Movies/SubVision demo" for clips
+/// kept in a scratch folder instead of the real home. Set it before `add`.
+enum DisplayHome {
+    #if DEBUG
+    nonisolated(unsafe) static var override: String?
+    #endif
+
+    static var path: String {
+        #if DEBUG
+        if let override { return override }
+        #endif
+        return NSHomeDirectory()
+    }
+}
+
 /// One row of the list, with the outcome of its last batch (design notes 8–9):
 /// the outcome stays until Process Again or Remove Finished.
 struct VideoItem: Identifiable, Codable, Equatable {
@@ -109,7 +126,7 @@ struct VideoItem: Identifiable, Codable, Equatable {
     /// "~/Movies/Show/Season 1".
     var folder: String {
         let dir = url.deletingLastPathComponent().path
-        let home = NSHomeDirectory()
+        let home = DisplayHome.path
         return dir.hasPrefix(home) ? "~" + dir.dropFirst(home.count) : dir
     }
 
@@ -178,7 +195,7 @@ struct VideoItem: Identifiable, Codable, Equatable {
 
     /// "~/Downloads/name.log": the log as the box of E4 writes it.
     var logDisplayPath: String {
-        let path = outputLog.path, home = NSHomeDirectory()
+        let path = outputLog.path, home = DisplayHome.path
         return path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
     }
 

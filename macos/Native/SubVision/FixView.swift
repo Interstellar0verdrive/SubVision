@@ -192,7 +192,7 @@ struct FixFileCard: View {
     /// "~/Movies/Show/Season 1".
     private var folder: String {
         let dir = url.deletingLastPathComponent().path
-        let home = NSHomeDirectory()
+        let home = DisplayHome.path
         return dir.hasPrefix(home) ? "~" + dir.dropFirst(home.count) : dir
     }
 

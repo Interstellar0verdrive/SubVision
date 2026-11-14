@@ -15,6 +15,10 @@
 //   row-menu <idx>                 opens the row's ⋯ menu, reads its items ("title ⌘key", "(off)", "✓", "—") and closes it
 //   row-menu-shot <idx> <path>     the main window with that ⋯ menu open over it (`screencapture`, the scheme in use)
 //   screen-shot <path>             the main window as the screen shows it (`screencapture`), the scheme in use
+//   window-shot <path> [noshadow]  the main window alone (`screencapture -l`): its shadow on a transparent
+//                                  background (noshadow: the window's own rectangle), at the screen's scale;
+//                                  nothing behind it or over it (the README captures)
+//   display-home <folder>|off      the folder the paths on screen shorten to "~" in place of the home
 //   video-fake before|drawers|batch|failed|outcomes|stopped|off
 //                                  the first three videos of the list in the states of the boards, fed by hand
 //                                  (a batch on the demo clips is over too fast to catch); off puts them back
@@ -87,6 +91,21 @@ enum DebugVideo {
             guard let idx = Int(argument), model.videos.indices.contains(idx) else { return "usage: strip-hold <idx>|off" }
             model.videoFrames.heldExtracting.insert(model.videos[idx].id)
             return strips(model)
+        case "window-shot":
+            guard let path = args.first else { return "usage: window-shot <path> [noshadow]" }
+            NSApp.activate(ignoringOtherApps: true)
+            guard let window = WindowSizer.main(model.config) else { return "no window" }
+            window.makeKeyAndOrderFront(nil)
+            try? await Task.sleep(for: .milliseconds(600))
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            task.arguments = ["-x", "-l\(window.windowNumber)"] + (args.dropFirst().first == "noshadow" ? ["-o"] : []) + [path]
+            try? task.run()
+            task.waitUntilExit()
+            return task.terminationStatus == 0 ? path : "screencapture failed"
+        case "display-home":
+            DisplayHome.override = argument == "off" || argument.isEmpty ? nil : argument
+            return "ok · home \(DisplayHome.path)"
         case "screen-shot":
             // The main window as the screen shows it (`screencapture`), not drawn again by `capture`.
             guard !argument.isEmpty else { return "usage: screen-shot <path>" }
