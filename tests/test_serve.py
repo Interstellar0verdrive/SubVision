@@ -224,6 +224,23 @@ def test_videos_probe(sidecar: Sidecar, work: dict):
     assert vids[2]["code"] == "probe_failed" and vids[2]["tool"] == "ffprobe" and vids[2]["detail"]
 
 
+def test_videos_thumbs(sidecar: Sidecar, work: dict):
+    """The five frames of the to-do drawer: taken once, then from the cache."""
+    clip = work["clips"][0]
+    res = sidecar.call("videos.thumbs", {"path": str(clip), "duration": 55.0})
+    assert res["path"] == str(clip) and res["cached"] is False and len(res["frames"]) == 5
+    assert all(Path(p).is_file() for p in res["frames"])
+    assert str(work["state"] / "tmp" / "thumbs") in res["frames"][0]
+    again = sidecar.call("videos.thumbs", {"path": str(clip)})
+    assert again["cached"] is True and again["frames"] == res["frames"]
+    bogus = work["root"] / "bogus-thumbs.mp4"
+    bogus.write_bytes(b"nope")
+    res = sidecar.call("videos.thumbs", {"path": str(bogus)})
+    assert res["frames"] == [None] * 5 and res["error"] == "probe_failed"
+    assert _bad(sidecar, "videos.thumbs", {})["data"]["field"] == "path"
+    assert _bad(sidecar, "videos.thumbs", {"path": str(clip), "duration": "55"})["data"]["field"] == "duration"
+
+
 def test_warmup(sidecar: Sidecar):
     res = sidecar.call("warmup", {"languages": ["it-IT", "en-US"]})
     assert res == {"started": True, "languages": ["it-IT"]}
@@ -237,6 +254,12 @@ def test_batch_start_and_stop(sidecar: Sidecar, work: dict):
                                        "params": PARAMS, "lang": "it"})
     assert res == {"started": True}
     i, _ = sidecar.wait_event("batch.step", since=since)
+    # during a batch the drawer's frames are not taken (busy), unless they are there already
+    fresh = work["root"] / "videos" / "fresh-copy.mp4"
+    shutil.copyfile(work["clips"][1], fresh)
+    assert sidecar.call("videos.thumbs", {"path": str(fresh)}) == {"path": str(fresh), "busy": True}
+    cached = sidecar.call("videos.thumbs", {"path": str(work["clips"][0])})
+    assert cached["cached"] is True and len(cached["frames"]) == 5
     assert sidecar.call("batch.stop", {"scope": "all"}) == {"ok": True}
     j, done = sidecar.wait_event("batch.done", since=i, timeout=30)
     assert done["stopped"] >= 1 and done["done"] == 0 and done["skipped"] == 1
