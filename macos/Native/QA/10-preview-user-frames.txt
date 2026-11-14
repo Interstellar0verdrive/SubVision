@@ -25,7 +25,7 @@ frames
 frame 9
 preview-state
 ? bands bottom\+top
-preview-capture $OUT/frame-9-both-bands.png
+capture $OUT/frame-9-both-bands.png
 ? frame-9-both-bands.png$
 try-ocr
 ? ^ok · reading
@@ -42,6 +42,6 @@ try-ocr
 wait-ocr 120
 preview-state
 ? bands none
-preview-capture $OUT/silent-after-test.png
+capture $OUT/silent-after-test.png
 ? silent-after-test.png$
 params default

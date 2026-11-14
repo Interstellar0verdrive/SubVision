@@ -9,7 +9,7 @@ text app.review.title
 lang en
 text app.review.title
 ? ^Review$
-text app.menu.preview_window
+text app.menu.preview
 ? ^Preview$
 menu
 ? \|Process\|.* · Choose Videos…\|Choose SRT…

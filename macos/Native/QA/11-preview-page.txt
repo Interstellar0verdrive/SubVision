@@ -1,30 +1,47 @@
-# Design notes 76, 79, 80 (boards C2-A1–A3): Preview in its own window. It
-# opens on a video and finds its 20 frames by itself; the block (frame,
-# thumbnails in two rows of ten as wide as the frame, summary, the two
-# panels as tall as each other) fits the window without scrolling, at the
-# board's size and at the smallest. Try OCR's results stay with their frame;
-# a change of the signs band in the main window's panel makes the signs
-# panel "Superato" and leaves the dialogue panel as it was.
+# Design notes 76, 79 and design round C3 (C3-09, C3-11, boards A0–A3):
+# Preview is a page inside Video. It comes over the list from a row (⌘Y,
+# Anteprima) with the panel on Bande and View › Back on, finds its 20
+# frames by itself (no Find 20 Frames anywhere) and keeps them per video;
+# the block (frame, thumbnails in two rows of ten as wide as the frame,
+# summary, the two panels as tall as each other) fits the window without
+# scrolling, the frame at most 640 pt wide. A search stopped keeps its
+# frames and «Riprova» resumes it on the zones left. Try OCR's results stay
+# with their frame; a change of a band's own value makes only that band's
+# panel stale, the language both. Back returns to the list as it was.
 ! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
 @launch
 wait-ready 600
 ? ^ready
 lang it
+size 1360x860
 params default
 inspector-set langHint it-IT
+inspector-tab read
 add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4
+select 1
 preview-state
-? ^window closed
+? ^page hidden
+menu-dump 4
+? Anteprima ⌘Y \|
+? Prova OCR su questo fotogramma ⌘T \(off\)
+? Video precedente ⌘.* \(off\) \| Video successivo ⌘.* \(off\)
+?! Trova 20
+menu-dump 5
+?! Anteprima
+# The row's video, searched by itself; the panel on Bande, Back on.
 preview-open 1
 ? ^ok · sintel_eng_hardsub_demo\.mp4 · searching$
+preview-state
+? search running.* · panel bands · back on
 wait-frames 300
 ? ^20 frames · 1[5-9] with text
-preview-menu
-? ✓ sintel_eng_hardsub_demo\.mp4 on
-preview-size 1280x860
-? ^ok · 1280x860
+preview-nav
+? ^video 2 di 2 · up sintel_ita_hardsub_demo\.mp4 · down off$
+menu-dump 4
+? Video precedente ⌘[^|]* \| Video successivo ⌘[^|]* \(off\)
+?! Video precedente ⌘[^|]* \(off\)
 preview-layout
-? ^window 1280x860 .* thumbs 2x10 .* · fits$
+? ^window 1360x860 .* thumbs 2x10 .* · fits$
 # No test yet: the panels wait for Try OCR.
 preview-state
 ? test none
@@ -35,17 +52,17 @@ wait-ocr 120
 preview-state
 ? test done · tests 1
 ?! stale
-# The signs band higher in the main window's panel: only the signs panel is stale.
+# The signs band higher in the panel: only the signs panel is stale (C3-11).
 inspector-set ocr.topKeepPct 26
 preview-state
 ? test done stale signs ·
 ?! stale dialogue
 theme dark
-preview-capture $OUT/A2-dark.png
-? A2-dark.png$
+capture $OUT/A3-dark.png
+? A3-dark.png$
 theme light
-preview-capture $OUT/A2-light.png
-? A2-light.png$
+capture $OUT/A3-light.png
+? A3-light.png$
 theme dark
 # Another frame has no test; back on the first, its test is still there.
 frame 2
@@ -54,40 +71,59 @@ preview-state
 frame 1
 preview-state
 ? test done stale signs
-# The dialogue band changed too: both panels stale.
+# The dialogue band changed too: both panels stale; the language alone makes both stale as well.
 band-set bottom-height 30
 preview-state
 ? test done stale dialogue\+signs
-# The smallest window, and the ones of design note 76.
-preview-size 600x400
-? ^ok · 900x640 · min 900x640
-preview-layout
-? ^window 900x640 .* · fits$
-preview-capture $OUT/min.png
-? min.png$
-preview-size 1000x700
-preview-layout
-? · fits$
-preview-size 1360x840
-preview-layout
-? · fits$
-# A large window: the frame stops at 640 pt and the block stays centred.
-preview-size 1800x1000
+# «Riprova OCR con i nuovi parametri» (⌘T): the test again, nothing stale.
+try-ocr
+? ^ok · reading
+wait-ocr 120
+preview-state
+? test done · tests [12] ·
+?! stale
+inspector-set langHint en-US
+preview-state
+? test done stale dialogue\+signs
+inspector-set langHint it-IT
+band-set bottom-height 28
+inspector-set ocr.topKeepPct 22
+# The window's sizes: the frame stops at 640 pt and the block stays centred.
+size 1800x1000
 preview-layout
 ? frame 640x[0-9]+ .* · fits$
-preview-size 1280x860
-# The other video from the window's menu: its frames are searched by themselves.
-preview-select 0
-? ^ok · sintel_ita_hardsub_demo\.mp4$
+size 1100x720
+preview-layout
+? · fits$
+# Narrow: the panel retracts as on the list (N1); the block still fits.
+size 1000x720
+preview-layout
+? · fits$
+size 1360x860
+# The other video with the band's arrow: its frames are searched by themselves; stopped
+# halfway they stay, «Riprova» goes on with the zones left (A1).
+preview-video up
+? ^ok · sintel_ita_hardsub_demo\.mp4 · searching$
+stop-frames
+? stopped user [0-9]+/20
+capture $OUT/A1-dark.png
+? A1-dark.png$
+retry-frames
+? ^ok · searching
 wait-frames 300
 ? ^20 frames
 preview-state
-? video sintel_ita_hardsub_demo\.mp4 .* test none
-preview-select 1
+? video sintel_ita_hardsub_demo\.mp4 .* complete .* test none
+# The first video: its frames and its test are still there (nothing searched again).
+preview-video down
+? ^ok · sintel_eng_hardsub_demo\.mp4$
 preview-state
-? test done stale dialogue\+signs
+? complete .* test done
+# Back: the list, its selection, the panel's tab as before, Back off.
 preview-close
-? ^ok
+? ^ok · tab process · back off$
 preview-state
-? ^window closed
+? ^page hidden .* panel read
+bottom-bar
+? ^selection 1 
 params default

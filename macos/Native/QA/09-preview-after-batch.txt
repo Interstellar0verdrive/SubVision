@@ -1,7 +1,7 @@
-# Design note 73: after a batch the Video menu of Preview offers every video
-# that was processed (state done), not only the ready ones, and Find 20
-# Frames works on them. Also the Process page after the batch and during it
-# (circles, steps with one numbers column, the line over the steps).
+# Design note 73: after a batch the Preview page shows every video that was
+# processed (state done), not only the ready ones: its arrows reach them and
+# their frames are searched. Also the Process page after the batch and during
+# it (circles, steps with one numbers column, the line over the steps).
 ! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
 @launch
 wait-ready 600
@@ -27,26 +27,26 @@ capture $OUT/process-finished-sheet.png
 summary-seen
 capture $OUT/process-done.png
 ? process-done.png$
-preview-menu
-? sintel_ita_hardsub_demo\.mp4 on
-? sintel_eng_hardsub_demo\.mp4 on
-?! off
-preview-select 1
-? ^ok · sintel_eng_hardsub_demo\.mp4$
-preview-menu
-? ✓ sintel_eng_hardsub_demo\.mp4 on
-preview-select 0
-? ^ok · sintel_ita_hardsub_demo\.mp4$
-# Design note 80: Preview is a window of its own; a video without frames
-# starts Find 20 Frames by itself when the window opens on it.
-preview-open
+# C3-09: Preview is a page inside Video; a video never searched searches its
+# 20 frames by itself; the title band's arrows go to the video below and above.
+preview-open 0
 ? ^ok · sintel_ita_hardsub_demo\.mp4 · searching$
 wait-frames 300
 ? ^20 frames · 1[5-9] with text · 0 with signs
-preview-capture $OUT/preview-ita.png
+preview-nav
+? ^video 1 di 2 · up off · down sintel_eng_hardsub_demo\.mp4$
+capture $OUT/preview-ita.png
 ? preview-ita.png$
+preview-video down
+? ^ok · sintel_eng_hardsub_demo\.mp4 · searching$
+preview-nav
+? ^video 2 di 2 · up sintel_ita_hardsub_demo\.mp4 · down off$
+wait-frames 300
+? ^20 frames · 1[5-9] with text
+preview-video up
+? ^ok · sintel_ita_hardsub_demo\.mp4$
 preview-close
-? ^ok
+? ^ok · tab process · back off$
 # Design note 72: the report follows the app's language at open and when it changes,
 # in place (an edit in a text box survives the switch); 71: its English names.
 ! test -s "$WORK/sintel_ita_hardsub_demo.review.html" && test ! -e "$WORK/sintel_ita_hardsub_demo.revisione.html"
