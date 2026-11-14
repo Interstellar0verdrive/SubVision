@@ -588,7 +588,7 @@ enum DebugQA {
         case .all: what = "all"
         }
         return "\(what) · window \(open.presentation.windowNumber) · buttons \(open.presentation.alert.buttons.map(\.title).joined(separator: "|"))"
-            + " · running \(runningIndex(model).map(String.init) ?? "-")"
+            + " · running \(runningIndex(model).map(String.init) ?? "-")" + " · text \(open.presentation.alert.texts.joined(separator: " "))"
     }
 
     /// "done 2 failed 0 stopped 0 skipped 0 elapsed 12.3" of the last batch.

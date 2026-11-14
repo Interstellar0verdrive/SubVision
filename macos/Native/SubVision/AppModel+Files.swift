@@ -378,6 +378,8 @@ extension AppModel {
             focusedRow = (after ?? before)?.id
         }
         videos.removeAll { ids.contains($0.id) }
+        // A row out of the list waits for no Retry (⌘Z brings the row back, not the queue).
+        for id in ids { run.queued.remove(id) }
         // The note on skipped items talks about this list: an empty list drops it (design note 45).
         if videos.isEmpty { skippedItems = [] }
         saveVideos()
@@ -429,18 +431,21 @@ extension AppModel {
 
     var headerCheck: CheckState { VideoChecks.headerState(checkRows) }
 
-    /// Retry on a failed or stopped row (C3-05, E5): at once when nothing else waits,
-    /// else checked, with the others, for the next batch.
+    /// Retry on a failed or stopped row (C3-05, E5): with no batch, that file alone, now
+    /// (the other checked rows stay checked for later); during a batch it is queued and
+    /// starts by itself when the batch ends ("In coda, dopo il lotto").
     func retry(_ id: UUID) {
         guard let video = videos.first(where: { $0.id == id }), video.checkKind == .finished else { return }
-        let others = checkedVideos.filter { $0.id != id }.count
-        switch VideoChecks.retry(batchRunning: batch.running, othersChecked: others) {
+        switch VideoChecks.retry(batchRunning: batch.running) {
         case .startNow:
             startBatch(only: [id])
-        case .check:
-            processAgain([id])
+        case .queue:
+            if run.queued.add(id) { log.info("retry: \(video.name) queued after the batch") }
         }
     }
+
+    /// The row waits for a Retry queued during the batch (C3-05).
+    func retryQueued(_ id: UUID) -> Bool { batch.running && run.queued.contains(id) }
 
     // MARK: - Focus (C3-02: the keyboard's ring, no selection)
 

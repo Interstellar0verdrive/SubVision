@@ -111,8 +111,10 @@ enum Alerts {
                         text: model.t("app.alerts.stop_text"))
             a.button(model.t("app.common.stop"), role: .destructiveSolid)
         case .all:
-            a = SVAlert(icon: AlertIconName.stopAll, tone: .red, title: model.t("app.alerts.stopall_title"),
-                        text: model.t("app.alerts.stopall_text"))
+            // A Retry queued after the batch goes with it (C3-05): the alert says so.
+            let queued = model.run.queued.count
+            let text = model.t("app.alerts.stopall_text") + (queued > 0 ? " " + model.tn("app.alerts.stopall_queued", queued) : "")
+            a = SVAlert(icon: AlertIconName.stopAll, tone: .red, title: model.t("app.alerts.stopall_title"), text: text)
             a.button(model.t("app.common.stop_all"), role: .destructiveSolid)
         }
         a.button(model.t("app.common.continue"), cancel: true)

@@ -90,6 +90,9 @@ struct BatchRun: Equatable {
     var factor: Double?
     /// When Stop All ended the batch: the note over the list of E5.
     var stoppedAt: Date?
+    /// Failed or stopped rows Retry queued while this batch ran (C3-05): "In coda, dopo il
+    /// lotto"; a batch of their own takes them when this one ends, Stop All drops them.
+    var queued = RetryQueue<UUID>()
 
     /// The step the engine works on (or the first not started).
     var currentStep: StepRun? {
@@ -170,10 +173,13 @@ extension AppModel {
             // The box is the batch's now: afterwards the outcome shows, unchecked (C3-04).
             videos[i].checked = nil
         }
-        // The drawers stay as they were.
-        let expanded = run.expanded
+        // The drawers stay as they were, and the sheet of the batch before (a queued Retry
+        // starts as the batch before ends, C3-05).
+        let previous = run
         run = BatchRun(ids: ids)
-        run.expanded = expanded
+        run.expanded = previous.expanded
+        run.summary = previous.summary
+        run.showSummary = previous.showSummary
         run.lang = lang
         run.fps = ocrParams.fps
         run.gapWarn = ocrParams.qcGapWarn
@@ -207,9 +213,11 @@ extension AppModel {
 
     private func rollBackStart(_ ids: [UUID]) {
         for i in videos.indices where ids.contains(videos[i].id) && videos[i].state.inBatch { videos[i].state = .ready }
-        let expanded = run.expanded
+        let previous = run
         run = BatchRun()
-        run.expanded = expanded
+        run.expanded = previous.expanded
+        run.summary = previous.summary
+        run.showSummary = previous.showSummary
         batch = BatchActivity()
         closeStopAlert()
         saveVideos()
@@ -484,6 +492,7 @@ extension AppModel {
         batch = BatchActivity()
         saveVideos()
         updateDock()
+        startQueuedRetries()
         // The sheet comes up over the page in front: no jump to Video (C3-12).
         if let error = d.error {
             Alerts.error(self, title: t("app.notify.batch_done"), text: engineErrorText(error.split(separator: " ").first.map(String.init) ?? "unknown", detail: error))
@@ -496,6 +505,18 @@ extension AppModel {
             notify(title: t("app.notify.batch_done"), body: join(parts), identifier: "batch-done",
                    userInfo: ["page": Tab.process.rawValue, "sheet": "summary"])
         }
+    }
+
+    /// The batch is over: the files Retry queued meanwhile start, in a batch of their own
+    /// (C3-05); after Stop All they are dropped and their rows say what they said before.
+    private func startQueuedRetries() {
+        let ids = run.queued.drain(stoppedAll: run.stoppedByUser) { [self] id in
+            guard let v = videos.first(where: { $0.id == id }) else { return false }
+            return v.exists && (v.state == .failed || v.state == .stopped)
+        }
+        guard !ids.isEmpty else { return }
+        log.info("retry: \(ids.count) queued file(s) start after the batch")
+        startBatch(only: ids)
     }
 
     /// The step the file broke in turns red, the ones after it grey (E4, E5).

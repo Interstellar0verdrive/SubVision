@@ -65,13 +65,17 @@ struct VideoRow: View {
     private var focused: Bool { model.focusedRow == video.id }
     private var unreadable: Bool { video.state == .unreadable }
     private var missing: Bool { !video.exists }
+    /// Retry queued it during the batch (C3-05): it starts when the batch ends.
+    private var queued: Bool { model.retryQueued(video.id) }
     /// A batch runs and this row is not in it (C3-04): dimmed, its box can't change.
-    private var outOfBatch: Bool { model.batch.running && !model.run.ids.contains(video.id) }
+    /// A row Retry queued is not dimmed: it is the next to go.
+    private var outOfBatch: Bool { model.batch.running && !model.run.ids.contains(video.id) && !queued }
     private var dim: Double { unreadable || (missing && !video.state.isFinished) ? 0.55 : outOfBatch ? 0.6 : 1 }
 
     /// The bar on the left: the state's colour, solid (C3-02, one border per row).
     private var edge: Color {
         if unreadable { return SV.red }
+        if queued { return SV.primary }
         switch video.state {
         case .running: return SV.primary
         case .done: return video.willRedo ? SV.primary : SV.green
@@ -242,7 +246,8 @@ struct RowLead: View {
                     .disabled(batchRunning)
                     .id("box")
             } else if batchRunning {
-                video.circle.map { StatusCircle($0) }
+                // A row Retry queued waits as the batch's rows wait: the dashed ring (C3-05).
+                (model.retryQueued(video.id) ? .waiting : video.circle).map { StatusCircle($0) }
             } else {
                 // The outcome; under the pointer the empty box that brings it back to the batch.
                 Button { model.toggleCheck(video.id) } label: {
@@ -276,6 +281,8 @@ struct RowStatusLine: View {
     var body: some View {
         if video.state == .unreadable {
             line(model.t("app.process.row.unreadable"), SV.redText).help(video.problem ?? "")
+        } else if model.retryQueued(video.id) {
+            line(model.t("app.process.row.retry_queued"), SV.text2)
         } else if !video.exists, !video.state.isFinished {
             line(model.t("app.process.row.not_found"), SV.yellowText).help(model.t("app.process.row.file_missing_help"))
         } else {
@@ -425,12 +432,12 @@ struct RowAction: View {
                 .disabled(video.outputReport == nil)
                 .help(model.t(video.outputReport == nil ? "app.process.row.review_none" : "app.process.row.review_help"))
         case .failed, .stopped:
-            let now = VideoChecks.retry(batchRunning: model.batch.running,
-                                        othersChecked: model.checkedVideos.filter { $0.id != video.id }.count) == .startNow
+            let now = VideoChecks.retry(batchRunning: model.batch.running) == .startNow
+            let queued = model.retryQueued(video.id)
             Button { model.retry(video.id) } label: { Label(model.t("app.process.row.retry"), systemImage: "arrow.clockwise") }
                 .svButton(.primary, .small)
-                .disabled(!video.exists || video.willRedo || (now && !model.canRun))
-                .help(model.t(now ? "app.process.row.retry_help" : "app.process.row.retry_queue_help"))
+                .disabled(!video.exists || video.willRedo || queued || (now && !model.canRun))
+                .help(model.t(queued ? "app.process.row.retry_queued_help" : now ? "app.process.row.retry_help" : "app.process.row.retry_queue_help"))
         case .waiting, .unreadable:
             // The column keeps its width: the numbers stay in line with the other rows.
             Color.clear.frame(height: 1)
