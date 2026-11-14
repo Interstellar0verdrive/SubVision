@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
-// The end-of-batch sheet (design boards E6, C2-V5): the outcomes in the title,
-// one row per file of the batch with Review or Open Log; Show SRTs in Finder
-// on the left, Close and Go to Review (the default) on the right. It stays "unseen" until closed: the notification's click and
-// the next launch bring it back (`AppModel.loadSummary`). The shape follows
-// the FinishedSheet of the native macOS app of AnimeUp (by the same author).
+// The end-of-batch sheet (design boards E6, C2-V5, C3-12): it comes up over
+// whatever page is open (no jump to Video). The outcomes in the title ("2 SRT
+// pronti · 1 non riuscito", "Nessun SRT: 1 non riuscito"), one row per file of
+// the batch in the batch's order: Review on the ones done, a failed one with a
+// red cross, its reason in one line and Open Log. Show SRTs in Finder on the
+// left, Close (Esc) and Go to Review (Return) on the right. It stays "unseen"
+// until closed: the notification's click and the next launch bring it back
+// (`AppModel.loadSummary`). The shape follows the FinishedSheet of the native
+// macOS app of AnimeUp (by the same author).
 
 import SVShell
 import SwiftUI
@@ -13,19 +17,7 @@ struct FinishedSheet: View {
 
     private var rows: [VideoItem] { model.summaryVideos }
 
-    /// "1 SRT pronto · 1 senza sottotitoli · 1 fallito" (the stopped ones too).
-    private var title: String {
-        let done = rows.filter { $0.state == .done }.count
-        let noSubs = rows.filter { $0.state == .noSubs }.count
-        let failed = rows.filter { $0.state == .failed }.count
-        let stopped = rows.filter { $0.state == .stopped }.count
-        var parts: [String] = []
-        if done > 0 || (noSubs + failed + stopped == 0) { parts.append(model.tn("app.process.finished.title", done)) }
-        if noSubs > 0 { parts.append(model.tn("app.process.bar.no_subs", noSubs)) }
-        if failed > 0 { parts.append(model.tn("app.process.bar.failed", failed)) }
-        if stopped > 0 { parts.append(model.tn("app.process.bar.stopped_count", stopped)) }
-        return model.join(parts)
-    }
+    private var title: String { model.summaryTitle }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -87,9 +79,17 @@ struct SummaryRow: View {
             (model.join([model.tn("app.process.finished.lines", video.segments ?? 0)]
                         + (video.elapsed.map { [model.t("app.process.finished.took_file", ["t": Localizer.clock($0)])] } ?? [])), SV.text2)
         case .noSubs: (model.t("app.process.finished.no_subs"), SV.yellowText)
-        case .failed: (model.t("app.process.finished.failed_at", ["step": model.stepLabel(video.atStep)]), SV.redText)
+        case .failed: (failedText, SV.redText)
         default: (model.t("app.common.stopped_chip"), SV.text2)
         }
+    }
+
+    /// "Non riuscito durante OCR ×3 · dialoghi: Vision non ha risposto." in one line (C3-12).
+    private var failedText: String {
+        let step = video.atStep.map { model.stepLabel($0) } ?? ""
+        let head = step.isEmpty ? model.t("app.process.finished.failed") : model.t("app.process.finished.failed_at", ["step": step])
+        let reason = model.failureText(video).trimmingCharacters(in: .whitespacesAndNewlines)
+        return reason.isEmpty ? head : model.t("app.process.finished.failed_reason", ["head": head, "reason": reason])
     }
 
     var body: some View {
@@ -97,7 +97,8 @@ struct SummaryRow: View {
             StatusCircle(circle)
             VStack(alignment: .leading, spacing: 2) {
                 Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
-                Text(detail.0).svFont(11.5).foregroundStyle(detail.1).lineLimit(1)
+                Text(detail.0).svFont(11.5).foregroundStyle(detail.1).lineLimit(1).truncationMode(.tail)
+                    .help(video.state == .failed ? detail.0 : "")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if video.state == .done || video.state == .noSubs {
@@ -108,12 +109,33 @@ struct SummaryRow: View {
                 .disabled(video.outputReport == nil)
                 .help(model.t("app.process.row.review_help"))
             } else {
-                Button(model.t("app.process.row.open_log")) { model.openLog(video) }
-                    .svButton(.secondary, .small)
-                    .disabled(!video.logExists)
+                Button { model.openLog(video) } label: {
+                    Label(model.t("app.process.row.open_log"), systemImage: "list.bullet.rectangle")
+                }
+                .svButton(.secondary, .small)
+                .disabled(!video.logExists)
             }
         }
         .padding(.vertical, 9)
         .padding(.horizontal, 12)
+    }
+}
+
+extension AppModel {
+    /// "2 SRT pronti · 1 non riuscito", "Nessun SRT: 1 non riuscito" (C3-12); the files
+    /// without subtitles and the stopped ones are counted too.
+    var summaryTitle: String {
+        let done = summaryVideos.filter { $0.state == .done }.count
+        let noSubs = summaryVideos.filter { $0.state == .noSubs }.count
+        let failed = summaryVideos.filter { $0.state == .failed }.count
+        let stopped = summaryVideos.filter { $0.state == .stopped }.count
+        var others: [String] = []
+        if noSubs > 0 { others.append(tn("app.process.bar.no_subs", noSubs)) }
+        if failed > 0 { others.append(tn("app.process.finished.failed_count", failed)) }
+        if stopped > 0 { others.append(tn("app.process.bar.stopped_count", stopped)) }
+        if done == 0, !others.isEmpty {
+            return t("app.process.finished.title_none", ["rest": join(others)])
+        }
+        return join([tn("app.process.finished.title", done)] + others)
     }
 }

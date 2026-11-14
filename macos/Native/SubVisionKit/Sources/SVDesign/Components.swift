@@ -672,7 +672,7 @@ public struct DropZone: View {
 
 // MARK: - Progress bar
 
-/// 4 pt (sidebar, rows) or 6 pt (players, speeds) bar.
+/// 4 pt (rows) or 6 pt (players, speeds) bar.
 public struct SVBar: View {
     var fraction: Double
     var height: CGFloat
@@ -695,49 +695,6 @@ public struct SVBar: View {
         }
         .frame(height: height)
         .clipShape(Capsule())
-    }
-}
-
-// MARK: - Activity card
-
-/// One card at the bottom of the sidebar for whatever keeps the app busy
-/// (a batch: there is no pause in SubVision). Soft accent tint.
-public struct ActivityCard<Buttons: View>: View {
-    var kind: String
-    var line: Text
-    var fraction: Double?
-    var footnote: String?
-    var leading: AnyView
-    @ViewBuilder var buttons: () -> Buttons
-
-    public init(kind: String, symbol: String? = nil, line: Text, fraction: Double?, footnote: String? = nil,
-                @ViewBuilder buttons: @escaping () -> Buttons) {
-        self.kind = kind
-        self.line = line
-        self.fraction = fraction
-        self.footnote = footnote
-        self.leading = symbol.map { AnyView(Image(systemName: $0).svFont(11)) } ?? AnyView(Spinner(size: 11))
-        self.buttons = buttons
-    }
-
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                leading
-                Text(kind).svFont(11, .semibold)
-            }
-            .foregroundStyle(SV.primaryText)
-            line.svFont(12).foregroundStyle(SV.text).lineSpacing(2)
-            if let fraction { SVBar(fraction) }
-            if let footnote {
-                Text(footnote).svFont(11).foregroundStyle(SV.text2)
-            }
-            HStack(spacing: 6) { buttons() }
-                .padding(.top, 4)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .svBox(RoundedRectangle(cornerRadius: SV.Radius.card), fill: SV.soft, line: SV.softLine,
-               padding: EdgeInsets(vertical: 12, horizontal: 12))
     }
 }
 
@@ -801,62 +758,6 @@ public struct UnderlineLink: View {
     }
 }
 
-// MARK: - Sidebar tab
-
-/// Icon tile 26 pt, title 13 semibold, one status line. The current tab gets
-/// the selection tint and an accent tile; work going on shows a spinner.
-public struct SidebarTab: View {
-    public enum Trailing: Sendable { case none, done, busy }
-
-    var symbol: String
-    var title: String
-    var subtitle: String
-    var selected: Bool
-    var trailing: Trailing
-    var action: () -> Void
-    @State private var hover = false
-
-    public init(symbol: String, title: String, subtitle: String, selected: Bool,
-                trailing: Trailing = .none, action: @escaping () -> Void) {
-        self.symbol = symbol
-        self.title = title
-        self.subtitle = subtitle
-        self.selected = selected
-        self.trailing = trailing
-        self.action = action
-    }
-
-    public var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: symbol)
-                    .svFont(14)
-                    .foregroundStyle(selected ? SV.onPrimary : SV.text2)
-                    .frame(width: 26, height: 26)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(selected ? SV.primary : .clear))
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(title).svFont(13, .semibold).foregroundStyle(SV.text)
-                    Text(subtitle).svFont(11).foregroundStyle(SV.text2)
-                }
-                .lineLimit(1)
-                Spacer(minLength: 0)
-                switch trailing {
-                case .none: EmptyView()
-                case .done: Image(systemName: "checkmark").svFont(11, .semibold).foregroundStyle(SV.greenText)
-                case .busy: Spinner(size: 14)
-                }
-            }
-            .padding(.vertical, 7)
-            .padding(.horizontal, 10)
-            .background(RoundedRectangle(cornerRadius: 9).fill(selected ? SV.sel : hover ? SV.glass : .clear))
-            .contentShape(RoundedRectangle(cornerRadius: 9))
-        }
-        .buttonStyle(.plain)
-        .onHover { hover = $0 }
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-}
-
 // MARK: - Top bar segment
 
 /// One page in the top bar's segmented control: 12 pt symbol and 12.5 pt title,
@@ -906,8 +807,8 @@ public struct TopBarSegment: View {
             .padding(.leading, 12)
             .padding(.trailing, count != nil ? 8 : 12)
             .frame(height: 24)
-            .background(RoundedRectangle(cornerRadius: 7).fill(selected ? SV.primary : hover ? SV.glassHover : .clear))
-            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .background(Capsule().fill(selected ? SV.primary : hover ? SV.glassHover : .clear))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .onHover { hover = $0 }
@@ -967,7 +868,7 @@ public struct SVMiniSegments: View {
     }
 }
 
-/// The track of the top bar's segments: 2 pt inset in glass, glass line.
+/// The track of the top bar's segments (`.tsegs`): a capsule 2 pt around them in glass, glass line.
 public struct TopBarSegments<Content: View>: View {
     @ViewBuilder var content: () -> Content
     public init(@ViewBuilder content: @escaping () -> Content) { self.content = content }
@@ -975,8 +876,8 @@ public struct TopBarSegments<Content: View>: View {
     public var body: some View {
         HStack(spacing: 2) { content() }
             .padding(2)
-            .background(RoundedRectangle(cornerRadius: 9).fill(SV.glass))
-            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(SV.glassLine))
+            .background(Capsule().fill(SV.glass))
+            .overlay(Capsule().strokeBorder(SV.glassLine))
     }
 }
 

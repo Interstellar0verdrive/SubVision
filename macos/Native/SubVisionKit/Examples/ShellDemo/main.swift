@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // ShellDemo: the SVShell frame around a fake engine (fake_engine.py). It shows
-// the main window with a sidebar of three tabs, the first-launch tools window
+// the main window with a top bar of three tabs, the first-launch tools window
 // (the state folder is a fresh temporary one, so every run is a first launch)
 // and, with SHELLDEMO_ALERT=1, an alert. With SHELLDEMO_SNAPSHOT=<prefix> it
 // writes PNGs of the tools window, the main window and an alert in light and
@@ -58,9 +58,6 @@ final class DemoModel {
     var status: EngineStatus = .starting
     var hello: EngineHello?
     var tab = "process"
-    var sidebarChoice: Bool?
-    var sidebarNarrow = false
-    var sidebarShown = true
     var checkingUpdates = false
     var working = false
     @ObservationIgnored var started = false
@@ -75,10 +72,9 @@ final class DemoModel {
     }
 
     var tabs: [ShellTab] {
-        [ShellTab(id: "process", symbol: "play.rectangle", title: "Process", subtitle: working ? "1 file running" : "Nothing queued",
-                  busy: working, count: working ? 1 : nil),
-         ShellTab(id: "preview", symbol: "eye", title: "Preview", subtitle: "Pick a video"),
-         ShellTab(id: "fix", symbol: "wrench.and.screwdriver", title: "Sub fix", subtitle: "Last run done", done: true)]
+        [ShellTab(id: "process", symbol: "play.rectangle", title: "Process", busy: working),
+         ShellTab(id: "preview", symbol: "eye", title: "Preview"),
+         ShellTab(id: "fix", symbol: "wrench.and.screwdriver", title: "Sub fix", separatorBefore: true)]
     }
 
     func start() {
@@ -125,27 +121,28 @@ struct DemoRoot: View {
                 ToolsSetupView(state: model.tools, appName: config.appName, showLog: model.showLog)
                     .onAppear { WindowSizer.toTools(config) }
             } else {
-                MainSplit(tabs: model.tabs, selection: $model.tab, sidebarChoice: $model.sidebarChoice,
-                          footer: ShellFooter(appVersion: config.appVersion, engineVersion: model.hello?.version,
-                                              pythonVersion: model.hello?.python, checkingUpdates: model.checkingUpdates, repositoryURL: config.repositoryURL,
-                                              checkUpdates: { checkForUpdates(config: config) { model.checkingUpdates = $0 } }),
-                          sizeOverride: config.environment("WINDOW"),
-                          openSettings: { openSettings() },
-                          layoutChanged: { narrow, shown in model.sidebarNarrow = narrow; model.sidebarShown = shown },
-                          sidebarExtra: { sidebarExtra },
+                MainSplit(tabs: model.tabs, selection: $model.tab, sizeOverride: config.environment("WINDOW"),
+                          openSettings: { openSettings() }, showsBottomBar: model.working,
                           topBarTrailing: { if model.working { TopBarChip("Working", tone: .accent, busy: true) {} } },
-                          page: { DemoPage() })
+                          page: { DemoPage() },
+                          bottomBar: { workBar })
             }
         }
     }
 
-    @ViewBuilder private var sidebarExtra: some View {
-        if model.working {
-            ActivityCard(kind: "Processing", line: Text("episode-01.mp4 · ocr 1 240 / 3 600"), fraction: 0.34) {
-                Button { model.working = false } label: { Label("Stop", systemImage: "stop.fill") }
-                    .svButton(.secondary, .small, fullWidth: true)
-            }
+    /// The window's bottom bar while the demo works.
+    private var workBar: some View {
+        HStack(spacing: 12) {
+            Spinner()
+            Text("episode-01.mp4 · ocr 1 240 / 3 600").svFont(12.5).foregroundStyle(SV.text)
+            Spacer(minLength: 8)
+            SegmentedProgressBar(weights: [24, 48], fraction: 0.34).frame(width: 220)
+            Button { model.working = false } label: { Label("Stop", systemImage: "stop.fill") }.svButton(.destructive, .small)
         }
+        .padding(.leading, 25).padding(.trailing, 20)
+        .frame(maxHeight: .infinity)
+        .background(SV.raised)
+        .overlay(alignment: .top) { Rectangle().fill(SV.line).frame(height: 1) }
     }
 }
 
@@ -162,7 +159,7 @@ struct DemoPage: View {
             case "fix": PlaceholderPage(title: "Sub fix", symbol: "wrench.and.screwdriver", text: "The Sub fix page of the app goes here.")
             default:
                 VStack(alignment: .leading, spacing: 16) {
-                    PageHeader("Process", "A demo page inside the SVShell frame: the sidebar, the top bar below 1240 pt,",
+                    PageHeader("Process", "A demo page inside the SVShell frame: the top bar, the bottom bar,",
                                "the engine status and the tools window are the shell's; this card is the app's.")
                     Card {
                         CardTitle("Engine", symbol: "gearshape.2")
@@ -180,7 +177,7 @@ struct DemoPage: View {
                     Spacer()
                 }
                 .padding(.horizontal, 28)
-                .padding(.top, 28)
+                .padding(.top, 17)
             }
         }
     }
@@ -201,16 +198,6 @@ func snapshots(_ model: DemoModel, base: String) async {
     model.working = true
     try? await Task.sleep(for: .milliseconds(300))
     await DebugSnapshot.capture(config, schemes: schemes, "\(base)-window-live.png")
-    let sidebar = ShellSidebar(tabs: model.tabs, selection: .constant("process"),
-                               footer: ShellFooter(appVersion: config.appVersion, engineVersion: model.hello?.version,
-                                                   repositoryURL: config.repositoryURL, checkUpdates: {}),
-                               openSettings: {}) {
-        ActivityCard(kind: "Processing", line: Text("episode-01.mp4 · ocr 1 240 / 3 600"), fraction: 0.34) {
-            Button { } label: { Label("Stop", systemImage: "stop.fill") }.svButton(.secondary, .small, fullWidth: true)
-        }
-    }
-    DebugSnapshot.renderComposite(sidebar: sidebar, page: DemoPage().environment(model), size: config.windowSize,
-                                  chrome: config.chrome, schemes: schemes, "\(base)-window.png")
     DebugSnapshot.render(EngineStatusView(status: .failed("engine launcher not found: /x/subvision"), retry: {}, showLog: {}),
                          width: 700, height: 300, schemes: schemes, "\(base)-engine-failed.png")
     DebugSnapshot.render(SVAlertCard(alert: model.demoAlert()).padding(48).background(SV.bg), width: 376, schemes: schemes, "\(base)-alert.png")
@@ -248,7 +235,6 @@ struct ShellDemoApp: App {
                         switch line {
                         case "work": model.working = true
                         case "idle": model.working = false
-                        case "sidebar": model.sidebarChoice = !(model.sidebarChoice ?? true)
                         default: if ["process", "preview", "fix"].contains(line) { model.tab = line } else { return "unknown" }
                         }
                         return "ok · tab \(model.tab) · working \(model.working)"

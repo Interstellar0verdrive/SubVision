@@ -369,7 +369,7 @@ extension AppModel {
     /// The row's Preview button, its menus: the Preview window on that video (design note 80).
     func openInPreview(_ id: UUID) { openPreview(id) }
 
-    /// The sidebar's Preview line: the chosen video, else the first of the list.
+    /// The video the Preview window shows: the chosen one, else the first of the list.
     var previewVideo: VideoItem? {
         videos.first { $0.id == previewVideoID } ?? videos.first
     }

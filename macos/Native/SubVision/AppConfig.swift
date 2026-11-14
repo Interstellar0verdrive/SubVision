@@ -62,7 +62,6 @@ enum DefaultsKey {
     static let warmupBuild = "warmupBuild"
     static let closeNoticeOff = "closeNoticeOff"
     static let includeSubfolders = "includeSubfolders"
-    static let inspectorOpen = "inspectorOpen"
     static let previewVideo = "previewVideo"
     /// The OCR language of the inspector (`OcrParams.langHint`), also the warm-up's.
     static let ocrLanguage = "langHint"

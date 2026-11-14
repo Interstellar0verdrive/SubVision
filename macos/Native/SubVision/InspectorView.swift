@@ -8,6 +8,9 @@
 // through `@AppStorage`, an accent dot on the values that differ, the default
 // in the (?) bubble, the OCR language from `hello.languages`, the frame's
 // schema in the main window's Bande, everything locked while a batch runs.
+// Everything about values that differ from the default is in the `modified`
+// colour, not the accent (design note 81, C3-10, boards I1–I3), and a slider
+// away from its default shows a grey tick there that brings it back.
 
 import SVShell
 import SwiftUI
@@ -127,7 +130,7 @@ struct InspectorView: View {
                 .padding(.top, 2)
             if changedCount > 0 {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(model.tn("app.inspector.changed_count", changedCount)).foregroundStyle(SV.primaryText)
+                    Text(model.tn("app.inspector.changed_count", changedCount)).foregroundStyle(SV.modified)
                     Spacer(minLength: 0)
                     restoreLink
                 }
@@ -143,9 +146,9 @@ struct InspectorView: View {
         Button { model.resetAllParameters() } label: {
             HStack(spacing: 3) {
                 Image(systemName: "arrow.counterclockwise").font(.system(size: 9.5, weight: .semibold))
-                Text(model.t("app.inspector.restore")).underline(true, color: SV.primaryText.opacity(0.55))
+                Text(model.t("app.inspector.restore")).underline(true, color: SV.modified.opacity(0.55))
             }
-            .foregroundStyle(SV.primaryText)
+            .foregroundStyle(SV.modified)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -163,7 +166,7 @@ struct InspectorView: View {
                     HStack(spacing: 6) {
                         Text(model.t("app.inspector.tab.\(item.rawValue)")).svControlFont(12, on ? .medium : .regular)
                         if tabChanged(item) {
-                            Circle().fill(SV.primary).frame(width: 6, height: 6)
+                            Circle().fill(SV.modified).frame(width: 6, height: 6)
                                 .accessibilityLabel(model.t("app.inspector.changed"))
                         }
                     }
@@ -260,7 +263,8 @@ struct InspectorView: View {
             ParamRow(title: model.t("app.inspector.fps"), help: model.t("app.inspector.help.fps"),
                      defaultText: model.t("app.inspector.default_range", ["value": model.localizer.number(o.fps), "range": "4–12"]),
                      changed: differs(fps, o.fps), value: model.localizer.number(fps)) {
-                SnapSlider(values: [4.0, 6, 8, 10, 12], selection: $fps, width: sliderWidth)
+                SnapSlider(values: [4.0, 6, 8, 10, 12], selection: $fps, width: sliderWidth,
+                           defaultValue: o.fps, defaultHelp: defaultHelp(model.localizer.number(o.fps)))
             }
             ParamRow(title: model.t("app.inspector.multi"), help: model.t("app.inspector.help.multi"),
                      defaultText: model.t("app.inspector.default_only", ["value": onOff(o.multiVariant)]), changed: multiVariant != o.multiVariant) {
@@ -269,7 +273,8 @@ struct InspectorView: View {
             ParamRow(title: model.t("app.inspector.conf"), help: model.t("app.inspector.help.conf"),
                      defaultText: model.t("app.inspector.default_range", ["value": model.localizer.number(o.minConfidence, decimals: 2), "range": "0,10–0,90"]),
                      changed: differs(minConfidence, o.minConfidence), value: model.localizer.number(minConfidence, decimals: 2)) {
-                SVSlider(value: Binding(get: { minConfidence }, set: { minConfidence = ($0 * 20).rounded() / 20 }), in: 0.1...0.9)
+                SVSlider(value: Binding(get: { minConfidence }, set: { minConfidence = ($0 * 20).rounded() / 20 }), in: 0.1...0.9,
+                         defaultValue: o.minConfidence, defaultHelp: defaultHelp(model.localizer.number(o.minConfidence, decimals: 2)))
             }
         }
         SectionLine()
@@ -278,7 +283,8 @@ struct InspectorView: View {
             ParamRow(title: model.t("app.inspector.skip"), help: model.t("app.inspector.help.skip"),
                      defaultText: model.t("app.inspector.default_range", ["value": o.skipHamming, "range": "0–3"]),
                      changed: skipHamming != o.skipHamming, value: "\(skipHamming)") {
-                SnapSlider(values: [0, 1, 2, 3], selection: $skipHamming, width: sliderWidth)
+                SnapSlider(values: [0, 1, 2, 3], selection: $skipHamming, width: sliderWidth,
+                           defaultValue: o.skipHamming, defaultHelp: defaultHelp("\(o.skipHamming)"))
             }
             ParamRow(title: model.t("app.inspector.workers"), help: model.t("app.inspector.help.workers"),
                      defaultText: model.t("app.inspector.default_range", ["value": o.workers, "range": "1–8"]), changed: workers != o.workers) {
@@ -366,7 +372,8 @@ struct InspectorView: View {
                                                                       "range": "\(range.lowerBound)–\(range.upperBound) %"]),
                  changed: value.wrappedValue != d, value: model.t("app.inspector.unit_pct", ["value": value.wrappedValue])) {
             SVSlider(value: Binding(get: { Double(value.wrappedValue) }, set: { value.wrappedValue = Int($0.rounded()) }),
-                     in: Double(range.lowerBound)...Double(range.upperBound))
+                     in: Double(range.lowerBound)...Double(range.upperBound),
+                     defaultValue: Double(d), defaultHelp: defaultHelp(model.t("app.inspector.unit_pct", ["value": d])))
         }
     }
 
@@ -430,6 +437,9 @@ struct InspectorView: View {
         Binding(get: { Double(b.wrappedValue) }, set: { b.wrappedValue = Int($0.rounded()) })
     }
 
+    /// The tooltip of a slider's default tick: "Predefinito: 28 % · clic per tornarci".
+    private func defaultHelp(_ value: String) -> String { model.t("app.inspector.default_tick", ["value": value]) }
+
     private func onOff(_ on: Bool) -> String { model.t(on ? "app.inspector.on" : "app.inspector.off") }
 
     private var secondsUnit: String { model.t("app.inspector.unit_s", ["value": ""]).trimmingCharacters(in: .whitespaces) }
@@ -442,8 +452,9 @@ struct InspectorView: View {
 // MARK: - Sections
 
 /// A section of the panel (`.sec`): its title (or what the band sections put
-/// there), "Predefinito" lit when one of its values differs (it resets them,
-/// off while disabled: the batch), an optional description, the rows.
+/// there), "↺ Predefinito" in the `modified` colour when one of its values
+/// differs (it resets them, off while disabled: the batch), an optional
+/// description, the rows.
 struct InspectorSection<Title: View, Content: View>: View {
     @Environment(AppModel.self) private var model
     @Environment(\.isEnabled) private var enabled
@@ -467,11 +478,18 @@ struct InspectorSection<Title: View, Content: View>: View {
             HStack(spacing: 6) {
                 title()
                 Spacer(minLength: 8)
-                Button(model.t("app.common.defaults")) { reset() }
-                    .buttonStyle(.plain)
-                    .svFont(11.5, .medium)
-                    .foregroundStyle(changed && enabled ? SV.primaryText : SV.text3.opacity(0.6))
-                    .disabled(!changed)
+                Button { reset() } label: {
+                    HStack(spacing: 3) {
+                        if changed { Image(systemName: "arrow.counterclockwise").font(.system(size: 9.5, weight: .semibold)) }
+                        Text(model.t("app.common.defaults"))
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .svFont(11.5, .medium)
+                .foregroundStyle(changed ? SV.modified.opacity(enabled ? 1 : 0.45) : SV.text3.opacity(0.6))
+                .disabled(!changed)
+                .help(changed ? model.t("app.inspector.section_reset_help") : "")
             }
             .frame(height: 24)
             if let description { SectionText(description).padding(.bottom, 2) }
@@ -520,7 +538,8 @@ struct BandSwatch: View {
 
 /// A row of the panel (`.prm`, 9 pt above and below): the name with its (?),
 /// on the right the value (sliders) or the control (switches, steppers) with
-/// the accent dot before it when it differs from the default; sliders and the
+/// the `modified` dot before it when it differs from the default (the value in
+/// that colour too, C3-10); sliders and the
 /// language menu on the next line (`below`). Disabled, it is dimmed to 0.45
 /// (the sliders and the menu dim themselves).
 struct ParamRow<Control: View>: View {
@@ -555,7 +574,7 @@ struct ParamRow<Control: View>: View {
                 Spacer(minLength: 8)
                 if let note { Text(note.0).svFont(11.5).foregroundStyle(note.1) }
                 if changed { ChangedDot() }
-                if let value { Text(value).svFont(SVFont.numbers).foregroundStyle(SV.textCode) }
+                if let value { Text(value).svFont(SVFont.numbers).foregroundStyle(changed ? SV.modified : SV.textCode) }
                 if !below { control() }
             }
             .frame(minHeight: 20)
@@ -575,12 +594,13 @@ struct InspectorSwitch: View {
     }
 }
 
-/// The accent dot before a value that differs from the default (design note 14).
+/// The dot before a value that differs from the default (design note 14), in the
+/// `modified` colour (C3-10).
 struct ChangedDot: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        Circle().fill(SV.primary).frame(width: 6, height: 6)
+        Circle().fill(SV.modified).frame(width: 6, height: 6)
             .help(model.t("app.inspector.changed"))
             .accessibilityLabel(model.t("app.inspector.changed"))
     }

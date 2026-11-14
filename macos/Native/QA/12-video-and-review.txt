@@ -1,7 +1,7 @@
 # C2 (design notes 58, 60, 80; boards C2-V1–V5, C2-R1): the Video page with the
 # drop area under the list and the selection bar, a fast batch of two with the
 # end-of-batch sheet, the Review page (lines, dropped, gaps, language and fps of
-# each file, the sidebar's count) and the review window's title. Captures in
+# each file) and the review window's title. Captures in
 # dark and light.
 ! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
 @launch
@@ -15,7 +15,7 @@ inspector-set langHint it-IT
 inspector-tab read
 tab review
 review-state
-? ^review 0 · sidebar Nessun video elaborato$
+? ^review 0$
 capture $OUT/R-empty-dark.png
 ? R-empty-dark.png$
 tab process
@@ -47,7 +47,6 @@ capture $OUT/V-done-dark.png
 ? V-done-dark.png$
 review-state
 ? ^review 2 · sintel_ita_hardsub_demo\.mp4 lines [0-9]+ dropped [0-9]+ gaps [0-9]+ lang it-IT fps 6 report yes reviewed no
-? sidebar 2 elaborati$
 review-select 0
 ? ^ok · sintel_ita_hardsub_demo\.mp4$
 capture $OUT/R1-dark.png
@@ -67,6 +66,6 @@ lang it
 # Process Again takes a file off Review.
 process-again
 review-state
-? ^review 0 
+? ^review 0$
 params default
 inspector-tab read

@@ -45,7 +45,7 @@ enum DebugSnapshot {
                 await capture(model, "\(base)-preview-videos.png", schemes: schemes)
                 model.tab = .process
             }
-            // The narrow window (760x640, as N1 and N2): the top bar instead of the sidebar.
+            // The narrow window (760x640, as N1 and N2): the parameters retracted.
             if let window = WindowSizer.main(model.config) {
                 let saved = window.frame
                 setNarrow(window)

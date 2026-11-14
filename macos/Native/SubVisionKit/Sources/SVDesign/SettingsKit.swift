@@ -7,28 +7,41 @@ import SwiftUI
 /// A snapping slider: a few fixed values; dots mark them, the knob snaps
 /// to the nearest, and the value under it lights up. With `ticks` (the
 /// parameters panel, design board C2-P1) the values are small ticks under the
-/// track instead, with no dots and no labels.
+/// track instead, with no dots and no labels. With `defaultValue`, while the
+/// value differs from it a thin grey tick marks where the default is; a click
+/// on it goes back there (C3-10, board I2).
 public struct SnapSlider<Value: Hashable>: View {
     var values: [Value]
     var label: (Value) -> String
     @Binding var selection: Value
     var width: CGFloat
     var ticks: Bool
+    var defaultValue: Value?
+    var defaultHelp: String
     @Environment(\.isEnabled) private var enabled
     @State private var dragging: Int?
 
     public init(values: [Value], selection: Binding<Value>, width: CGFloat = 250, ticks: Bool = false,
-                label: @escaping (Value) -> String) {
+                defaultValue: Value? = nil, defaultHelp: String = "", label: @escaping (Value) -> String) {
         self.values = values
         self._selection = selection
         self.width = width
         self.ticks = ticks
+        self.defaultValue = defaultValue
+        self.defaultHelp = defaultHelp
         self.label = label
     }
 
     /// The ticks variant: no labels.
-    public init(values: [Value], selection: Binding<Value>, width: CGFloat) {
-        self.init(values: values, selection: selection, width: width, ticks: true) { _ in "" }
+    public init(values: [Value], selection: Binding<Value>, width: CGFloat, defaultValue: Value? = nil, defaultHelp: String = "") {
+        self.init(values: values, selection: selection, width: width, ticks: true,
+                  defaultValue: defaultValue, defaultHelp: defaultHelp) { _ in "" }
+    }
+
+    /// The default's stop, while the value is elsewhere.
+    private var defaultIndex: Int? {
+        guard let defaultValue, defaultValue != selection, dragging == nil else { return nil }
+        return values.firstIndex(of: defaultValue)
     }
 
     private var index: Int { dragging ?? values.firstIndex(of: selection) ?? 0 }
@@ -38,6 +51,10 @@ public struct SnapSlider<Value: Hashable>: View {
         let usable = width - 16
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .leading) {
+                if let d = defaultIndex {
+                    DefaultTick(help: defaultHelp)
+                        .offset(x: 8 + usable * CGFloat(d) / CGFloat(steps) - DefaultTick.hitWidth / 2)
+                }
                 if ticks {
                     // 1×4 pt ticks just under the track (3 pt below it), at the knob's stops (C2-P1).
                     ForEach(values.indices, id: \.self) { i in
@@ -210,21 +227,37 @@ public struct CapsuleSegments<Value: Hashable>: View {
 }
 
 /// The continuous slider: 4 pt track, accent fill, white knob (16 pt, or 12
-/// under a player).
+/// under a player). With `defaultValue`, while the value differs from it a thin
+/// grey tick marks where the default is; a click on it goes back there (C3-10,
+/// board I2).
 public struct SVSlider: View {
     @Binding var value: Double
     var range: ClosedRange<Double>
     var knob: CGFloat
+    var defaultValue: Double?
+    var defaultHelp: String
     var onEditingChanged: (Bool) -> Void
     @Environment(\.isEnabled) private var enabled
     @State private var dragging = false
+    /// The press began on the default's tick: the value stays on the default unless it becomes a drag.
+    @State private var resetting = false
 
     public init(value: Binding<Double>, in range: ClosedRange<Double>, knob: CGFloat = 16,
+                defaultValue: Double? = nil, defaultHelp: String = "",
                 onEditingChanged: @escaping (Bool) -> Void = { _ in }) {
         self._value = value
         self.range = range
         self.knob = knob
+        self.defaultValue = defaultValue
+        self.defaultHelp = defaultHelp
         self.onEditingChanged = onEditingChanged
+    }
+
+    /// The knob's centre for a value, on a track `w` wide.
+    private func centre(_ v: Double, _ w: CGFloat) -> CGFloat {
+        let span = max(range.upperBound - range.lowerBound, .ulpOfOne)
+        let f = min(max((v - range.lowerBound) / span, 0), 1)
+        return min(max(w * f, knob / 2), w - knob / 2)
     }
 
     public var body: some View {
@@ -232,7 +265,11 @@ public struct SVSlider: View {
             let span = max(range.upperBound - range.lowerBound, .ulpOfOne)
             let f = min(max((value - range.lowerBound) / span, 0), 1)
             let w = g.size.width
+            let tick = defaultValue.flatMap { d in abs(d - value) > span * 1e-6 && !dragging ? centre(d, w) : nil }
             ZStack(alignment: .leading) {
+                if let tick {
+                    DefaultTick(help: defaultHelp).offset(x: tick - DefaultTick.hitWidth / 2)
+                }
                 Capsule().fill(SV.trackSoft).frame(height: 4)
                 Capsule().fill(SV.sysAccent).frame(width: max(0, w * f), height: 4)
                 Circle().fill(SV.knob)
@@ -245,12 +282,40 @@ public struct SVSlider: View {
             .gesture(DragGesture(minimumDistance: 0)
                 .onChanged { d in
                     guard enabled else { return }
-                    if !dragging { dragging = true; onEditingChanged(true) }
+                    // A click on the default's tick (not a drag) goes back to the default.
+                    if !dragging, let defaultValue, abs(d.translation.width) < 3,
+                       resetting || tick.map({ abs(d.startLocation.x - $0) <= DefaultTick.hitWidth / 2 }) == true {
+                        if !resetting { resetting = true; onEditingChanged(true) }
+                        value = defaultValue
+                        return
+                    }
+                    if !dragging { dragging = true; if !resetting { onEditingChanged(true) } }
+                    resetting = false
                     value = range.lowerBound + min(max(d.location.x / max(w, 1), 0), 1) * span
                 }
-                .onEnded { _ in dragging = false; onEditingChanged(false) })
+                .onEnded { _ in
+                    dragging = false
+                    resetting = false
+                    onEditingChanged(false)
+                })
         }
         .frame(height: max(knob, 16))
         .opacity(enabled ? 1 : 0.4)
+    }
+}
+
+/// The default's tick on a slider (`.slider .dt`, board I2): 2 × 14 pt, grey,
+/// under the track, in a wider transparent strip that carries the tooltip.
+struct DefaultTick: View {
+    static let hitWidth: CGFloat = 10
+    var help: String
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 1).fill(SV.defaultTick)
+            .frame(width: 2, height: 14)
+            .frame(width: Self.hitWidth, height: 16)
+            .contentShape(Rectangle())
+            .help(help)
+            .accessibilityHidden(true)
     }
 }

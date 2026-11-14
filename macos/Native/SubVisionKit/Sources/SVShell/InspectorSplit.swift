@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // The parameters panel's place on the Video and Preview pages (design boards
-// C2-V1, C2-N1, design note 50): always beside the page in a window of
-// 1000 pt or more, over it from the right below that.
+// C2-V1, N1, N2, design note 50, C3-03): always beside the page in a window of
+// 1100 pt or more, where it never closes; over it from the right below that.
 
 import AppKit
 import SVDesign

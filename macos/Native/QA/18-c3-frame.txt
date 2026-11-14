@@ -1,0 +1,61 @@
+# Design round C3, the frame (C3-01, C3-03, C3-12, O9): the window opens at
+# least at 1360x860 even when it was left smaller; no sidebar, the pages in the
+# top bar; the app menu has About, Check for Updates and SubVision on GitHub;
+# View has Back (⌘[, shown remapped to the keyboard layout; off without a title
+# band) and the parameters item only in a narrow window. A batch of a short
+# clip, a damaged one and a long clip run from Sub fix: the batch bar on every
+# page with one segment per file, then the end-of-batch sheet over Sub fix (no
+# jump to Video) with the failed file as a row and the count in the title.
+! SRC="$DEMO/sintel_ita_hardsub_demo.mp4"; { head -c 1000000 "$SRC"; head -c $(( $(stat -f%z "$SRC") - 1000000 )) /dev/zero; } > damaged.mp4
+! "$STATE/bin/ffmpeg" -v error -i "$DEMO/sintel_eng_hardsub_demo.mp4" -t 20 -c copy short.mp4 && cp "$DEMO/sintel_ita_hardsub_demo.mp4" long.mp4
+@launch
+wait-ready 600
+? ^ready
+size 900x700
+! sleep 1
+window-size
+? ^900x700
+@quit
+@launch
+wait-ready 600
+? ^ready
+window-size
+? ^(1360x860|[0-9]{4}x[0-9]{3}) · 
+?! ^900x700
+lang it
+menu-dump 0
+? ^SubVision: Informazioni su SubVision \| Controlla aggiornamenti… \| SubVision su GitHub \|
+menu-dump 3
+? ^Vista: ✓Video ⌘1 \| Revisione ⌘2 \| Sub fix ⌘3 \| — \| Indietro ⌘[^ ]+ \(off\)
+?! barra laterale|parametri
+size 900x700
+! sleep 1
+menu-dump 3
+? Mostra i parametri ⌥⌘I
+size 1360x860
+params fast
+inspector-set langHint it-IT
+tab process
+add $WORK/short.mp4,$WORK/damaged.mp4,$WORK/long.mp4
+batch-bar
+? ^hidden$
+start
+tab fix
+batch-bar
+? ^shown · File [1-3] di 3 · .*\.mp4.* · segments 3 · [0-9]+ %$
+tab review
+batch-bar
+? ^shown · File [1-3] di 3
+tab fix
+wait-batch 600
+? ^batch done · done 2 failed 1 stopped 0 skipped 0
+batch-bar
+? ^hidden$
+summary-sheet
+? ^sheet · 2 SRT pronti · 1 non riuscito · tab fix · short\.mp4=done damaged\.mp4=failed long\.mp4=done$
+capture-all $OUT/sheet-over-fix.png
+? sheet-over-fix.png$
+summary-seen
+summary-sheet
+? ^no sheet · tab fix$
+params default

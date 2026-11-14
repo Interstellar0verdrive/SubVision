@@ -64,7 +64,7 @@ struct ReviewPage: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                PageTop(title: model.t("app.review.title"), intro: windowWidth < chrome.collapseBelow ? nil : model.t("app.review.intro")) {
+                PageTop(title: model.t("app.review.title"), intro: chrome.inspectorOverlays(windowWidth: windowWidth) ? nil : model.t("app.review.intro")) {
                     EmptyView()
                 }
                 .padding(.bottom, 18)

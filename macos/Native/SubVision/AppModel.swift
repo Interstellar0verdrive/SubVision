@@ -9,7 +9,7 @@ import Observation
 import SVShell
 import SwiftUI
 
-/// The pages of the sidebar (design note 80): Video (the list, the parameters, Start),
+/// The pages, segments of the top bar (design note 80, C3 navigation N-A): Video (the list, the parameters, Start),
 /// Review (the videos processed), then Sub fix among the tools. Preview is a window of
 /// its own (`PreviewWindow.swift`). `process` keeps its raw value: the notifications
 /// and the QA scenarios name the pages by it.
@@ -26,15 +26,15 @@ enum Tab: String, CaseIterable, Identifiable {
     }
 }
 
-/// The batch as the sidebar, the Dock and the quit alert see it. F5.1 fills
-/// it from `batch.*` events; in F4 nothing runs.
+/// The batch as the batch bar, the Dock and the quit alert see it, filled
+/// from the `batch.*` events.
 struct BatchActivity: Equatable {
     var running = false
     /// 1-based index of the file in progress, and the batch size.
     var index = 0
     var total = 0
     var name = ""
-    /// The batch's fraction, for the sidebar card and the Dock.
+    /// The batch's fraction, for the batch bar and the Dock.
     var fraction: Double?
     /// "Ends around 14:20", when there is an estimate.
     var endsAround: String?
@@ -54,18 +54,29 @@ final class AppModel {
     var status: EngineStatus = .starting
     var hello: EngineHello?
     var tab: Tab = .process
-    /// The sidebar as the person set it from View, in a wide window; nil keeps it shown.
-    var sidebarChoice: Bool?
-    /// The window is narrower than `SVChrome.collapseBelow`: no sidebar, the top bar instead.
-    var sidebarNarrow = false
-    var sidebarShown = true
-    /// The main window's width (the parameters lie over the page below 1000 pt).
-    var mainWindowWidth: CGFloat = 1360
-    var inspectorOpen: Bool { didSet { defaults.set(inspectorOpen, forKey: DefaultsKey.inspectorOpen) } }
+    /// The main window's width (the parameters retract below 1100 pt, C3-03).
+    var mainWindowWidth: CGFloat = 1360 {
+        didSet {
+            // Narrowed past the threshold: the panel retracts (N1); the top bar's button brings it.
+            let chrome = config.chrome
+            if chrome.inspectorOverlays(windowWidth: mainWindowWidth), !chrome.inspectorOverlays(windowWidth: oldValue) {
+                inspectorOpen = false
+            }
+        }
+    }
+    /// The parameters laid over the page of a narrow window (N2). In a wide window the
+    /// panel is always beside the page and this does not matter (C3-03); a window that
+    /// becomes narrow starts with the panel retracted (N1).
+    var inspectorOpen = false
+    /// The page in front has a title band with its back button (the report in Review, Preview;
+    /// C3-07, C3-09): View › Back (⌘[) runs it. The page sets it when it shows the band and
+    /// clears it when it goes, and builds its band with `TitleBand(shortcut: false)`.
+    @ObservationIgnored var backAction: (@MainActor () -> Void)? { didSet { canGoBack = backAction != nil } }
+    var canGoBack = false
     /// Goes up by one to open the inspector's language menu (O7's "Choose the Language").
     var languageMenuRequest = 0
     var checkingUpdates = false
-    /// A newer release GitHub told about (the sidebar card, Settings › Updates).
+    /// A newer release GitHub told about (the top bar's chip, Settings › Updates).
     var updateAvailable: (version: String, url: URL)?
     var lastUpdateResult: UpdateResult?
     var lastUpdateCheck: Date?
@@ -122,8 +133,6 @@ final class AppModel {
         config = AppConfig.shell(localizer: localizer)
         engine = EngineClient(configuration: configuration)
         tools = ToolsSetupState(tools: config.tools, engine: engine)
-        // Open on the first launch (design note 50): the key is missing then.
-        inspectorOpen = defaults.object(forKey: DefaultsKey.inspectorOpen) as? Bool ?? true
         previewVideoID = defaults.string(forKey: DefaultsKey.previewVideo).flatMap(UUID.init)
         AppLog.shared = AppLog(subsystem: config.logSubsystem, file: configuration.stateFolder.appendingPathComponent("records/app.log"))
         log.info("SubVision \(config.appVersion) · code \(configuration.codeFolder.path) · state \(configuration.stateFolder.path)")
@@ -357,16 +366,14 @@ final class AppModel {
     func showLog() { openLogInConsole(configuration.logFile.path) }
     func showAppLog() { openLogInConsole(configuration.stateFolder.appendingPathComponent("records/app.log").path) }
 
-    /// View › Show/Hide Sidebar and the top bar's button; a narrow window has no sidebar.
-    func toggleSidebar() {
-        guard !sidebarNarrow else { return }
-        sidebarChoice = !sidebarShown
+    /// The top bar's button and ⌥⌘I, in a narrow window only (N1, N2).
+    func toggleInspector() {
+        guard inspectorOverlays else { return }
+        inspectorOpen.toggle()
     }
 
-    func toggleInspector() { inspectorOpen.toggle() }
-
-    /// The main window is narrow enough for the parameters to lie over the page (below 1000 pt):
-    /// only then they can be shown and hidden (design note 50).
+    /// The main window is narrow enough for the parameters to lie over the page (below 1100 pt):
+    /// only then they can be shown and hidden (C3-03, N1, N2).
     var inspectorOverlays: Bool { config.chrome.inspectorOverlays(windowWidth: mainWindowWidth) }
 
     /// View › Video, Review, Sub fix (⌘1–⌘3): the main window, on that page.
@@ -391,11 +398,12 @@ final class AppModel {
     func showLanguageMenu() {
         tab = .process
         defaults.set("read", forKey: "inspector.tab")
-        let wasOpen = inspectorOpen
-        inspectorOpen = true
+        // Beside a wide page the panel is always there; over a narrow one it slides in first.
+        let wasOpen = inspectorOpen || !inspectorOverlays
+        if inspectorOverlays { inspectorOpen = true }
         Task {
             try? await Task.sleep(for: .milliseconds(wasOpen ? 150 : 500))
-            guard inspectorOpen, tab == .process, !batch.running else { return }
+            guard inspectorOpen || !inspectorOverlays, tab == .process, !batch.running else { return }
             languageMenuRequest += 1
         }
     }
@@ -454,9 +462,13 @@ final class AppModel {
         }
     }
 
+    /// SubVision › About SubVision: the version, the line about the app, the GitHub mark and link (C3-01, O9).
     func showAbout() {
-        showAboutPanel(repositoryURL: config.repositoryURL, credits: t("app.menu.about_credits"))
+        showAboutPanel(repositoryURL: config.repositoryURL, credits: t("app.menu.about_credits"), mark: NSImage(named: "GitHubMark"))
     }
+
+    /// SubVision › SubVision on GitHub ↗.
+    func openRepository() { NSWorkspace.shared.open(config.repositoryURL) }
 
     // MARK: - Batch (the rest is in AppModel+Run, F5.1)
 
@@ -483,7 +495,7 @@ final class AppModel {
         }
     }
 
-    /// Remembers a check's outcome (Settings › Updates, the sidebar card).
+    /// Remembers a check's outcome (Settings › Updates, the top bar's chip).
     func record(_ result: UpdateResult) {
         lastUpdateResult = result
         lastUpdateCheck = Date()
@@ -500,7 +512,7 @@ final class AppModel {
         }
     }
 
-    /// SubVision › Check for Updates… and the sidebar footer: the shell's alert, then the record.
+    /// SubVision › Check for Updates…: the shell's alert, then the record.
     func checkForUpdates() {
         guard !checkingUpdates else { return }
         checkingUpdates = true
