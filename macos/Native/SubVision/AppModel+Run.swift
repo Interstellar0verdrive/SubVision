@@ -86,6 +86,10 @@ struct BatchRun: Equatable {
     var lang: String?
     var fps: Double?
     var gapWarn: Double?
+    /// The work the batch's parameters ask for (`WorkEstimate.factor`): the files done teach the rate with it.
+    var factor: Double?
+    /// When Stop All ended the batch: the note over the list of E5.
+    var stoppedAt: Date?
 
     /// The step the engine works on (or the first not started).
     var currentStep: StepRun? {
@@ -147,10 +151,12 @@ extension AppModel {
 
     // MARK: - Start
 
-    /// Start (⌘↩): the ready rows go into the batch with the inspector's parameters.
-    func startBatch() {
-        guard canStart else { return }
-        let ready = readyVideos
+    /// Process (⌘↩, the bottom bar): the checked rows go into the batch with the inspector's
+    /// parameters (C3-02); `only` for Retry on one row (C3-05).
+    func startBatch(only: [UUID]? = nil) {
+        guard canRun else { return }
+        let ready = only.map { ids in videos.filter { ids.contains($0.id) && $0.exists && $0.state != .unreadable } } ?? checkedVideos
+        guard !ready.isEmpty else { return }
         let lang = ocrLanguage
         if let known = hello?.languages, !known.isEmpty, !known.contains(where: { $0.caseInsensitiveCompare(lang) == .orderedSame }) {
             Alerts.languageUnsupported(self, language: lang, count: known.count)
@@ -161,13 +167,18 @@ extension AppModel {
         for i in videos.indices where ids.contains(videos[i].id) {
             videos[i].resetOutcome()
             videos[i].state = .waiting
+            // The box is the batch's now: afterwards the outcome shows, unchecked (C3-04).
+            videos[i].checked = nil
         }
+        // The drawers stay as they were.
+        let expanded = run.expanded
         run = BatchRun(ids: ids)
+        run.expanded = expanded
         run.lang = lang
         run.fps = ocrParams.fps
         run.gapWarn = ocrParams.qcGapWarn
+        run.factor = estimateFactor
         batch = BatchActivity(running: true, index: 1, total: ids.count, name: ready.first?.name ?? "")
-        selection = []
         saveVideos()
         updateDock()
         log.info("batch.start: \(ids.count) videos, \(ocrParams.langHint), fps \(ocrParams.fps)")
@@ -196,7 +207,9 @@ extension AppModel {
 
     private func rollBackStart(_ ids: [UUID]) {
         for i in videos.indices where ids.contains(videos[i].id) && videos[i].state.inBatch { videos[i].state = .ready }
+        let expanded = run.expanded
         run = BatchRun()
+        run.expanded = expanded
         batch = BatchActivity()
         closeStopAlert()
         saveVideos()
@@ -353,6 +366,8 @@ extension AppModel {
         videos[i].reportPath = f.report
         run.steps = f.steps.map(StepRun.init)
         run.fileStarted = Date()
+        // Its drawer opens by itself, unless the person has another one open (C3-04).
+        if !videos.contains(where: { run.expanded.contains($0.id) }) { run.expanded.insert(videos[i].id) }
         batch.index = f.idx + 1
         batch.total = f.total
         batch.name = f.name
@@ -402,6 +417,7 @@ extension AppModel {
             if let t = d.times[run.steps[j].id] { run.steps[j].duration = t }
         }
         run.lastFileElapsed = d.elapsed
+        learnRate(elapsed: d.elapsed, duration: videos[i].duration, factor: run.factor)
         refreshActivity()
         saveVideos()
         closeStopAlert(file: d.idx)
@@ -457,6 +473,7 @@ extension AppModel {
         log.info("batch.done: \(d.done) done, \(d.failed) failed, \(d.stopped) stopped, \(d.skipped) skipped in \(d.elapsed) s")
         let summary = BatchSummary(ids: run.ids, done: d.done, failed: d.failed, stopped: d.stopped, skipped: d.skipped,
                                    elapsed: d.elapsed, error: d.error, when: Date())
+        if run.stoppedByUser { run.stoppedAt = Date() }
         run.summary = summary
         run.steps = []
         run.fileStarted = nil
@@ -519,12 +536,12 @@ extension AppModel {
     /// Seconds of work per second of video, from the files done (nil before the first).
     var batchRate: Double? { BatchProgress.rate(weights: batchWeights, measured: batchMeasured) }
 
-    /// About how long a waiting row will take: its duration at the rate of the files done.
+    /// About how long a waiting row will take: its duration at the rate of the files done in
+    /// this batch, else the estimate of the parameters (`WorkEstimate`).
     func waitingEstimate(_ video: VideoItem) -> Double? {
-        guard let i = run.ids.firstIndex(of: video.id) else { return run.lastFileElapsed }
         let weights = batchWeights
-        guard let rate = batchRate, weights.indices.contains(i) else { return run.lastFileElapsed }
-        return rate * weights[i]
+        if let i = run.ids.firstIndex(of: video.id), let rate = batchRate, weights.indices.contains(i) { return rate * weights[i] }
+        return estimate(video) ?? run.lastFileElapsed
     }
 
     /// `BatchActivity` (batch bar, Dock, O3): the fraction and "Ends around", both by duration:
@@ -647,10 +664,21 @@ extension AppModel {
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 
-    /// The finished row whose report Open Report (⌘R) opens: the one selected.
-    var selectedFinished: VideoItem? {
-        guard selection.count == 1, let id = selection.first else { return nil }
-        return videos.first { $0.id == id && $0.state.isFinished }
+    /// When the file in progress should be over: its steps' estimates (scaled to its duration),
+    /// else the estimate of the parameters less the time gone ("finisce verso le 08:44", C3-04).
+    func runningFileEnds(at now: Date = Date()) -> Date? {
+        guard let video = runningVideo, let started = run.fileStarted else { return nil }
+        let elapsed = now.timeIntervalSince(started)
+        let weights = batchWeights
+        var scale = 1.0
+        if let i = run.ids.firstIndex(of: video.id), weights.indices.contains(i),
+           let previous = run.ids[..<i].last(where: { id in videos.contains { $0.id == id && ($0.state == .done || $0.state == .noSubs) } }),
+           let j = run.ids.firstIndex(of: previous), weights[j] > 0 {
+            scale = weights[i] / weights[j]
+        }
+        if let left = run.fileRemaining(scale: scale) { return now.addingTimeInterval(left) }
+        guard let total = estimate(video) else { return nil }
+        return now.addingTimeInterval(max(total - elapsed, 0))
     }
 
     // MARK: - Notifications (design note 23)

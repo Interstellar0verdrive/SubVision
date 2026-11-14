@@ -83,7 +83,15 @@ final class AppModel {
 
     // Process (F4.4)
     var videos: [VideoItem] = []
-    var selection: Set<UUID> = []
+    /// The row of Video the keyboard's ring is on (C3-02: no selection any more): ↑ ↓ move it,
+    /// the menus' Review, Show in Finder, Open Log and Remove act on it.
+    var focusedRow: UUID?
+    /// Seconds of work per second of video learned from the files done (`WorkEstimate`), nil before the first.
+    var estimateRate: Double? { didSet { defaults.set(estimateRate, forKey: Self.estimateRateKey) } }
+    /// A change opens that row's ⋯ menu, as a click does (the debug commands and the menu captures).
+    var rowMenuRequest: (id: UUID, count: Int)?
+    /// The rows probed again this launch for their codecs (once each).
+    @ObservationIgnored var codecProbed: Set<UUID> = []
     /// The row selected on the Review page (⌘R reviews it).
     var reviewSelection: UUID?
     /// Items dropped that are not videos: the yellow note over the list, until closed.
@@ -134,6 +142,7 @@ final class AppModel {
         engine = EngineClient(configuration: configuration)
         tools = ToolsSetupState(tools: config.tools, engine: engine)
         previewVideoID = defaults.string(forKey: DefaultsKey.previewVideo).flatMap(UUID.init)
+        estimateRate = defaults.object(forKey: Self.estimateRateKey) as? Double
         AppLog.shared = AppLog(subsystem: config.logSubsystem, file: configuration.stateFolder.appendingPathComponent("records/app.log"))
         log.info("SubVision \(config.appVersion) · code \(configuration.codeFolder.path) · state \(configuration.stateFolder.path)")
         readUpdateDefaults()
@@ -382,15 +391,9 @@ final class AppModel {
         reopenMainWindow()
     }
 
-    /// The one row selected on Video, if one.
-    var selectedSingle: VideoItem? {
-        guard selection.count == 1, let id = selection.first else { return nil }
-        return videos.first { $0.id == id }
-    }
-
-    /// What Review (⌘R) opens: the row selected on Review, else the finished row selected on Video.
+    /// What Review (⌘R) opens: the row selected on Review, else the row with the focus on Video.
     var reviewTarget: VideoItem? {
-        tab == .review ? selectedReview : (tab == .process ? selectedFinished : nil)
+        tab == .review ? selectedReview : (tab == .process ? focusedVideo : nil)
     }
 
     /// O7's "Choose the Language": Process with the inspector open on the OCR
@@ -472,9 +475,11 @@ final class AppModel {
 
     // MARK: - Batch (the rest is in AppModel+Run, F5.1)
 
-    var canStart: Bool {
-        status == .ready && !batch.running && hello?.vision == true && !readyVideos.isEmpty
-    }
+    /// Process (⌘↩, the bottom bar): the checked rows (C3-02).
+    var canStart: Bool { canRun && !checkedVideos.isEmpty }
+
+    /// The engine could take a batch now.
+    var canRun: Bool { status == .ready && !batch.running && hello?.vision == true }
 
     // MARK: - Updates
 
