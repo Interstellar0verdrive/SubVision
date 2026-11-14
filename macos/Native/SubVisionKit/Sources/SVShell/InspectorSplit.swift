@@ -8,8 +8,9 @@ import SVDesign
 import SwiftUI
 
 extension EnvironmentValues {
-    /// True for a parameters panel laid over the page of a narrow window: it shows
-    /// its × (design note 57); beside the page it cannot be closed.
+    /// True for a parameters panel laid over the page of a narrow window (N2); beside
+    /// the page it cannot be closed. The panel has no × of its own: the top bar's
+    /// panel button closes it.
     @Entry public var svInspectorOverlaid = false
 }
 
@@ -17,8 +18,8 @@ extension EnvironmentValues {
 /// In a window of `SVChrome.inspectorOverlayBelow` or more (read from
 /// `svWindowWidth`, which `MainSplit` sets) the panel is always there and
 /// `isOpen` does not matter. In a narrower window the panel covers the page
-/// with a shadow while `isOpen`, and closes with Esc, a click outside it or
-/// its × (`svInspectorOverlaid`). The panel's look (background, header,
+/// with a shadow while `isOpen`, and closes with the top bar's panel button
+/// (the app's), Esc or a click outside it (`svInspectorOverlaid`). The panel's look (background, header,
 /// sections) is the app's.
 public struct InspectorSplit<Page: View, Inspector: View>: View {
     @Binding var isOpen: Bool

@@ -30,7 +30,6 @@ enum InspectorTab: String, CaseIterable {
 struct InspectorView: View {
     var place: InspectorPlace = .main
     @Environment(AppModel.self) private var model
-    @Environment(\.svInspectorOverlaid) private var overlaid
     @AppStorage(InspectorTab.key) private var tab: InspectorTab = .read
     @AppStorage(OcrKey.fps) private var fps: Double = ocrDefaults.fps
     @AppStorage(OcrKey.langHint) private var lang: String = ocrDefaults.langHint
@@ -112,17 +111,7 @@ struct InspectorView: View {
             HStack(spacing: 8) {
                 Text(model.t("app.inspector.title")).svFont(15, .bold).foregroundStyle(SV.text)
                 Spacer(minLength: 0)
-                // Only laid over a narrow window (C2-N1, note 57): beside the page it stays.
-                if overlaid {
-                    Button { model.inspectorOpen = false } label: {
-                        Image(systemName: "xmark").svFont(11, .semibold).foregroundStyle(SV.text2)
-                            .frame(width: 22, height: 22).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .svHover(RoundedRectangle(cornerRadius: 5))
-                    .help(model.t("app.inspector.close"))
-                    .accessibilityLabel(model.t("app.inspector.close"))
-                }
+                // No × even over a narrow window (N2): the top bar's panel button closes it, as Esc does.
             }
             .frame(height: 24)
             Text(model.t("app.inspector.subtitle")).svFont(11.5, leading: 1.4).foregroundStyle(SV.text2)
