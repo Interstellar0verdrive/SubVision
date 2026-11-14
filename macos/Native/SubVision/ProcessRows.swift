@@ -253,11 +253,13 @@ struct RowLead: View {
             if let circle = video.circle { StatusCircle(circle) } else { Color.clear }
         case .todo:
             SVCheckbox(isOn: video.isChecked, help: model.t("app.process.row.check_help")) { model.toggleCheck(video.id) }
+                .accessibilityLabel("\(model.t("app.process.row.check_help")): \(video.name)")
                 .disabled(batchRunning)
                 .id("box")
         case .finished:
             if video.isChecked {
                 SVCheckbox(isOn: true, help: model.t("app.process.row.check_help")) { model.toggleCheck(video.id) }
+                    .accessibilityLabel("\(model.t("app.process.row.check_help")): \(video.name)")
                     .disabled(batchRunning)
                     .id("box")
             } else if batchRunning {
@@ -279,7 +281,7 @@ struct RowLead: View {
                 .buttonStyle(.plain)
                 .onHover { hover = $0 }
                 .help(model.t("app.process.row.redo_help"))
-                .accessibilityLabel(model.t("app.process.row.redo_help"))
+                .accessibilityLabel("\(model.t("app.process.row.redo_help")): \(video.name)")
             }
         }
     }
