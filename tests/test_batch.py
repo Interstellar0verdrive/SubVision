@@ -274,6 +274,30 @@ def test_error_info_of_a_tool_that_exits_with_an_error():
     assert bare["text"] == "true exited with status 1" and "tool" not in bare
 
 
+def test_error_info_words_its_own_texts_in_the_batch_language():
+    # 11.3.4: with the app in Italian the row of a failed file is in Italian too
+    stderr = "[dec:h264 @ 0x7a60] Decode error rate 0.88 exceeds maximum 0.666667\nConversion failed!\n"
+    exc = subprocess.CalledProcessError(69, ["/opt/bin/ffmpeg", "-i", "/v/a.mkv"], stderr=stderr)
+    it = batch.error_info(exc, path="/v/a.mkv", lang="it")
+    assert it["text"] == "ffmpeg è uscito con il codice 69: Decode error rate 0.88 exceeds maximum 0.666667"
+    # the parts, for the app to word the sentence in its own language
+    assert it["program"] == "ffmpeg" and it["status"] == 69 and it["tool"] == "ffmpeg"
+    assert it["reason"] == "Decode error rate 0.88 exceeds maximum 0.666667"
+    en = batch.error_info(exc, path="/v/a.mkv", lang="en")
+    assert en["text"].startswith("ffmpeg exited with status 69: ")
+    # an unknown language falls back to English, as the default does
+    assert batch.error_info(exc, lang="fr")["text"] == en["text"] == batch.error_info(exc)["text"]
+    # a known errno of the file system, with the file it is about
+    full = OSError(28, "No space left on device", "/v/a.srt")
+    assert batch.error_info(full, lang="it")["text"] == "Il disco è pieno: /v/a.srt"
+    assert batch.error_info(full, lang="en")["text"] == "The disk is full: /v/a.srt"
+    assert batch.error_info(PermissionError(13, "Permission denied"), lang="it")["text"] == "Permesso negato"
+    # a message of Python stays as it is; the code stays `unknown` for all of them
+    assert batch.error_info(ValueError("boom"), lang="it")["text"] == "boom"
+    assert {batch.error_info(x, lang="it")["code"] for x in (exc, full, ValueError("boom"))} == {"unknown"}
+
+
+
 def test_log_catalogues_are_aligned():
     assert set(batch._LOG_I18N["it"]) == set(batch._LOG_I18N["en"])
     # every LogEvent code of the engine has a log line

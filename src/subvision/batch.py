@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import errno
 import re
 import subprocess
 import threading
@@ -375,7 +376,7 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
         except Exception as e:      # noqa: BLE001 - any engine error fails this file only
             at_step = tracker.current_step()
             tracker.abort()
-            info = error_info(e, path=str(video))
+            info = error_info(e, path=str(video), lang=lang)
             log.code("log_error", e=info["error"])
             counts["failed"] += 1
             emit("batch.file.failed", {"idx": idx, "at_step": at_step,
@@ -407,6 +408,45 @@ def run_batch(videos: Sequence[str | Path], params: OcrParams, lists: Any,
 
 _TEXT_MAX = 300      # characters of `text`: it is one row of the app
 
+# The short texts of the errors the engine words itself (a tool that exits with
+# an error, the common errors of the file system), in the language of the batch:
+# with the app in Italian the row of a failed file is in Italian too. The app has
+# the same sentence for a tool that exits (`app.errors.tool_exit`) and builds it
+# from `program`, `status` and `reason`, so it follows a later change of language.
+_ERR_I18N = {
+    "it": {
+        "tool_exit": "{program} è uscito con il codice {status}",
+        "ENOSPC": "Il disco è pieno",
+        "EACCES": "Permesso negato",
+        "EPERM": "Operazione non permessa",
+        "EROFS": "Il disco è in sola lettura",
+        "ENOENT": "Il file o la cartella non c’è",
+        "EIO": "Errore di lettura o scrittura sul disco",
+    },
+    "en": {
+        "tool_exit": "{program} exited with status {status}",
+        "ENOSPC": "The disk is full",
+        "EACCES": "Permission denied",
+        "EPERM": "Operation not permitted",
+        "EROFS": "The disk is read-only",
+        "ENOENT": "No such file or folder",
+        "EIO": "Input/output error on the disk",
+    },
+}
+
+
+def _err_tr(lang: Optional[str]) -> Dict[str, str]:
+    return _ERR_I18N.get(lang or "en") or _ERR_I18N["en"]
+
+
+def _os_error_text(e: OSError, lang: Optional[str]) -> Optional[str]:
+    """A known errno in the batch language, with the file it is about; None otherwise."""
+    name = errno.errorcode.get(e.errno or 0, "")
+    sentence = _err_tr(lang).get(name) if name else None
+    if not sentence:
+        return None
+    return f"{sentence}: {e.filename}" if e.filename else sentence
+
 
 def _short(text: str) -> Optional[str]:
     """The first non-empty line of `text`, cut to _TEXT_MAX; None when empty."""
@@ -417,12 +457,14 @@ def _short(text: str) -> Optional[str]:
     return None
 
 
-def _tool_failure(e: subprocess.CalledProcessError) -> Dict[str, Any]:
+def _tool_failure(e: subprocess.CalledProcessError, lang: Optional[str] = None) -> Dict[str, Any]:
     """
     A tool that exited with an error in the middle of the work (ffmpeg on a
     damaged video): `tool`, a `text` that names the tool, the exit status
     and its last real complaint on stderr (str(e) would be the whole
-    command line), and the whole story in `detail`.
+    command line), and the whole story in `detail`. The text is in `lang`
+    (the complaint stays as the tool wrote it); `program`, `status` and
+    `reason` let the app word it in its own language.
     """
     cmd = e.cmd if isinstance(e.cmd, (list, tuple)) else [e.cmd]
     name = Path(str(cmd[0])).name if cmd else "tool"
@@ -435,18 +477,20 @@ def _tool_failure(e: subprocess.CalledProcessError) -> Dict[str, Any]:
                if re.search(r"\berror\b|invalid|cannot|no such|denied", ln, re.I)
                and not re.match(r"Terminating thread|Task finished|Last message repeated", ln)]
     reason = (telling[-1:] or lines[-1:] or [""])[0]
-    text = f"{name} exited with status {e.returncode}" + (f": {reason}" if reason else "")
+    text = _err_tr(lang)["tool_exit"].format(program=name, status=e.returncode) + (f": {reason}" if reason else "")
     detail = f"{type(e).__name__}: {e}"
     if lines:
         # the last lines only: a damaged video repeats the same complaint for every packet
         detail += "\n" + "\n".join(lines[-12:])
-    out: Dict[str, Any] = {"text": text, "detail": detail}
+    out: Dict[str, Any] = {"text": text, "detail": detail, "program": name, "status": e.returncode}
+    if reason:
+        out["reason"] = _short(reason)
     if name in ("ffmpeg", "ffprobe"):
         out["tool"] = name
     return out
 
 
-def error_info(e: Exception, path: Optional[str] = None) -> Dict[str, Any]:
+def error_info(e: Exception, path: Optional[str] = None, lang: Optional[str] = None) -> Dict[str, Any]:
     """
     The error fields of an event: `code` (stable, translated by the app),
     `message` (= code), `error` (one line with the details, for logs),
@@ -459,7 +503,10 @@ def error_info(e: Exception, path: Optional[str] = None) -> Dict[str, Any]:
     for an unexpected exception it is str(e), or the type name when the
     exception has no message; for a tool that exited with an error it names
     the tool and the exit status. Unexpected exceptions are `unknown` with
-    `Type: message` as detail.
+    `Type: message` as detail. What the engine words itself (a tool that
+    exits, a known errno of the file system) is in `lang`, the language of
+    the batch ("it" | "en"; English by default); a message of Python stays
+    as it is.
     """
     if isinstance(e, EngineError):
         info: Dict[str, Any] = {"code": e.code, "message": e.code, "error": e.describe(),
@@ -470,8 +517,10 @@ def error_info(e: Exception, path: Optional[str] = None) -> Dict[str, Any]:
         info = {"code": "unknown", "message": "unknown", "error": f"unknown ({detail})",
                 "detail": detail}
         text = _short(str(e)) or type(e).__name__
+        if isinstance(e, OSError):
+            text = _short(_os_error_text(e, lang) or "") or text
         if isinstance(e, subprocess.CalledProcessError):
-            tool = _tool_failure(e)
+            tool = _tool_failure(e, lang)
             text = _short(tool.pop("text"))
             info.update(tool)
             info["error"] = f"unknown ({text})"

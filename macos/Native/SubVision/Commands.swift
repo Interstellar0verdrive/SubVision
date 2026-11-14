@@ -54,15 +54,24 @@ struct AppCommands: Commands {
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(!model.canRemoveSelection || model.tab != .process)
         }
-        CommandGroup(after: .pasteboard) {
-            Button(model.t("app.menu.select_all")) { model.selectAll() }
+        // One Select All (design note 44): the system's group is replaced, so Cut, Copy and
+        // Paste go to the first responder as before, and ⌘A selects the text being edited
+        // or, on the Video page, every row.
+        CommandGroup(replacing: .pasteboard) {
+            Button(model.t("app.menu.cut")) { NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) }
+                .keyboardShortcut("x", modifiers: .command)
+            Button(model.t("app.menu.copy")) { NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) }
+                .keyboardShortcut("c", modifiers: .command)
+            Button(model.t("app.menu.paste")) { NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) }
+                .keyboardShortcut("v", modifiers: .command)
+            Button(model.t("app.menu.select_all")) { model.selectAllInContext() }
                 .keyboardShortcut("a", modifiers: .command)
-                .disabled(model.tab != .process || model.videos.isEmpty)
         }
         CommandGroup(before: .sidebar) {
-            Button(model.t("app.sidebar.tab.process")) { model.showPage(.process) }.keyboardShortcut("1", modifiers: .command)
-            Button(model.t("app.sidebar.tab.review")) { model.showPage(.review) }.keyboardShortcut("2", modifiers: .command)
-            Button(model.t("app.sidebar.tab.fix")) { model.showPage(.fix) }.keyboardShortcut("3", modifiers: .command)
+            // The page shown has its check mark (board O9).
+            pageItem(.process, "app.sidebar.tab.process", "1")
+            pageItem(.review, "app.sidebar.tab.review", "2")
+            pageItem(.fix, "app.sidebar.tab.fix", "3")
             Divider()
             Button(model.t(model.sidebarShown ? "app.menu.hide_sidebar" : "app.menu.show_sidebar")) { model.toggleSidebar() }
                 .keyboardShortcut("s", modifiers: [.control, .command])
@@ -71,8 +80,6 @@ struct AppCommands: Commands {
             Button(model.t(model.inspectorOpen ? "app.menu.hide_inspector" : "app.menu.show_inspector")) { model.toggleInspector() }
                 .keyboardShortcut("i", modifiers: [.command, .option])
                 .disabled(model.tab != .process || !model.inspectorOverlays)
-            Button(model.t("app.menu.restore_defaults")) { model.resetAllParameters() }
-                .disabled(model.batch.running)
             Divider()
         }
         CommandMenu(model.t("app.menu.process")) {
@@ -85,6 +92,9 @@ struct AppCommands: Commands {
             Button(model.t("app.menu.stop_all")) { model.stopAll() }
                 .keyboardShortcut(".", modifiers: .command)
                 .disabled(!model.batch.running)
+            // Board O9: the parameters' defaults belong to the batch menu, not to View.
+            Button(model.t("app.menu.restore_defaults")) { model.resetAllParameters() }
+                .disabled(model.batch.running)
             Divider()
             // The Preview window (design note 80): on the row selected, else on the video shown last.
             Button(model.t("app.menu.preview")) { model.openPreview(model.selectedSingle?.id) }
@@ -111,7 +121,8 @@ struct AppCommands: Commands {
         CommandGroup(after: .windowArrangement) {
             Button(model.t("app.menu.main_window")) { openWindow(id: model.config.mainWindowID) }
                 .keyboardShortcut("0", modifiers: .command)
-            Button(model.t("app.menu.preview_window")) { model.openPreview(nil) }
+            // "Preview · <video>" (board O9): the video the window shows, or would show.
+            Button(previewWindowTitle) { model.openPreview(nil) }
                 .disabled(model.videos.isEmpty)
         }
         CommandGroup(replacing: .help) {
@@ -121,5 +132,16 @@ struct AppCommands: Commands {
                 .keyboardShortcut("l", modifiers: [.command, .option])
             Button(model.t("app.menu.report_problem")) { NSWorkspace.shared.open(AppConfig.issuesURL) }
         }
+    }
+
+    private var previewWindowTitle: String {
+        guard let name = model.previewVideo?.name else { return model.t("app.menu.preview_window") }
+        return model.t("app.menu.preview_window_named", ["name": name])
+    }
+
+    /// A page of View: a toggle, so the menu shows the check mark on the page in front.
+    private func pageItem(_ tab: Tab, _ key: String, _ shortcut: Character) -> some View {
+        Toggle(model.t(key), isOn: Binding(get: { model.tab == tab }, set: { _ in model.showPage(tab) }))
+            .keyboardShortcut(KeyEquivalent(shortcut), modifiers: .command)
     }
 }

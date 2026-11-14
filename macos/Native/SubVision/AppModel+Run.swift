@@ -299,6 +299,12 @@ extension AppModel {
     /// catalogue knows, else the engine's short text as it is. Never the
     /// "Something went wrong:" of `unknown`, never the exception's type name.
     func failureText(_ video: VideoItem) -> String {
+        // A tool that exited with an error: the app's own sentence, in the language of now;
+        // the complaint stays as the tool wrote it (11.3.4).
+        if let program = video.failProgram, let status = video.failStatus {
+            let sentence = t("app.errors.tool_exit", ["tool": program, "status": status])
+            return video.failReason.map { "\(sentence): \($0)" } ?? sentence
+        }
         if let code = video.errorCode, code != "unknown", localizer.has("app.errors.\(code)") {
             // The row takes the engine's short text; a long technical detail (a command line,
             // stderr) stays in the box under the steps.
@@ -405,6 +411,9 @@ extension AppModel {
         videos[i].failTool = f.tool
         videos[i].failPath = f.path
         videos[i].failLine = f.line
+        videos[i].failProgram = f.program
+        videos[i].failStatus = f.status
+        videos[i].failReason = f.reason
         if let log = f.log, !log.isEmpty { videos[i].logPath = log }
         videos[i].atStep = f.atStep ?? run.currentStep?.id
         videos[i].finished = Date()

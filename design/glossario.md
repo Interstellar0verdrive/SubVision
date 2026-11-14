@@ -1,6 +1,6 @@
 # Glossario EN/IT · SubVision 2.0
 
-Per chi scrive testi nell'app, nella guida e nelle note di release (F4–F7). I testi dell'app stanno solo nei cataloghi `macos/Native/SubVision/Resources/locales/{en,it}/app.json`: nessun testo fisso nel codice Swift. Dopo ogni modifica ai cataloghi lancia `python3 -I design/tavole/check_locales.py` (stesse chiavi, stessi segnaposto) e `python3 -I design/tavole/build_strings.py` (rigenera i testi delle tavole).
+Per chi scrive testi nell'app, nella guida e nelle note di release (F4–F7). I testi dell'app stanno solo nei cataloghi `macos/Native/SubVision/Resources/locales/{en,it}/app.json`: nessun testo fisso nel codice Swift. Dopo ogni modifica ai cataloghi lancia `python3 -I tools/check_locales.py` (stesse chiavi, stessi segnaposto, chiavi ordinate). Le tavole definitive sono nel file di design https://claude.ai/artifact/6hPbiA85ZJxGauwq1w4evQ.
 
 ## Regole di stile
 

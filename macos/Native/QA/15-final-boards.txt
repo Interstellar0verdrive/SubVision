@@ -1,0 +1,142 @@
+# The real windows against the final boards of the design file (design/snapshot/c2):
+# Preview A0, A1, A4, A5; N1 (the row in progress at 760 pt); Video E5 (stopped), E7 (banner and notes); Review RV1;
+# Sub fix F0–F4; the menus of O9 as text. Dark, and light for the main pages.
+# Fast profile with the signs band on; the two demo clips copied in $WORK.
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
+! mkdir -p extra && cp "$DEMO/sintel_ita_hardsub_demo.mp4" extra/sintel_copy.mp4 && printf 'x' > extra/cover.jpg && printf 'x' > extra/notes.txt && head -c 4000 /dev/urandom > extra/rotto.mkv
+! printf '1\n00:00:01,000 --> 00:00:02,500\nCiao a tutti.\n\n2\n00:00:03,000 --> 00:00:04,000\nCiao a tutti.\n' > "$WORK/sintel_ita_hardsub_demo-prova.srt"
+! printf 'not a subtitle\n' > "$WORK/rotto.srt"
+@launch
+wait-ready 600
+? ^ready
+lang it
+size 1360x840
+params fast
+inspector-set langHint it-IT
+inspector-set ocr.topBand true
+inspector-tab read
+theme dark
+# F0 · Sub fix without a file; RV0 · Review without videos
+tab fix
+capture $OUT/F0-dark.png
+theme light
+capture $OUT/F0-light.png
+tab review
+capture $OUT/RV0-light.png
+theme dark
+# The menus of O9 (text)
+menu-dump 0
+menu-dump 1
+menu-dump 2
+menu-dump 3
+menu-dump 4
+menu-dump 5
+menu-dump 6
+# E7 · the red banner, the skipped items, an unreadable video, the disk note
+tab process
+add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4,$WORK/extra,$WORK/extra/cover.jpg,$WORK/extra/notes.txt
+states
+vision off
+disk-free 6
+! sleep 1
+capture $OUT/E7-dark.png
+theme light
+capture $OUT/E7-light.png
+theme dark
+vision on
+disk-free off
+menu-dump 1
+menu-dump 2
+menu-dump 4
+# A1, A0 · the Preview window on a video never searched: it searches on its own
+# as it opens (A1); stopped before the first frame it is A0
+inspector-tab bands
+preview-open 3
+? ^ok · sintel_copy\.mp4
+preview-capture $OUT/A1-dark.png
+stop-frames
+preview-size 1280x860
+preview-capture $OUT/A0-dark.png
+preview-select 0
+? ^ok
+wait-frames 300
+? ^20 frames
+preview-capture $OUT/A2-dark.png
+# A4 · the test in the two bands
+try-ocr
+wait-ocr 120
+preview-capture $OUT/A4-dark.png
+theme light
+preview-capture $OUT/A4-light.png
+theme dark
+preview-state
+# A5 · a frame without text, signs off
+band-set top-band 0
+frame silent
+try-ocr
+wait-ocr 120
+preview-capture $OUT/A5-dark.png
+preview-state
+band-set top-band 1
+preview-close
+# E5 · a batch stopped: the first file stopped by Stop, then Stop All
+inspector-tab read
+remove-all
+add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4
+start
+wait-step 0 ocr 300
+? ^ok
+# N1 · the row in progress at 760 pt: the numbers of the steps are not cut (note 46)
+size 760x780
+capture $OUT/N1-running-dark.png
+size 1360x840
+stop-file 0
+wait-step 1 extract 300
+stop-all
+wait-batch 300
+summary-seen
+capture $OUT/E5-dark.png
+theme light
+capture $OUT/E5-light.png
+theme dark
+# RV1 · Review with a finished video
+process-again 0,1
+start
+wait-batch 900
+? ^batch done · done 2
+summary-seen
+tab review
+review-select 0
+capture $OUT/RV1-dark.png
+theme light
+capture $OUT/RV1-light.png
+theme dark
+# F1–F3 · Sub fix with a file, done, error; F4 narrow
+tab fix
+fix-open $WORK/sintel_ita_hardsub_demo-prova.srt
+capture $OUT/F1-dark.png
+theme light
+capture $OUT/F1-light.png
+theme dark
+fix-run
+wait-fix 60
+capture $OUT/F2-dark.png
+theme light
+capture $OUT/F2-light.png
+theme dark
+fix-open $WORK/rotto.srt
+fix-run
+wait-fix 60
+capture $OUT/F3-dark.png
+theme light
+capture $OUT/F3-light.png
+theme dark
+fix-open $WORK/sintel_ita_hardsub_demo-prova.srt
+size 760x780
+capture $OUT/F4-dark.png
+theme light
+capture $OUT/F4-light.png
+size 1360x840
+theme system
+params default
+inspector-tab read

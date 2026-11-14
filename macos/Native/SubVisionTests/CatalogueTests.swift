@@ -54,6 +54,13 @@ import Testing
         #expect(missing.isEmpty, "shell keys missing from the catalogues: \(missing)")
     }
 
+    /// 11.3.4: a tool that exits with an error is worded by the app, in the language of the app.
+    @Test func toolExitIsWordedInEachLanguage() {
+        let args: [String: Any] = ["tool": "ffmpeg", "status": 69]
+        #expect(Self.localizer(language: "en").t("app.errors.tool_exit", args) == "ffmpeg exited with status 69")
+        #expect(Self.localizer(language: "it").t("app.errors.tool_exit", args) == "ffmpeg è uscito con il codice 69")
+    }
+
     /// `{name}` fields of a text, as a multiset.
     static func fields(_ text: String) -> [String] {
         var out: [String] = []

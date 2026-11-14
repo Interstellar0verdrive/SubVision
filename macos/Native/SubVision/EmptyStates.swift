@@ -84,6 +84,8 @@ struct DropArea: View {
     var title: String
     var orText: String?
     var buttonTitle: String
+    /// The symbol before the button's title (board F0: a document).
+    var buttonSymbol: String? = nil
     /// The tooltip of the button, with its shortcut ("Choose videos to process · ⌘O"): no glyph in the button (design note 62).
     var help: String
     var footnote: String?
@@ -100,7 +102,9 @@ struct DropArea: View {
             Text(title).svFont(14, .semibold).foregroundStyle(targeted ? SV.primaryText : SV.text)
             HStack(spacing: 6) {
                 if let orText { Text(orText).svFont(13).foregroundStyle(SV.text2) }
-                Button(action: onOpen) { Text(buttonTitle) }
+                Button(action: onOpen) {
+                    if let buttonSymbol { Label(buttonTitle, systemImage: buttonSymbol) } else { Text(buttonTitle) }
+                }
                     .svButton(.primary, .regular)
                     .help(help)
             }
@@ -157,8 +161,9 @@ struct FixEmptyView: View {
                     .frame(maxWidth: FixReadyView.columnWidth, alignment: .leading)
                     .padding(.bottom, 14)
             }
-            DropArea(symbol: "text.badge.checkmark", title: model.t("app.fix.drop"), orText: model.t("app.process.empty.or_open"),
-                     buttonTitle: model.t("app.fix.open"), help: model.t("app.fix.open_help"),
+            // Board F0: a document, and "Choose SRT…" with its document too.
+            DropArea(symbol: "doc", title: model.t("app.fix.drop"), orText: model.t("app.process.empty.or_open"),
+                     buttonTitle: model.t("app.fix.open"), buttonSymbol: "doc", help: model.t("app.fix.open_help"),
                      footnote: model.t("app.fix.why"),
                      onOpen: { model.openSRTPanel() }, onDrop: { model.receiveFixDrop($0) })
         }

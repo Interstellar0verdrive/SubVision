@@ -483,12 +483,14 @@ def test_damaged_videos(sidecar: Sidecar, work: dict):
     assert a["code"] == "probe_failed" and a["text"] == "moov atom not found" and a["tool"] == "ffprobe"
     assert b["code"] == "unknown" and b["message"] == "unknown" and b["tool"] == "ffmpeg"
     assert b["at_step"] == "extract:bottom" and b["path"] == str(damaged)
-    assert b["text"].startswith("ffmpeg exited with status ") and "Decode error rate" in b["text"]
+    # the batch is in Italian: so is the engine's own sentence (11.3.4); the parts are there for the app
+    assert b["text"].startswith("ffmpeg è uscito con il codice ") and "Decode error rate" in b["text"]
+    assert b["program"] == "ffmpeg" and b["status"] != 0 and "Decode error rate" in b["reason"]
     assert b["detail"].startswith("CalledProcessError: ") and "Conversion failed!" in b["detail"]
     assert b["error"] == f"unknown ({b['text']})"
     for f, video in ((a, no_index), (b, damaged)):
         assert set(f) <= {"idx", "at_step", "log", "code", "message", "error", "text",
-                          "detail", "tool", "path", "line"}
+                          "detail", "tool", "path", "line", "program", "status", "reason"}
         assert f["log"] == str(video.with_suffix(".log"))
         assert f"ERRORE: {f['error']}" in Path(f["log"]).read_text(encoding="utf-8")
         assert not video.with_suffix(".srt").exists()

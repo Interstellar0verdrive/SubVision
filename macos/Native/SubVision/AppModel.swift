@@ -421,7 +421,7 @@ final class AppModel {
     func dockMenu() -> [DockMenuEntry] {
         var items: [DockMenuEntry] = []
         if batch.running {
-            items.append(.item(t("app.sidebar.batch_line", ["i": batch.index, "n": batch.total, "name": batch.name])) {})
+            items.append(.label(t("app.sidebar.batch_line", ["i": batch.index, "n": batch.total, "name": batch.name])))
             items.append(.item(t("app.common.stop_all")) { [weak self] in self?.stopAll() })
             items.append(.separator)
         }

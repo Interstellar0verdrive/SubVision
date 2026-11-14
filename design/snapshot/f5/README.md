@@ -1,5 +1,7 @@
 # Snapshot F5 (le pagine)
 
+> Le tavole di F3 citate qui (`design/tavole/`) non sono più nel ramo: le tavole definitive sono nel file di design https://claude.ai/artifact/6hPbiA85ZJxGauwq1w4evQ.
+
 Immagini a 2× della build Debug di F5, in chiaro e in scuro (`SUBVISION_SNAPSHOT_SCHEME=both`), fatte da `DebugSnapshot` dell'app con `SUBVISION_SNAPSHOT=<prefisso>` e `SUBVISION_SNAPSHOT_ADD=<video>`. Il nome è il codice della tavola in `design/tavole/png/`.
 
 ## Elabora in corso e inspector (5.1)

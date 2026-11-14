@@ -474,7 +474,7 @@ Totale: 141 chiavi, ognuna con una destinazione (verificato con uno script sulle
 
 ## 12. Tavole previste per 3.2
 
-Tavole HTML in `design/tavole/`, ognuna in versione **chiara e scura** con il suo PNG, testi EN e IT (una lingua per immagine, l'altra nella stessa pagina HTML). Codici: DS design system, T strumenti, E Elabora, I inspector, A Anteprima, F Sub fix, R report, ST Impostazioni, O avvisi e menu, N finestra stretta.
+(14/11/2026: `design/tavole/` non c'è più nel ramo; le tavole definitive sono nel file di design https://claude.ai/artifact/6hPbiA85ZJxGauwq1w4evQ.) Tavole HTML in `design/tavole/`, ognuna in versione **chiara e scura** con il suo PNG, testi EN e IT (una lingua per immagine, l'altra nella stessa pagina HTML). Codici: DS design system, T strumenti, E Elabora, I inspector, A Anteprima, F Sub fix, R report, ST Impostazioni, O avvisi e menu, N finestra stretta.
 
 | Tavola | Contenuto e stati coperti |
 |---|---|

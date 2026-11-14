@@ -100,7 +100,7 @@ struct ProcessView: View {
             }
             if !model.skippedItems.isEmpty {
                 NoteView(.yellow, title: model.tn("app.process.note.skipped", model.skippedItems.count),
-                         text: model.skippedItems.joined(separator: ", ")) {
+                         text: model.skippedItems.joined(separator: ", "), inlineTitle: true) {
                     Button { model.skippedItems = [] } label: {
                         Image(systemName: "xmark").svFont(11, .semibold).frame(width: 22, height: 22).contentShape(Rectangle())
                     }
@@ -173,7 +173,7 @@ struct ProcessView: View {
                 if !finished.isEmpty {
                     Text(outcomeText(finished, ready: ready.count)).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
                 } else {
-                    Text(model.tn("app.process.bar.ready", ready.count, ["t": model.durationText(model.totalDuration)]))
+                    Text(model.tn("app.process.bar.ready", ready.count, ["t": Localizer.clock(model.totalDuration)]))
                         .svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
                     if !narrow {
                         OutputsNote(text: model.t("app.process.bar.outputs"))
