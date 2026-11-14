@@ -207,7 +207,7 @@ struct InspectorView: View {
     /// The slim accent note with a lock (C2-P3): what the batch uses.
     private var lockedNote: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "lock").svFont(12.5)
+            Image(systemName: "lock").svFont(12.5).accessibilityHidden(true)
                 .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
             Text(model.t("app.inspector.locked")).svFont(12, leading: 1.45)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -264,7 +264,7 @@ struct InspectorView: View {
             }
             ParamRow(title: model.t("app.inspector.multi"), help: model.t("app.inspector.help.multi"),
                      defaultText: model.t("app.inspector.default_only", ["value": onOff(o.multiVariant)]), changed: multiVariant != o.multiVariant) {
-                InspectorSwitch(isOn: $multiVariant)
+                InspectorSwitch(isOn: $multiVariant, label: model.t("app.inspector.multi"))
             }
             ParamRow(title: model.t("app.inspector.conf"), help: model.t("app.inspector.help.conf"),
                      defaultText: model.t("app.inspector.default_range", ["value": model.localizer.number(o.minConfidence, decimals: 2), "range": "0,10–0,90"]),
@@ -339,7 +339,7 @@ struct InspectorView: View {
             HStack(spacing: 6) {
                 BandSwatch(color: BandColors.signs)
                 Text(model.t("app.inspector.sec.signs")).svFont(12.5, .semibold).foregroundStyle(SV.text)
-                InspectorSwitch(isOn: $topBand)
+                InspectorSwitch(isOn: $topBand, label: model.t("app.inspector.sec.signs"))
                     .padding(.leading, 6)
                     .help(model.t("app.inspector.help.sig_on"))
             }
@@ -392,7 +392,7 @@ struct InspectorView: View {
             }
             ParamRow(title: model.t("app.inspector.refine"), help: model.t("app.inspector.help.refine"),
                      defaultText: model.t("app.inspector.default_only", ["value": onOff(o.refineTiming)]), changed: refineTiming != o.refineTiming) {
-                InspectorSwitch(isOn: $refineTiming)
+                InspectorSwitch(isOn: $refineTiming, label: model.t("app.inspector.refine"))
             }
         }
         SectionLine()
@@ -400,7 +400,7 @@ struct InspectorView: View {
                          reset: { model.restoreDefaults([OcrKey.qcReport, OcrKey.qcGapWarn, OcrKey.useIgnore, OcrKey.useCorrections]) }) {
             ParamRow(title: model.t("app.inspector.report"), help: model.t("app.inspector.help.report"),
                      defaultText: model.t("app.inspector.default_only", ["value": onOff(o.qcReport)]), changed: qcReport != o.qcReport) {
-                InspectorSwitch(isOn: $qcReport)
+                InspectorSwitch(isOn: $qcReport, label: model.t("app.inspector.report"))
             }
             ParamRow(title: model.t("app.inspector.gap"), help: model.t("app.inspector.help.gap"),
                      defaultText: model.t("app.inspector.default_only", ["value": seconds(o.qcGapWarn, decimals: 0)]), changed: differs(qcGapWarn, o.qcGapWarn)) {
@@ -410,12 +410,12 @@ struct InspectorView: View {
             ParamRow(title: model.t("app.inspector.ignore"), help: model.t("app.inspector.help.ignore"),
                      defaultText: model.t("app.inspector.default_only", ["value": onOff(true)]), changed: !useIgnore,
                      note: listNote(model.lists?.ignore, key: "app.inspector.phrases")) {
-                InspectorSwitch(isOn: $useIgnore)
+                InspectorSwitch(isOn: $useIgnore, label: model.t("app.inspector.ignore"))
             }
             ParamRow(title: model.t("app.inspector.corr"), help: model.t("app.inspector.help.corr"),
                      defaultText: model.t("app.inspector.default_only", ["value": onOff(true)]), changed: !useCorrections,
                      note: listNote(model.lists?.corrections, key: "app.inspector.corrections")) {
-                InspectorSwitch(isOn: $useCorrections)
+                InspectorSwitch(isOn: $useCorrections, label: model.t("app.inspector.corr"))
             }
         }
     }
@@ -586,9 +586,11 @@ struct ParamRow<Control: View>: View {
 /// A system switch in the deep cyan of the system controls (`SV.sysAccent`, design note 53).
 struct InspectorSwitch: View {
     @Binding var isOn: Bool
+    /// What VoiceOver says for the switch (the visible title sits beside it, not in it).
+    var label: String = ""
 
     var body: some View {
-        Toggle("", isOn: $isOn).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
+        Toggle(label, isOn: $isOn).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
     }
 }
 

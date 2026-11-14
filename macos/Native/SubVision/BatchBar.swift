@@ -36,6 +36,9 @@ struct BatchBar: View {
             Spacer(minLength: 8)
             SegmentedProgressBar(weights: weights, fraction: batch.fraction ?? 0)
                 .frame(width: barWidth)
+                .accessibilityElement()
+                .accessibilityLabel(model.t("app.process.batchbar.progress_label"))
+                .accessibilityValue(model.t("app.process.batchbar.percent", ["n": Int(((batch.fraction ?? 0) * 100).rounded())]))
             Text(model.t("app.process.batchbar.percent", ["n": Int(((batch.fraction ?? 0) * 100).rounded())]))
                 // The font's own line box, centred on the bar like the line on the left (the fixed
                 // box of `svFont` set it a point low).

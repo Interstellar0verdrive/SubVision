@@ -128,6 +128,10 @@ struct VideoRow: View {
         .help(video.path)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(focused ? .isSelected : [])
+        // The drawer opens with a click on the row; VoiceOver gets it as the row's action.
+        .accessibilityAction(named: model.t(open ? "app.process.row.close_drawer" : "app.process.row.open_drawer")) {
+            withAnimation(.easeOut(duration: 0.2)) { model.toggleDrawer(video.id) }
+        }
     }
 
     private var head: some View {

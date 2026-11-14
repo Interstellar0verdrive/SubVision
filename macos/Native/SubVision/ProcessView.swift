@@ -265,7 +265,7 @@ struct VideoDropStrip: View {
         HStack(spacing: 10) {
             // Centred on the strip: the icon, the sentence (its own line box, capitals in the
             // middle) and the button; the formats, smaller, sit on the sentence's baseline.
-            Image(systemName: "film").svControlFont(13).foregroundStyle(targeted ? SV.primaryText : SV.text2)
+            Image(systemName: "film").svControlFont(13).foregroundStyle(targeted ? SV.primaryText : SV.text2).accessibilityHidden(true)
             Text(model.t("app.process.list.drop_strip")).svControlFont(12.5).foregroundStyle(targeted ? SV.primaryText : SV.text2)
                 .fixedSize(horizontal: false, vertical: true)
             Button { model.openVideos() } label: { Label(model.t("app.process.list.choose"), systemImage: "folder") }

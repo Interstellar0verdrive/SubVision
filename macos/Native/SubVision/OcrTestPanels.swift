@@ -186,7 +186,7 @@ struct OcrTestPanel: View {
             VStack(spacing: 6) {
                 HStack(spacing: 8) {
                     Text(model.t("app.preview.signs_turn_on")).svFont(12).foregroundStyle(SV.text)
-                    InspectorSwitch(isOn: $signsOn)
+                    InspectorSwitch(isOn: $signsOn, label: model.t("app.preview.signs_turn_on"))
                         .disabled(model.batch.running)
                         .help(model.t("app.inspector.help.sig_on"))
                 }

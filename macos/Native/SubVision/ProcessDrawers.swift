@@ -633,7 +633,7 @@ struct StepCell: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            icon.frame(width: 14, height: 14)
+            icon.frame(width: 14, height: 14).accessibilityHidden(true)
             SVBar(fraction, height: 4, fill: fill, track: SV.trackSoft).frame(width: barWidth)
             Text(text).svFont(11, mono: true).foregroundStyle(color).lineLimit(1)
         }
