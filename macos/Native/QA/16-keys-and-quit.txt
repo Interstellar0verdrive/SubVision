@@ -1,5 +1,5 @@
 # The menu bar's shortcuts with the app's state of now (manual tests, 14/11):
-# ⌫ and ⌘Z on a row, ⌘Y, ⌘→ ⌘← in Preview, ⌘↩, ⌘. and ⌥⌘. pressed without
+# ⌫ and ⌘Z on a row, ⌘Y, ⌘→ ⌘← ⌘↓ ⌘↑ in Preview, ⌘↩, ⌘. and ⌥⌘. pressed without
 # opening a menu first (they did nothing until the menu had been opened once),
 # then ⌘Q during the batch: O3 is not modal, the batch goes on under it and
 # Esc cancels it. Key presses go through `key` (posted to the event queue,
@@ -30,6 +30,14 @@ preview-state
 key cmd+left
 preview-state
 ? index 1
+# ⌘↓ ⌘↑: the video below and above (C3-09); b.mp4 searches by itself
+key cmd+down
+preview-state
+? video b\.mp4
+wait-frames 300
+key cmd+up
+preview-state
+? video a\.mp4 .* index 1
 preview-close
 select
 key cmd+return main

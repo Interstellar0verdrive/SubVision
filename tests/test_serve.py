@@ -368,9 +368,7 @@ def test_preview_frames_busy_then_done(sidecar: Sidecar, work: dict):
     since = len(sidecar.events)
     assert sidecar.call("preview.frames", {"video": str(clip), "params": PARAMS,
                                            "n": 20, "tries": 3}) == {"started": True}
-    # a second long job is refused while the first runs
-    assert sidecar.call("batch.start", {"videos": [str(clip)], "params": PARAMS}) == \
-        {"started": False, "reason": "busy"}
+    # a second preview job is refused while the first runs (a batch is not: see below)
     assert sidecar.call("preview.frames", {"video": str(clip), "params": PARAMS}) == \
         {"started": False, "reason": "busy"}
     # ...but Sub fix is never subject to busy
@@ -388,7 +386,9 @@ def test_preview_frames_busy_then_done(sidecar: Sidecar, work: dict):
     assert str(work["state"] / "tmp" / "preview") in frames[0]["path"]
     progress = [d for e, d in sidecar.events[since:] if e == "preview.progress"]
     assert progress and progress[-1]["done"] == 20
-    assert set(progress[-1]) == {"done", "total", "found", "found_top"}
+    assert set(progress[-1]) == {"done", "total", "found", "found_top", "zone", "frame"}
+    assert {d["zone"] for d in progress} == set(range(20))
+    assert all(f["zone"] == i for i, f in enumerate(frames))
     assert progress[-1]["found"] == len(with_text)
     assert progress[-1]["found_top"] == sum("top" in f["bands"] for f in frames)
     work["frame"] = with_text[0]["path"]
@@ -410,10 +410,40 @@ def test_preview_stop(sidecar: Sidecar, work: dict):
     assert sidecar.call("preview.frames", {"video": str(clip), "params": PARAMS}) == {"started": True}
     sidecar.wait_event("preview.progress", since=since, timeout=60)
     assert sidecar.call("preview.stop") == {"ok": True}
-    sidecar.wait_event("preview.stopped", since=since, timeout=30)
+    _, stopped = sidecar.wait_event("preview.stopped", since=since, timeout=30)
+    assert stopped == {"reason": "user"}
     time.sleep(0.3)
     assert _ffmpeg_on(clip.name) == []
     assert sidecar.call("preview.stop") == {"ok": False, "reason": "no_preview"}
+    # resumed on the zones it had not searched: the others are not searched again
+    seen = {d["zone"] for e, d in sidecar.events[since:] if e == "preview.progress"}
+    left = [z for z in range(20) if z not in seen]
+    since = len(sidecar.events)
+    assert sidecar.call("preview.frames", {"video": str(clip), "params": PARAMS,
+                                           "zones": left}) == {"started": True}
+    _, done = sidecar.wait_event("preview.done", since=since, timeout=120)
+    assert [f["zone"] for f in done["frames"]] == left
+    progress = [d for e, d in sidecar.events[since:] if e == "preview.progress"]
+    assert sorted(d["done"] for d in progress) == list(range(21 - len(left), 21))
+    assert _bad(sidecar, "preview.frames", {"video": str(clip), "zones": "1,2"})["data"]["field"] == "zones"
+
+
+def test_batch_start_stops_the_preview(sidecar: Sidecar, work: dict):
+    """C3 (board A1): a batch started while the frames are searched stops the search and starts."""
+    clip = work["clips"][1]
+    since = len(sidecar.events)
+    assert sidecar.call("preview.frames", {"video": str(clip), "params": PARAMS}) == {"started": True}
+    sidecar.wait_event("preview.progress", since=since, timeout=60)
+    assert sidecar.call("batch.start", {"videos": [str(clip)], "params": PARAMS,
+                                        "lang": "en"}) == {"started": True}
+    names = [e for e, _ in sidecar.events[since:]]
+    assert "preview.stopped" in names and "preview.done" not in names
+    _, stopped = sidecar.wait_event("preview.stopped", since=since, timeout=5)
+    assert stopped == {"reason": "batch"}
+    _, done = sidecar.wait_event("batch.done", since=since, timeout=180)
+    assert done["done"] == 1
+    names = [e for e, _ in sidecar.events[since:]]
+    assert names.index("preview.stopped") < names.index("batch.file.started")
 
 
 def test_srt_fix_errors(sidecar: Sidecar, work: dict):

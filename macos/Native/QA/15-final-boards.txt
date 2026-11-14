@@ -48,26 +48,31 @@ disk-free off
 menu-dump 1
 menu-dump 2
 menu-dump 4
-# A1, A0 · the Preview window on a video never searched: it searches on its own
-# as it opens (A1); stopped before the first frame it is A0
-inspector-tab bands
+# A0, A1 · the Preview page on a video never searched: it searches on its own
+# as it opens (A0); stopped, it keeps what it found and offers «Riprova» (A1).
+# A0 is captured with the search held at zone 12 (frames-progress): the real
+# one on the demo clip is over before a capture ends.
 preview-open 3
-? ^ok · sintel_copy\.mp4
-preview-capture $OUT/A1-dark.png
+? ^ok · sintel_copy\.mp4 · searching$
 stop-frames
-preview-size 1280x860
-preview-capture $OUT/A0-dark.png
+? complete|stopped user
+capture $OUT/A1-dark.png
+frames-progress 12 9
+? search running
+capture $OUT/A0-dark.png
+frames-progress off
+? search idle
 preview-select 0
 ? ^ok
 wait-frames 300
 ? ^20 frames
-preview-capture $OUT/A2-dark.png
+capture $OUT/A2-dark.png
 # A4 · the test in the two bands
 try-ocr
 wait-ocr 120
-preview-capture $OUT/A4-dark.png
+capture $OUT/A4-dark.png
 theme light
-preview-capture $OUT/A4-light.png
+capture $OUT/A4-light.png
 theme dark
 preview-state
 # A5 · a frame without text, signs off
@@ -75,10 +80,11 @@ band-set top-band 0
 frame silent
 try-ocr
 wait-ocr 120
-preview-capture $OUT/A5-dark.png
+capture $OUT/A5-dark.png
 preview-state
 band-set top-band 1
 preview-close
+? ^ok
 # E5 · a batch stopped: the first file stopped by Stop, then Stop All
 inspector-tab read
 remove-all

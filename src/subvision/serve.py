@@ -32,14 +32,20 @@ progress is stopped, whichever it is; `scope: "all"` ignores `file`.
 Replies: `{"ok": true}`, `{"ok": false, "reason": "no_batch"}` when no
 batch is running.
 
-`preview.frames {video, params, n?, tries?}` starts the preview job
-(`{"started": true}`, or `{"started": false, "reason": "busy"}`); its
-events are `preview.progress {done, total, found, found_top}` after every
-zone, then `preview.done {frames}`, `preview.stopped {}` or
-`preview.failed {error, ...}`. Every frame is `{path, bands, has_text,
-width, height, ts}`: `bands` lists the bands with text, a subset of
-`["bottom", "top"]` in this order (`[]` = no text; "top" only when the
+`preview.frames {video, params, n?, tries?, zones?}` starts the preview
+job (`{"started": true}`, or `{"started": false, "reason": "busy"}`); its
+events are `preview.progress {done, total, found, found_top, zone, frame}`
+after every zone (`frame` is the zone's frame, null when the zone could
+not be read), then `preview.done {frames}`, `preview.stopped {reason}` or
+`preview.failed {error, ...}`. Every frame is `{zone, path, bands,
+has_text, width, height, ts}`: `bands` lists the bands with text, a subset
+of `["bottom", "top"]` in this order (`[]` = no text; "top" only when the
 signs band is on), `has_text` is `bands` non-empty (see preview.py).
+`zones` (0-based indices of the `n` zones) resumes a search that stopped:
+only those zones are searched, the frames of the others stay. `reason` of
+`preview.stopped` is "user" (`preview.stop`) or "batch": `batch.start`
+while a preview job runs stops it (the progress events already carry its
+frames) and starts the batch once it has ended, instead of `busy`.
 
 The events of a batch are described in batch.py; `batch.file.failed`
 carries `code`, `text` (short, for the row of the file), `detail`, `log`
@@ -473,9 +479,35 @@ def _batch_start(params: dict) -> dict:
                                  "skipped": len(videos), "elapsed": 0.0,
                                  "error": f"{type(e).__name__}: {e}", **_unknown_error(e)})
 
+    # A batch takes precedence over the preview's frame search (C3, board A1):
+    # the search stops, its frames so far are with the app, "Retry" resumes it.
+    _stop_preview_for_batch()
     if not _start_job("batch", control, work):
         return {"started": False, "reason": "busy"}
     return {"started": True}
+
+
+PREVIEW_YIELD_TIMEOUT = 15.0   # seconds batch.start waits for a stopped preview job to end
+
+
+class _PreviewStop(threading.Event):
+    """The stop of a preview job, with why it was set ("user" or "batch")."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.reason = "user"
+
+    def stop(self, reason: str) -> None:
+        self.reason = reason
+        self.set()
+
+
+def _stop_preview_for_batch() -> None:
+    job = _current_job("preview")
+    if job is None:
+        return
+    job["stop"].stop("batch")
+    job["thread"].join(PREVIEW_YIELD_TIMEOUT)
 
 
 def _batch_stop(params: dict) -> dict:
@@ -506,15 +538,19 @@ def _preview_frames(params: dict) -> dict:
     p = _params_from(params.get("params"))
     n = _number(params, "n", 20, int)
     tries = _number(params, "tries", 3, int)
-    stop = threading.Event()
+    zones = params.get("zones")
+    if zones is not None and (not isinstance(zones, list)
+                              or not all(isinstance(z, int) and not isinstance(z, bool) for z in zones)):
+        raise bad_params("zones", "must be a list of zone indices")
+    stop = _PreviewStop()
 
     def work() -> None:
         try:
             frames = preview.find_frames(video, p, n=n, tries=tries, emit=_emit,
-                                         stop=stop, state=_paths().root)
+                                         stop=stop, state=_paths().root, zones=zones)
             _emit("preview.done", {"frames": frames})
         except Stopped:
-            _emit("preview.stopped", {})
+            _emit("preview.stopped", {"reason": stop.reason})
         except EngineError as e:
             _emit("preview.failed", {"error": e.code, **_engine_error(e).payload()})
         except Exception as e:  # noqa: BLE001
@@ -530,7 +566,7 @@ def _preview_stop(_params: dict) -> dict:
     job = _current_job("preview")
     if job is None:
         return {"ok": False, "reason": "no_preview"}
-    job["stop"].set()
+    job["stop"].stop("user")
     return {"ok": True}
 
 

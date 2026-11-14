@@ -339,23 +339,32 @@ public struct BatchDone: Decodable, Sendable, Equatable {
 }
 
 public struct PreviewProgress: Decodable, Sendable, Equatable {
+    /// Zones searched, of `total` (a resumed search counts the zones it did not search again).
     public var done: Int
     public var total: Int
-    /// Frames with text in any band.
+    /// Frames with text in any band (of the zones this search looked at).
     public var found: Int
     /// Frames with text in the signs band (`found_top`; nil from an engine without it).
     public var foundTop: Int?
+    /// The zone just searched, 0-based (nil from an engine before C3).
+    public var zone: Int?
+    /// Its frame; nil when no timestamp of the zone could be read.
+    public var frame: PreviewFrame?
 
-    public init(done: Int, total: Int, found: Int, foundTop: Int? = nil) {
+    public init(done: Int, total: Int, found: Int, foundTop: Int? = nil, zone: Int? = nil, frame: PreviewFrame? = nil) {
         self.done = done
         self.total = total
         self.found = found
         self.foundTop = foundTop
+        self.zone = zone
+        self.frame = frame
     }
 }
 
 /// A whole frame in `<state>/tmp/preview/<hash>/`: the app draws the bands.
 public struct PreviewFrame: Decodable, Sendable, Equatable {
+    /// The zone of the video it comes from, 0-based (nil from an engine before C3).
+    public var zone: Int?
     public var path: String
     /// The bands with text, in this order: `bottom`, `top` (empty when none has text;
     /// `top` only with the signs band on). Both when the frame has a line and a sign.
@@ -367,10 +376,28 @@ public struct PreviewFrame: Decodable, Sendable, Equatable {
 
     public var hasDialogue: Bool { bands.contains("bottom") }
     public var hasSigns: Bool { bands.contains("top") }
+
+    public init(zone: Int? = nil, path: String, bands: [String], width: Int = 1920, height: Int = 1080, ts: Double = 0) {
+        self.zone = zone
+        self.path = path
+        self.bands = bands
+        self.hasText = !bands.isEmpty
+        self.width = width
+        self.height = height
+        self.ts = ts
+    }
 }
 
 public struct PreviewDone: Decodable, Sendable, Equatable {
     public var frames: [PreviewFrame]
+}
+
+/// `preview.stopped`: why the search stopped before its end.
+public struct PreviewStopped: Decodable, Sendable, Equatable {
+    /// "user" (`preview.stop`) or "batch" (a batch started); nil from an engine before C3.
+    public var reason: String?
+
+    public init(reason: String? = nil) { self.reason = reason }
 }
 
 public struct PreviewFailed: Decodable, Sendable, Equatable {
@@ -393,7 +420,7 @@ public enum EngineMessage: Sendable, Equatable {
     case batchDone(BatchDone)
     case previewProgress(PreviewProgress)
     case previewDone(PreviewDone)
-    case previewStopped
+    case previewStopped(PreviewStopped)
     case previewFailed(PreviewFailed)
     /// The client's own events.
     case engineStarted(pid: Int)
@@ -422,7 +449,7 @@ extension EngineEvent {
         case "batch.done": return .batchDone(try decode())
         case "preview.progress": return .previewProgress(try decode())
         case "preview.done": return .previewDone(try decode())
-        case "preview.stopped": return .previewStopped
+        case "preview.stopped": return .previewStopped(try decode())
         case "preview.failed": return .previewFailed(try decode())
         case "engine.started": return .engineStarted(pid: try decode(as: Pid.self).pid)
         case "engine.exited": return .engineExited(status: try decode(as: Status.self).status)
@@ -491,8 +518,11 @@ extension EngineClient {
         return try await call(EngineMethod.batchStop, params: params)
     }
 
-    public func previewFrames(video: String, params: OcrParams, n: Int = 20, tries: Int = 3) async throws -> StartReply {
-        try await call(EngineMethod.previewFrames, params: ["video": video, "params": params.dictionary, "n": n, "tries": tries])
+    /// `zones` resumes a search that stopped: only those zones (0-based) are searched.
+    public func previewFrames(video: String, params: OcrParams, n: Int = 20, tries: Int = 3, zones: [Int]? = nil) async throws -> StartReply {
+        var args: [String: Any] = ["video": video, "params": params.dictionary, "n": n, "tries": tries]
+        if let zones { args["zones"] = zones }
+        return try await call(EngineMethod.previewFrames, params: args)
     }
 
     public func previewStop() async throws -> StopReply {

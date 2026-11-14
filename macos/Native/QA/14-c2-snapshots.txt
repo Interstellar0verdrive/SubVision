@@ -35,32 +35,44 @@ capture $OUT/C2-P3-light.png
 theme dark
 capture $OUT/C2-P3-dark.png
 inspector-tab bands
+# The Preview page (C3-09): A2 before the test, A3 stale after it.
 preview-open 0
 ? ^ok · sintel_ita_hardsub_demo\.mp4
 wait-frames 300
 ? ^20 frames
-preview-size 1280x860
-preview-capture $OUT/C2-A1-dark.png
+capture $OUT/C2-A1-dark.png
 theme light
-preview-capture $OUT/C2-A1-light.png
+capture $OUT/C2-A1-light.png
 try-ocr
 wait-ocr 120
 inspector-set ocr.topKeepPct 26
-preview-capture $OUT/C2-A2-light.png
+capture $OUT/C2-A2-light.png
 theme dark
-preview-capture $OUT/C2-A2-dark.png
+capture $OUT/C2-A2-dark.png
 inspector-set ocr.topKeepPct 22
+preview-video down
+? ^ok · sintel_eng_hardsub_demo\.mp4 · searching$
+wait-frames 300
+? ^20 frames
+preview-close
+? ^ok
 inspector-tab read
 start
 ? status ready
 wait-step 0 ocr 300
 ? ^ok
 capture $OUT/C2-V3-dark.png
-preview-capture $OUT/C2-A3-dark.png
 theme light
 capture $OUT/C2-V3-light.png
 theme dark
+# A6: the page during the batch (the test off, the panel locked, the batch bar).
+preview-open 1
+? ^ok · sintel_eng_hardsub_demo\.mp4$
+preview-state
+? complete .* batch true
+capture $OUT/C2-A3-dark.png
 preview-close
+? ^ok
 wait-batch 900
 ? ^batch done · done 2
 capture-all $OUT/C2-V5-dark.png

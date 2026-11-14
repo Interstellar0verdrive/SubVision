@@ -5,8 +5,9 @@
 // confidence, agreement and readings under it, the kind of OCR and the time
 // in its header; before a test the prompt, during the batch when the test
 // comes back, the spinner while it reads, the empty band, the error, the
-// signs band off with its switch, and "Superato" over a result whose
-// parameters changed since (the result at half strength).
+// signs band off with its switch, and over a result whose parameters
+// changed since a grey note that says so with «Riprova OCR con i nuovi
+// parametri» (C3-11; the old result at half strength until it is redone).
 
 import AppKit
 import SVShell
@@ -48,12 +49,14 @@ struct OcrTestPanel: View {
         let content = self.content
         VStack(alignment: .leading, spacing: 6) {
             header(content)
-            if stale(content) {
-                staleNote
+            // The panel keeps the height the block gives it: what does not fit (the grey note of
+            // C3-11 over a result, in a short window) scrolls under the header.
+            ViewThatFits(in: .vertical) {
+                body(content)
+                ScrollView(.vertical) { body(content).fixedSize(horizontal: false, vertical: true) }
+                    .scrollIndicators(.automatic)
             }
-            contentView(content)
-                .opacity(stale(content) ? 0.5 : 1)
-                .frame(maxHeight: .infinity, alignment: .top)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.vertical, 12)
@@ -61,6 +64,18 @@ struct OcrTestPanel: View {
         .background(RoundedRectangle(cornerRadius: SV.Radius.card).fill(SV.surface))
         .overlay(RoundedRectangle(cornerRadius: SV.Radius.card).strokeBorder(SV.line))
         .clipShape(RoundedRectangle(cornerRadius: SV.Radius.card))
+    }
+
+    /// The note when the result is stale, then the result (dimmed until it is redone).
+    private func body(_ content: Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if stale(content) {
+                staleNote
+            }
+            contentView(content)
+                .opacity(stale(content) ? 0.5 : 1)
+                .frame(maxHeight: .infinity, alignment: .top)
+        }
     }
 
     private var content: Content {
@@ -124,9 +139,8 @@ struct OcrTestPanel: View {
     private func contentView(_ content: Content) -> some View {
         switch content {
         case .prompt:
-            // Board A0: before the frames, what comes first.
-            centred(symbol: "magnifyingglass",
-                    text: model.t(model.previewFrames.isEmpty ? "app.preview.panel_no_frames" : "app.preview.panel_prompt"))
+            // Boards A0, A1: before the frames, what comes first; with frames but none shown, pick one.
+            centred(symbol: "magnifyingglass", text: model.t(promptKey))
         case .batch:
             centred(symbol: "magnifyingglass", text: model.t("app.preview.panel_batch"))
         case .reading:
@@ -184,6 +198,12 @@ struct OcrTestPanel: View {
         }
     }
 
+    private var promptKey: String {
+        if model.previewFrame != nil { return "app.preview.panel_prompt" }
+        if model.previewFrames.isEmpty || model.isSearchingPreviewVideo { return "app.preview.panel_no_frames" }
+        return "app.preview.panel_choose"
+    }
+
     /// `.panel2 .empty`: a symbol and a short text in the middle of the panel.
     private func centred(symbol: String, text: String) -> some View {
         HStack(spacing: 8) {
@@ -229,21 +249,37 @@ struct OcrTestPanel: View {
         return reads > 1 ? model.tn("app.preview.conf_reads", reads, values) : model.t("app.preview.conf", values)
     }
 
-    /// `.note.yellow.slim`: "**Superato:** rifai la prova."
+    /// C3-11: a neutral note (grey, an info symbol, not the yellow of the defaults) that says the
+    /// parameters changed after this test and the text under it is from before, with the button
+    /// that runs the test again on this frame (⌘T, as Try OCR).
     private var staleNote: some View {
-        var text = AttributedString(model.t("app.preview.stale_title"))
-        text.inlinePresentationIntent = .stronglyEmphasized
-        text += AttributedString(" " + model.t("app.preview.stale"))
-        return HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle").svFont(12)
-            Text(text).svFont(12).fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "info.circle").svFont(12)
+                Text(model.t("app.preview.stale_text")).svFont(12, leading: 1.4).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(SV.text2)
+            // A narrow panel: the short label, so the panel never grows past its half of the block.
+            ViewThatFits(in: .horizontal) {
+                retryButton("app.preview.stale_retry").padding(.leading, 20)
+                retryButton("app.preview.stale_retry")
+                retryButton("app.preview.stale_retry_short")
+            }
         }
-        .foregroundStyle(SV.yellowText)
-        .padding(.vertical, 7)
+        .padding(.vertical, 8)
         .padding(.horizontal, 10)
-        .background(RoundedRectangle(cornerRadius: SV.Radius.field).fill(SV.yellowBg))
-        .overlay(RoundedRectangle(cornerRadius: SV.Radius.field).strokeBorder(SV.yellowLine))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: SV.Radius.field).fill(SVTone.neutral.background))
+        .overlay(RoundedRectangle(cornerRadius: SV.Radius.field).strokeBorder(SVTone.neutral.line))
+    }
+
+    private func retryButton(_ key: String) -> some View {
+        Button { model.tryOCR() } label: { Label(model.t(key), systemImage: "arrow.clockwise") }
+            .svButton(.secondary, .small)
+            .fixedSize()
+            .disabled(!model.canTryOCR)
+            .help(model.t("app.preview.stale_retry_help"))
     }
 
     private func copy(_ text: String) {

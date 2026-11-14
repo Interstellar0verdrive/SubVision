@@ -64,7 +64,17 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
         guard case .previewDone(let p) = done else { Issue.record("\(done)"); return }
         #expect(p.frames.map(\.hasText) == [true, false, true] && p.frames[1].bands.isEmpty)
         #expect(p.frames.map(\.hasDialogue) == [true, false, false] && p.frames.map(\.hasSigns) == [true, false, true])
-        #expect(try event("preview.stopped", "{}") == .previewStopped)
+        #expect(try event("preview.stopped", "{}") == .previewStopped(PreviewStopped()))
+        #expect(try event("preview.stopped", #"{"reason":"batch"}"#) == .previewStopped(PreviewStopped(reason: "batch")))
+        // C3: every zone's event carries its frame (null when the zone could not be read).
+        let zone = try event("preview.progress", #"""
+            {"done":4,"total":20,"found":3,"found_top":0,"zone":7,
+             "frame":{"zone":7,"path":"/s/tmp/preview/ab/007.jpg","bands":["bottom"],"has_text":true,"width":1280,"height":544,"ts":21.4}}
+            """#)
+        guard case .previewProgress(let p) = zone else { Issue.record("\(zone)"); return }
+        #expect(p.zone == 7 && p.frame?.zone == 7 && p.frame?.path.hasSuffix("007.jpg") == true && p.frame?.hasDialogue == true)
+        let empty = try event("preview.progress", #"{"done":5,"total":20,"found":3,"found_top":0,"zone":2,"frame":null}"#)
+        #expect(empty == .previewProgress(PreviewProgress(done: 5, total: 20, found: 3, foundTop: 0, zone: 2)))
         #expect(try event("preview.failed", #"{"error":"invalid_duration","message":"invalid_duration (path=/v)"}"#)
                 == .previewFailed(PreviewFailed(error: "invalid_duration", message: "invalid_duration (path=/v)")))
 

@@ -61,7 +61,17 @@ struct Page: View {
             EngineStatusView(status: model.status, texts: model.texts, retry: { model.retry() }, showLog: { model.showLog() })
         } else {
             switch model.tab {
-            case .process: ProcessView()
+            case .process:
+                // C3-09 (P-A): the Preview page slides over the list, which stays as it was
+                // under it (scroll, drawers) for the way back.
+                ZStack {
+                    ProcessView()
+                        .allowsHitTesting(!model.preview.shown)
+                        .accessibilityHidden(model.preview.shown)
+                    if model.preview.shown {
+                        PreviewPage()
+                    }
+                }
             case .review: ReviewPage()
             case .fix: FixPage()
             }
