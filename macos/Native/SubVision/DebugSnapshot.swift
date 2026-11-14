@@ -5,8 +5,8 @@
 // (comma-separated files or folders) fills the list first;
 // `SUBVISION_SNAPSHOT_SETTINGS=1` renders the four Settings tabs;
 // `SUBVISION_SNAPSHOT_FIX=<srt>` runs Sub fix on that file and captures F1–F3;
-// `SUBVISION_SNAPSHOT_REPORT=<report.html>` opens that report and captures
-// the window of R1–R3 (the export of R2 writes an SRT next to it).
+// `SUBVISION_SNAPSHOT_REPORT=<report.html>` opens that report in the Review
+// page and captures R1–R3 (the export of R2 writes an SRT next to it).
 // Adapted from the DebugSnapshot of the native macOS app of AnimeUp (by the
 // same author); the renderers are the shell's.
 
@@ -377,34 +377,33 @@ enum DebugSnapshot {
         try? FileManager.default.removeItem(at: empty)
     }
 
-    /// The report window of R1–R3 (F5.4): open, after an export (the toast),
-    /// the file gone, the loading spinner, and the alert of a failed save.
+    /// The report in the Review page (R1–R3, C3-07): loading, open, after an export
+    /// (the report bar says "Salvato"), the file gone, and the alert of a failed save.
     private static func reportWindows(_ model: AppModel, report: URL, base: String, schemes: [ColorScheme]) async {
-        let window = model.openReport(report)
-        // R3 bottom: the spinner, while the page loads (the capture may come too late).
-        if window.session.phase == .loading {
-            _ = await captureReport(window, "\(base)-report-r3-loading.png", schemes: schemes, settle: .milliseconds(50))
+        model.openReport(report)
+        guard let session = model.report.session else { return }
+        // R3 top left: the spinner, while the page loads (the capture may come too late).
+        if session.phase == .loading {
+            _ = await captureMain(model, "\(base)-report-r3-loading.png", schemes: schemes, settle: .milliseconds(50))
         }
-        _ = await DebugQA.wait(15) { window.session.phase != .loading }
+        _ = await DebugQA.wait(15) { session.phase != .loading }
         try? await Task.sleep(for: .milliseconds(600))
-        _ = await captureReport(window, "\(base)-report-r1.png", schemes: schemes)
-        // R2: the export through the bridge, then the toast.
-        if let bridge = window.session.bridge {
+        _ = await captureMain(model, "\(base)-report-r1.png", schemes: schemes)
+        // R2: the export through the bridge; the report bar shows the file saved.
+        if let bridge = session.bridge {
             _ = try? await bridge.call("await exportSrt();")
-            _ = await DebugQA.wait(5) { window.session.toast != nil }
             try? await Task.sleep(for: .milliseconds(400))
-            _ = await captureReport(window, "\(base)-report-r2.png", schemes: schemes)
+            _ = await captureMain(model, "\(base)-report-r2.png", schemes: schemes)
         }
-        window.close()
-        // R3 top left: the report is not there.
+        // R3 top right: the report is not there.
         let gone = report.deletingLastPathComponent().appendingPathComponent("sintel_ita_hardsub_demo.review.html")
         if !FileManager.default.fileExists(atPath: gone.path) {
-            let w = model.openReport(gone)
+            model.openReport(gone)
             try? await Task.sleep(for: .milliseconds(600))
-            _ = await captureReport(w, "\(base)-report-r3-gone.png", schemes: schemes)
-            w.close()
+            _ = await captureMain(model, "\(base)-report-r3-gone.png", schemes: schemes)
         }
-        // R3 top right: the alert of a save that failed next to the original (the card alone).
+        model.closeReport()
+        // R3 bottom: the alert of a save that failed next to the original (the card alone).
         let alert = SVAlert(icon: AlertIconName.error, tone: .red, title: model.t("app.report.save_failed"),
                             text: model.t("app.report.save_failed_text"))
         alert.button(model.t("app.report.save_elsewhere"), role: .primary)
@@ -412,20 +411,57 @@ enum DebugSnapshot {
         SVShell.DebugSnapshot.render(SVAlertCard(alert: alert).padding(48), width: 376, schemes: schemes, "\(base)-report-r3-savefail.png")
     }
 
-    /// A report window, once per scheme, as `SVShell.DebugSnapshot.capture` does for the main one.
-    static func captureReport(_ window: ReportWindowController, _ path: String, schemes: [ColorScheme],
-                              settle: Duration = .milliseconds(500)) async -> [String] {
+    /// The main window once per scheme, as `SVShell.DebugSnapshot.capture` takes it, with what
+    /// `cacheDisplay` leaves out drawn in: the report's web view (drawn out of process, it comes
+    /// out blank) and an alert over the window (R3's failed save, R4's "Reset all…").
+    static func captureMain(_ model: AppModel, _ path: String, schemes: [ColorScheme],
+                            settle: Duration = .milliseconds(500)) async -> [String] {
         let saved = NSApp.appearance
         defer { NSApp.appearance = saved }
         var written: [String] = []
         for scheme in schemes {
             NSApp.appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-            window.window?.displayIfNeeded()
+            WindowSizer.main(model.config)?.displayIfNeeded()
             try? await Task.sleep(for: settle)
             let p = schemes.count > 1 ? SVShell.DebugSnapshot.path(path, scheme) : path
-            if await window.capture(to: p) { written.append(p) }
+            if await captureMain(model, to: p) { written.append(p) }
         }
         return written
+    }
+
+    private static func captureMain(_ model: AppModel, to path: String) async -> Bool {
+        guard let window = WindowSizer.main(model.config), let root = window.contentView?.superview ?? window.contentView,
+              let rep = root.bitmapImageRepForCachingDisplay(in: root.bounds) else { return false }
+        root.cacheDisplay(in: root.bounds, to: rep)
+        var web: (image: NSImage, frame: CGRect)?
+        if let session = model.report.session, model.reportShown, session.phase == .ready,
+           let webView = session.bridge?.webView, webView.window === window,
+           let image = try? await webView.takeSnapshot(configuration: nil) {
+            web = (image, webView.convert(webView.bounds, to: root))
+        }
+        let image = NSImage(size: root.bounds.size)
+        image.lockFocus()
+        rep.draw(in: root.bounds)
+        if let web { web.image.draw(in: web.frame) }
+        for child in window.childWindows ?? [] where child.isVisible {
+            guard let view = child.contentView, let r = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+            view.cacheDisplay(in: view.bounds, to: r)
+            let origin = NSPoint(x: child.frame.minX - window.frame.minX, y: child.frame.minY - window.frame.minY)
+            r.draw(in: NSRect(origin: origin, size: child.frame.size), from: .zero, operation: .sourceOver, fraction: 1,
+                   respectFlipped: false, hints: nil)
+        }
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation, let out = NSBitmapImageRep(data: tiff),
+              let png = out.representation(using: .png, properties: [:]) else { return false }
+        do {
+            try FileManager.default.createDirectory(at: URL(fileURLWithPath: path).deletingLastPathComponent(), withIntermediateDirectories: true)
+            try png.write(to: URL(fileURLWithPath: path))
+            AppLog.shared.info("snapshot \(path)")
+            return true
+        } catch {
+            AppLog.shared.error("snapshot \(path) failed: \(error)")
+            return false
+        }
     }
 
     /// The narrow boards (N1, N2): the whole window at 760x640 as the boards measure it, its top kept.

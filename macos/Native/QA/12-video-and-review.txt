@@ -1,8 +1,10 @@
-# C2 (design notes 58, 60, 80; boards C2-V1–V5, C2-R1): the Video page with the
-# drop area under the list and the selection bar, a fast batch of two with the
-# end-of-batch sheet, the Review page (lines, dropped, gaps, language and fps of
-# each file) and the review window's title. Captures in
-# dark and light.
+# C2, C3 (design notes 58, 60, 80, 87; boards C2-V1–V5, C3-06, C3-07, C3-12, RV1, R1–R4):
+# the Video page with the drop area under the list and the selection bar, a fast
+# batch of two with the end-of-batch sheet, the Review list (RV1), and the report
+# inside the Review page (no window of its own): the title band and its details,
+# the report bar that sticks and the legend fixed at the bottom, Reset all's
+# question (R4, Return = Cancel), ⌘S, back to the list (‹, ⌘[), a file's
+# notification, the language, the report gone (R3). Captures in dark and light.
 ! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
 @launch
 wait-ready 600
@@ -16,6 +18,8 @@ inspector-tab read
 tab review
 review-state
 ? ^review 0$
+report-page
+? ^list · tab review · back off$
 capture $OUT/R-empty-dark.png
 ? R-empty-dark.png$
 tab process
@@ -47,22 +51,123 @@ capture $OUT/V-done-dark.png
 ? V-done-dark.png$
 review-state
 ? ^review 2 · sintel_ita_hardsub_demo\.mp4 lines [0-9]+ dropped [0-9]+ gaps [0-9]+ lang it-IT fps 6 report yes reviewed no
+# RV1 · the list: Righe, Buchi, Elaborato, «Apri», ⋯ and the chevron; the totals at the bottom
 review-select 0
 ? ^ok · sintel_ita_hardsub_demo\.mp4$
+capture $OUT/RV1-dark.png
+? RV1-dark.png$
+theme light
+capture $OUT/RV1-light.png
+? RV1-light.png$
+theme dark
+# R1 · «Apri»: the report in the page, under the title band; View › Back and ⌘S on
+review 0
+? ^Revisione di sintel_ita_hardsub_demo\.mp4 · [0-9]+ righe · [0-9]+ da ricontrollare · [0-9]+ buch[io] · elaborato oggi alle [0-9:.]+ · ready · tab review · back on · save on$
+report-windows
+? ^1 windows: 
+?! window menu: .*(Revisione|Review) ·
+menu-dump 3
+? Indietro ⌘[^ ]+ \|
+?! Indietro ⌘[^ ]+ \(off\)
 capture $OUT/R1-dark.png
 ? R1-dark.png$
 theme light
 capture $OUT/R1-light.png
 ? R1-light.png$
 theme dark
-review 0
-? ^Revisione · sintel_ita_hardsub_demo\.mp4$
-report-close all
-lang en
+# Inside the app the report starts with the summary box (no page title of its own); its bar sticks, the legend is fixed
+report-js document.documentElement.classList.contains('app') + ' · ' + getComputedStyle(document.querySelector('.rhead')).position + ' · ' + getComputedStyle(document.querySelector('.legend')).position
+? ^true · sticky · fixed$
+report-run window.scrollTo(0, document.documentElement.scrollHeight); await new Promise(r => setTimeout(r, 300)); const b = document.querySelector('.rhead').getBoundingClientRect(), l = document.querySelector('.legend').getBoundingClientRect(); return [window.scrollY > 100, Math.round(b.top), Math.round(l.bottom) === window.innerHeight].join(' · ');
+? ^true · 0 · true$
+capture $OUT/R2-dark.png
+? R2-dark.png$
+theme light
+capture $OUT/R2-light.png
+? R2-light.png$
+theme dark
+report-run window.scrollTo(0, 0); return 'ok';
+# An edit, then Reset all…: the app's alert with the report's words; Return is Cancel and keeps the edit
+report-run const t = document.querySelector('#rows textarea'); t.value = 'edited by QA'; t.dispatchEvent(new Event('input', {bubbles: true})); return 'ok';
+? ok
+report-confirm ask
+report-run resetAll(); return 'ok';
+report-alert
+? ^Ripristinare tutto il report\? · Perderai tutte le modifiche .* · buttons Annulla\|Ripristina tutto$
+report-capture $OUT/R4-dark.png
+? R4-dark.png$
+report-alert-key return
+? ^closed$
+report-js document.querySelector('#rows textarea').value
+? ^edited by QA$
+# Esc too; then «Ripristina tutto» puts the report back as the engine wrote it
+report-run resetAll(); return 'ok';
+report-alert-key esc
+? ^closed$
+report-run resetAll(); return 'ok';
+report-alert
+? buttons Annulla\|Ripristina tutto$
+report-alert-press 1
+? pressed Ripristina tutto
+! sleep 2
+report-js document.querySelector('#rows textarea').value
+?! edited by QA
+?! ^error
+# ⌘S (File › Save Reviewed SRT): the report's own save, next to the video; the bar says so
+report-save
+? sintel_ita_hardsub_demo-reviewed-.*\.srt$
+! sleep 1
+report-js document.getElementById('savedNote').textContent
+? -reviewed-
+# Back (the band's ‹, View › Back): the list, with the chip of the reviewed SRT
+report-back
+? ^list · tab review · back off$
+review-state
+? sintel_ita_hardsub_demo\.mp4 .* reviewed yes
+# ⌘[ from the keyboard
 review 1
-? ^Review · sintel_eng_hardsub_demo\.mp4$
-report-close all
+? ^Revisione di sintel_eng_hardsub_demo\.mp4 · .* · ready
+report-key-back
+? · list · tab review · back off$
+# A finished file's notification: Review with its report open; the report follows the language
+tab fix
+notification-click file 1
+report-page
+? ^Revisione di sintel_eng_hardsub_demo\.mp4 · .* · ready · tab review · back on
+lang en
+report-page
+? ^Review of sintel_eng_hardsub_demo\.mp4 · [0-9]+ lines? · [0-9]+ to re-check · .* · processed today at
+report-js document.documentElement.lang
+? ^en$
 lang it
+# Away to another page and back: the report is still open; Sub fix has no Back
+tab fix
+report-page
+? back off
+tab review
+report-page
+? ^Revisione di sintel_eng_hardsub_demo\.mp4 .* back on
+report-close
+? ok
+# R3 · the report moved away: the red note, back to the list from it
+! mv "$WORK/sintel_ita_hardsub_demo.review.html" "$WORK/moved.html"
+review 0
+? ^Revisione di sintel_ita_hardsub_demo\.mp4 · elaborato oggi alle [0-9:.]+ · gone
+capture $OUT/R3-gone-dark.png
+? R3-gone-dark.png$
+theme light
+capture $OUT/R3-gone-light.png
+? R3-gone-light.png$
+theme dark
+report-back
+? ^list
+! mv "$WORK/moved.html" "$WORK/sintel_ita_hardsub_demo.review.html"
+# File › Open a Review… (without the panel): the page with that report
+report-open $WORK/sintel_ita_hardsub_demo.review.html
+? ^ready · sintel_ita_hardsub_demo\.review\.html · bridged$
+report-page
+? ^Revisione di sintel_ita_hardsub_demo\.mp4 · 
+report-close
 # Process Again takes a file off Review.
 process-again
 review-state
