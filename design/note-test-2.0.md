@@ -204,3 +204,49 @@ L'app è in `/Applications/SubVision.app` (build Release di F6, zip `SubVision-v
 - La sezione di Sub fix si chiama «Condivisi con Video» (la tavola dice «con Elabora», pagina che non c’è più).
 - La barra delle azioni sulla selezione compare solo fuori dal lotto: durante il lotto la barra in basso resta quella del lotto.
 - Righe fallite: «Apri il log» e ⋯ (con «Elabora di nuovo»), perché la colonna delle azioni della tavola è larga 136–150 pt.
+
+---
+
+## Prove a mano (agente, 14/11)
+
+Build Debug di `native-2.0` (`2d2fc72`), poi del ramo `c3-manual` per le correzioni; cartella di stato `SubVision-dev`, le due clip demo copiate nella scratchpad, interfaccia in italiano, parametri predefiniti. Il controllo a schermo intero non c'era (ogni richiesta interrotta subito), quindi niente tasti né gesti fisici: accessibilità in background dove basta (pulsanti, voci dei menu, Esc su avvisi e menu) e per il resto i comandi nuovi di `DebugQA` (`30d5adc`): `key` mette la pressione nella coda degli eventi dell'app, come la consegna il sistema; `mouse click|double|right|drag|scroll` manda gli eventi del mouse alla finestra (tocchi, doppio clic, menu contestuali e a comparsa, maniglie delle bande, scorrimento). I difetti D2–D4 li ho riprodotti anche sulla build di `native-2.0` con gli stessi comandi. Catture in `design/snapshot/manual/`.
+
+| Prova | Esito |
+|---|---|
+| ⌘↩ su Video | **difetto D2**, corretto (`47d6a42`): dopo aver aggiunto i video il lotto non partiva finché non si apriva una volta il menu Elabora. Ora parte. |
+| ⌘↩ su Sub fix | ok: esegue il fix («Creato: …-fixed-….srt (12 righe)»), il lotto no. |
+| ⌘. e ⌥⌘. durante il lotto | **D2** (voci spente per la scorciatoia), corretto: ⌘. apre O2, ⌥⌘. apre O1 sul file in corso. |
+| Invio/Esc su O1, O2; righe con l'avviso aperto | ok: Esc = Continua su O1 e O2 (anche dal pulsante «Ferma tutto»), Invio = Ferma (scenario 03); con O2 aperto la riga è andata avanti (trascorso 00:08 → 00:41, cartelli 10/600). |
+| ⌘Z dopo «↺ Ripristina» | ok (38 % → predefiniti → 38 %). Il menu Modifica diceva «Ripristina Ripristina i predefiniti» dopo l'annullamento: ora «Annulla / Ripristina ritorno ai predefiniti» (`91d01a2`). Lasciato: l'annullamento vive nella finestra dove si è premuto Ripristina (ripristino nella finestra Anteprima, ⌘Z nella principale non fa nulla). ⇧⌘Z: l'azione funziona, la scorciatoia non si può simulare (i caratteri con ⇧ li calcola il sistema dalla tastiera): da riprovare a mano. |
+| ⌘Y (Anteprima) | ok: apre la finestra Anteprima della riga selezionata. |
+| ⌘R (Rivedi) | **D2**, corretto: con la riga selezionata (Video e Revisione) apre «Revisione · sintel_…mp4». |
+| ⌘A/⌘C/⌘V nei campi | ok: pannello Parametri («Letture OCR in parallelo» copiato e incollato), Sub fix («A capo oltre»), testo di una riga del report (⌘A, ⌘C, ⌘V e ⌘Z nella WKWebView). «Durata minima» di Sub fix è uno stepper, non un campo. |
+| ⌘A sulle righe; ⌘C sulle righe | ⌘A seleziona tutte le righe («2 selezionati»); ⌘C sulle righe non copia nulla (nessuna azione prevista). |
+| ⌫ su una riga selezionata | **difetto D4**, corretto (`47d6a42`): non toglieva la riga (la voce del menu ha ⌫ = U+0008, il tasto manda U+007F). Ora la toglie, ⌘Z la rimette; in un campo di testo ⌫ cancella il testo e non tocca le righe. |
+| Doppio clic su una riga finita | apre e chiude il dettaglio della riga (tempi e file), non il report: la voce 13 «(a) apre il report, come ora» non descrive più l'app. Decisione ancora dell'utente: non toccato. |
+| Menu contestuale delle righe | ok: Mostra nel Finder · Apri in Anteprima · Rivedi · Apri l'SRT · Apri il log · Elabora di nuovo · Togli dall'elenco. |
+| Menu ⋯ | ok: Mostra nel Finder · Apri l'SRT · Apri il log · Apri in Anteprima · Elabora di nuovo · Togli dall'elenco; «Apri in Anteprima» apre la finestra. L'ordine è diverso dal menu contestuale (osservazione, lasciato). |
+| Selezione, barra delle azioni, Esc, clic sul vuoto | ok: «1 selezionato · Mostra nel Finder · Togli · Esc o clic sullo spazio vuoto: deseleziona»; Esc, clic nell'area sotto la lista e sul titolo deselezionano. |
+| Maniglie nella finestra Anteprima | ok con un trascinamento di eventi del mouse (non fisico): maniglia alta dei Dialoghi 35 pt in su, altezza 28 → 38 % nel pannello dell'Anteprima e in quello della finestra principale, puntino sulla scheda Bande, «1 valore diverso dal predefinito». |
+| Prova OCR e fotogrammi | ok: ⌘T, la prova resta sul suo fotogramma andando avanti e indietro (← →, e ⌘← ⌘→ dopo D2). |
+| Finestra stretta (960 pt) | ok: pannello sovrapposto; Esc, clic fuori e ⌥⌘I lo chiudono, ⌥⌘I lo riapre; a 1100 pt il pannello è fisso. |
+| Scorrimento del pannello | ok: il contenuto passa sotto l'intestazione, linea sotto le schede. |
+| O7 «Scegli la lingua» | ok: con `xx-XX` ⌘↩ apre O7, il pulsante apre il pannello sul menu della lingua. |
+| Sub fix, valori condivisi | ok: «A capo oltre» 42 → 43 da Sub fix scrive la chiave del pannello (`ocr.wrapWidth`). |
+| Revisione e «Revisione · <nome>» | ok: pagina con le due righe, titolo della finestra del report «Revisione · sintel_eng_hardsub_demo.mp4». |
+| Impostazioni | ok le quattro schede; menu FFmpeg: «Quelli scaricati (9.0.2, verificati)» ✓, «Homebrew · 9.0.2 (/opt/homebrew/bin)», «Una cartella mia…». Il pulsante cartella di Elenchi era letto «Sposta» da VoiceOver: ora «Mostra nel Finder» (`91d01a2`). |
+| Chiusura della finestra durante il lotto (O4) | ok: «SubVision continua a lavorare», il lotto finisce; riaprendo l'app torna la finestra con il foglio di fine lotto (Esc lo chiude). |
+| ⌘Q durante il lotto (O3) | **difetto D3**, corretto (`8b26819`): con O3 aperto righe, scheda e Dock restavano fermi (OCR «ETA 00:03» per 16 s, `D3-O3-righe-ferme-prima.jpg`), come O1/O2 prima della voce 3. Ora O3 non è modale: le righe vanno avanti (`D3-O3-righe-avanti-dopo.jpg`), Esc = Annulla, Invio = Esci e ferma; dopo l'uscita nessun motore né ffmpeg acceso e nessun SRT a metà. |
+| Notifiche | non provate davvero: macOS nega le notifiche all'app dev (`authorization 1`), non l'ho cambiato. Il clic simulato sulla notifica di un file apre Revisione con la riga aperta. |
+| Dock | ok: barra sull'icona, menu «File 1 di 2 · sintel_ita_hardsub_demo.mp4» (attenuato) · Ferma tutto · Mostra SubVision. |
+| Fine del lotto nella barra in basso | **difetto D1**, corretto (`10346ad`): nel secondo file «File 2 di 2» senza «il lotto finisce verso le…», e niente anche nella scheda della barra laterale (`D1-lotto-senza-fine-prima.jpg`). Il raffinamento dei cartelli senza cartelli non aveva un tempo, quindi nessuna stima. Ora «File 2 di 2 · il lotto finisce verso le 07:24» (`D1-lotto-finisce-dopo.jpg`). |
+| Menu Finestra e Vista | Finestra: «Anteprima · <video>» due volte con la finestra aperta, corretto (`91d01a2`). Vista ha «Attiva modalità a tutto schermo» (13.3.1). |
+| Tema chiaro e scuro | ok al volo da Impostazioni › Aspetto; interruttori in ciano con l'app in primo piano (12.3.1). |
+| Lingua al volo | ok in inglese e di nuovo in italiano; i menu di sistema (Modifica, Vista, Finestra, Aiuto, Chiudi) cambiano al riavvio, come previsto. |
+| Lotto vero sulle demo, parametri predefiniti | ok: 12 righe ciascuna, 01:05–01:10 per file (2 min 15 s in tutto), 0 e 2 scartate; gli SRT differiscono da quelli di `demo-assets` solo nei tempi (quelli sono del profilo veloce a 6 fps). |
+
+**Non provato:** tasti e gesti fisici (schermo intero non disponibile); ⇧⌘Z; notifiche vere; A0 con un video 16:9; report in cartella di sola lettura e avviso Sostituisci (C2, punto 8); un episodio vero (C2, punto 10).
+
+**Scenario QA nuovo:** `16-keys-and-quit` (⌫ e ⌘Z su una riga, ⌘Y, ⌘→ ⌘←, ⌘↩, ⌘., ⌥⌘. senza aprire i menu; ⌘Q con il lotto che va avanti sotto O3).
+
+**Verifiche sul ramo `c3-manual`:** build Debug pulita; `swift test` 52 verdi; test dei cataloghi 6 verdi e `tools/check_locales.py` OK (642 chiavi per lingua); `pytest` 111 verdi e 4 saltati (`test_launcher_marker_decides_the_sync` sistemato in `43c803b`: la copia del venv di sviluppo portava il marcatore); scenari QA 16 su 16 (02 con gli SRT di `demo-assets`, 10 con `_test-1.mkv` copiato nella scratchpad). Le correzioni rifatte a mano dopo la build: ⌘↩, ⌘., ⌥⌘., ⌘R, ⌘T, ⌘← ⌘→, ⌫ e ⌘Z sulle righe, O3 con le righe che vanno avanti, «il lotto finisce verso le …», menu Finestra e Modifica.
