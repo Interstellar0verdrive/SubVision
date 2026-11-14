@@ -152,22 +152,9 @@ public struct BackCircleButton: View {
         .keyboardShortcut(shortcut ? KeyboardShortcut("[", modifiers: .command) : nil)
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.12), value: hover)
-        .overlay(alignment: .topLeading) {
-            if hover {
-                Text(help)
-                    .svFont(11.5)
-                    .foregroundStyle(SV.text)
-                    .padding(.horizontal, 8)
-                    .frame(height: 20)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(SV.alert))
-                    .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(SV.glassLine))
-                    .fixedSize()
-                    .offset(x: -6, y: 44)
-                    .allowsHitTesting(false)
-                    .transition(.opacity)
-            }
-        }
-        .zIndex(1)
+        // The system's tooltip, not one drawn in the band: a page under the band (the report's
+        // web view) is drawn above anything the band draws, and covered it.
+        .help(help)
         .accessibilityLabel(help)
     }
 }

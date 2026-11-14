@@ -40,8 +40,9 @@ public struct SnapSlider<Value: Hashable>: View {
 
     /// The default's stop, while the value is elsewhere.
     private var defaultIndex: Int? {
-        guard let defaultValue, defaultValue != selection, dragging == nil else { return nil }
-        return values.firstIndex(of: defaultValue)
+        // Shown while dragging too: it is where the knob goes back to the default.
+        guard let defaultValue, let d = values.firstIndex(of: defaultValue), d != index else { return nil }
+        return d
     }
 
     private var index: Int { dragging ?? values.firstIndex(of: selection) ?? 0 }
@@ -265,7 +266,8 @@ public struct SVSlider: View {
             let span = max(range.upperBound - range.lowerBound, .ulpOfOne)
             let f = min(max((value - range.lowerBound) / span, 0), 1)
             let w = g.size.width
-            let tick = defaultValue.flatMap { d in abs(d - value) > span * 1e-6 && !dragging ? centre(d, w) : nil }
+            // Shown while dragging too (the owner's note): it is where to aim for the default.
+            let tick = defaultValue.flatMap { d in abs(d - value) > span * 1e-6 ? centre(d, w) : nil }
             ZStack(alignment: .leading) {
                 if let tick {
                     DefaultTick(help: defaultHelp).offset(x: tick - DefaultTick.hitWidth / 2)
