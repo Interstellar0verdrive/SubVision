@@ -126,6 +126,14 @@ public enum SV {
     public static let redSoft = Color(dark: "rgba(242,109,109,.07)", light: "rgba(205,55,37,.10)")
     public static let redTint = Color(dark: "rgba(242,109,109,.16)", light: "rgba(217,64,46,.12)")
 
+    /// A value different from its default (design note 81, boards C3-10, DS1): a warning,
+    /// never an error, so never red, and not the accent either. Yellow in dark (10.6 : 1 on
+    /// the panel), amber in light (4.9 : 1 on white, 4.5 : 1 on the window's background).
+    public static let modified = Color(dark: "#E8C547", light: "#AB5E00")
+    public static let modifiedTint = Color(dark: "rgba(232,197,71,.16)", light: "rgba(171,94,0,.12)")
+    /// The tick of a slider's default value (C3-10, board I2): grey, under the track.
+    public static let defaultTick = Color(dark: "#80868E", light: "#656B73")
+
     /// Drop areas (design notes 38 and 40): a 2 pt dash strong enough to read in
     /// both appearances, and faint diagonal stripes inside (14 pt on, 14 pt off).
     public static let dropLine = Color(dark: "rgba(255,255,255,.40)", light: "rgba(0,0,0,.40)")
