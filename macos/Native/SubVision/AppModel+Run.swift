@@ -111,15 +111,17 @@ struct BatchRun: Equatable {
         return total > 0 ? done / total : 0
     }
 
-    /// Seconds left in this file, from the estimates (nil without them).
-    var fileRemaining: Double? {
+    /// Seconds left in this file, from the estimates (nil without them). The estimates
+    /// are the times of the previous file: `scale` is this file's duration over that one's.
+    func fileRemaining(scale: Double = 1) -> Double? {
         guard !steps.isEmpty, steps.allSatisfy({ $0.estimate != nil }) else { return nil }
         var left = 0.0
         for step in steps {
+            let estimate = (step.estimate ?? 0) * scale
             switch step.state {
-            case .waiting: left += step.estimate ?? 0
+            case .waiting: left += estimate
             case .running:
-                if let eta = step.eta { left += eta } else { left += max(0, (step.estimate ?? 0) - step.elapsed) }
+                if let eta = step.eta { left += eta } else { left += max(0, estimate - step.elapsed) }
             default: break
             }
         }
@@ -400,6 +402,7 @@ extension AppModel {
             if let t = d.times[run.steps[j].id] { run.steps[j].duration = t }
         }
         run.lastFileElapsed = d.elapsed
+        refreshActivity()
         saveVideos()
         closeStopAlert(file: d.idx)
         let v = videos[i]
@@ -497,17 +500,50 @@ extension AppModel {
         return out
     }
 
-    /// `BatchActivity` (sidebar, Dock, O3): the fraction and "Ends around".
+    /// Each file of the batch weighs its duration (`BatchProgress`), in the engine's order.
+    var batchWeights: [Double] {
+        BatchProgress.weights(run.ids.map { id in videos.first { $0.id == id }?.duration })
+    }
+
+    /// Seconds each file of the batch took, by index: the ones done in this batch.
+    private var batchMeasured: [Int: Double] {
+        var out: [Int: Double] = [:]
+        for (i, id) in run.ids.enumerated() {
+            guard let v = videos.first(where: { $0.id == id }), v.state == .done || v.state == .noSubs,
+                  let elapsed = v.elapsed else { continue }
+            out[i] = elapsed
+        }
+        return out
+    }
+
+    /// Seconds of work per second of video, from the files done (nil before the first).
+    var batchRate: Double? { BatchProgress.rate(weights: batchWeights, measured: batchMeasured) }
+
+    /// About how long a waiting row will take: its duration at the rate of the files done.
+    func waitingEstimate(_ video: VideoItem) -> Double? {
+        guard let i = run.ids.firstIndex(of: video.id) else { return run.lastFileElapsed }
+        let weights = batchWeights
+        guard let rate = batchRate, weights.indices.contains(i) else { return run.lastFileElapsed }
+        return rate * weights[i]
+    }
+
+    /// `BatchActivity` (sidebar, Dock, O3): the fraction and "Ends around", both by duration:
+    /// a file twice as long weighs twice as much (`BatchProgress`).
     private func refreshActivity() {
         guard batch.running, batch.total > 0 else { return }
-        let done = Double(max(0, batch.index - 1))
-        batch.fraction = (done + run.fileFraction) / Double(batch.total)
-        var remaining: Double?
-        if let left = run.fileRemaining {
-            let after = Double(batch.total - batch.index)
-            let perFile = run.lastFileElapsed ?? run.steps.compactMap(\.estimate).reduce(0, +)
-            remaining = left + after * perFile
-        }
+        let current = max(0, batch.index - 1)
+        var weights = batchWeights
+        if weights.count != batch.total { weights = Array(repeating: 1, count: batch.total) }
+        batch.fraction = BatchProgress.fraction(weights: weights, current: current, fileFraction: run.fileFraction)
+        let measured = batchMeasured
+        // The step estimates come from the last file done: scaled to this file's duration.
+        let source = measured.keys.filter { $0 < current }.max()
+        let scale = source.map { weights[current] / weights[$0] } ?? 1
+        let left = run.fileRemaining(scale: scale)
+        // Nothing done yet: the step estimates, if any, stand for this file.
+        let rate = BatchProgress.rate(weights: weights, measured: measured)
+            ?? run.steps.compactMap(\.estimate).reduce(0, +) / weights[current]
+        let remaining = BatchProgress.remaining(weights: weights, current: current, currentLeft: left, rate: rate)
         batch.endsAround = remaining.map { Self.clockTime(Date().addingTimeInterval($0)) }
         updateDock()
     }

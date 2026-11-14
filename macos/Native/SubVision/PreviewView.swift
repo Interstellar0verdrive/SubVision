@@ -14,8 +14,8 @@ import SwiftUI
 
 /// The measures of the block in a content area of `size` (C2-A1 at 1280 × 860:
 /// frame 732 × 414, thumbnails 68 × 38, panels 176). The frame is as wide as the
-/// height lets everything fit with the panels at least `panelsMin` tall, and never
-/// wider than the area less the arrows.
+/// height lets everything fit with the panels at least `panelsMin` tall, never
+/// wider than the area less the arrows, and never wider than `maxFrameWidth`.
 struct PreviewLayout: Equatable {
     static let top: CGFloat = 22
     static let bottom: CGFloat = 22
@@ -36,6 +36,8 @@ struct PreviewLayout: Equatable {
     /// The panels' least height: room for a two-line reading, its line and the stale note.
     static let panelsMin: CGFloat = 170
     static let minFrameWidth: CGFloat = 320
+    /// In a large window the frame stops growing here; the block stays centred.
+    static let maxFrameWidth: CGFloat = 640
 
     var size: CGSize
     var frameWidth: CGFloat
@@ -54,7 +56,7 @@ struct PreviewLayout: Equatable {
         let rows = CGFloat(Self.rows)
         let byHeight = ((size.height - fixed) * a + rows * (n - 1) * g / n) / (1 + rows / n)
         let byWidth = size.width - 2 * (Self.arrow + Self.margin)
-        let w = max(Self.minFrameWidth, min(byWidth, byHeight)).rounded(.down)
+        let w = max(Self.minFrameWidth, min(byWidth, byHeight, Self.maxFrameWidth)).rounded(.down)
         self.size = size
         frameWidth = w
         frameHeight = (w / a).rounded()
@@ -477,8 +479,10 @@ struct FrameBox: View {
             if let image = model.preview.frameImage {
                 Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
                     .frame(width: size.width, height: size.height)
-                    .clipShape(RoundedRectangle(cornerRadius: SV.Radius.field))
-                    .overlay(RoundedRectangle(cornerRadius: SV.Radius.field).strokeBorder(SV.line))
+                    // Square, as the bands over it (design note 89): a band at 100 % width
+                    // would leave the rounded corners showing inside its border.
+                    .clipShape(Rectangle())
+                    .overlay(Rectangle().strokeBorder(SV.line))
                 BandOverlay(size: size, editable: model.canDragBands, drag: $model.preview.drag)
             } else {
                 HStack(spacing: 6) {

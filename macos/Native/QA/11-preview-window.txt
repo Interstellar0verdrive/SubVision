@@ -71,6 +71,10 @@ preview-layout
 preview-size 1360x840
 preview-layout
 ? · fits$
+# A large window: the frame stops at 640 pt and the block stays centred.
+preview-size 1800x1000
+preview-layout
+? frame 640x[0-9]+ .* · fits$
 preview-size 1280x860
 # The other video from the window's menu: its frames are searched by themselves.
 preview-select 0

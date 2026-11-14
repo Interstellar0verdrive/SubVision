@@ -46,6 +46,8 @@
 //   menu-dump <index>              one menu's items with their keys, dimmed and checked ones marked
 //   window-size                    the main window's size (the whole window, as `size` sets it), "760x640"
 //   row-text <idx>                 what the row of video idx says after its step (a failed row: the error text)
+//   batch-progress                 the batch's weights (durations), fraction, rate and ends around, as the
+//                                  sidebar card, the Dock and O3 show them
 //   alert-other · alert-other-press <n>   the non-modal alert that is not O1/O2 (O7, an error): title and buttons; press n
 //   lang-menu                      waits for the inspector's language menu to open, reads its items and closes it
 //   The F6 design snapshots: engine-status, vision, disk-free, batch-fake, capture-all, capture-window,
@@ -244,6 +246,12 @@ enum DebugQA {
                 model.videos[idx].state == .running && model.run.steps.contains { $0.key == p[1] && ($0.state == .running || $0.state == .done) && $0.count > 0 }
             }
             return "\(ok ? "ok" : "timeout") · \(model.run.currentStep?.id ?? "-")"
+        case "batch-progress":
+            guard model.batch.running else { return "no batch" }
+            let weights = model.batchWeights.map { String(format: "%.1f", $0) }.joined(separator: "+")
+            let rate = model.batchRate.map { String(format: "%.2f", $0) } ?? "-"
+            return "file \(model.batch.index)/\(model.batch.total) · weights \(weights) · fraction "
+                + String(format: "%.3f", model.batch.fraction ?? -1) + " · rate \(rate) · ends \(model.batch.endsAround ?? "-")"
         case "states":
             return model.videos.map { "\($0.name)=\($0.state.rawValue)\($0.segments.map { ":\($0)" } ?? "")\($0.atStep.map { "@\($0)" } ?? "")" }.joined(separator: " ")
         case "expand":
@@ -719,6 +727,7 @@ enum DebugQA {
                 && abs(thumbs.width - frame.width) < 0.5 && abs(dialogue.height - signs.height) < 0.5
                 && dialogue.height >= PreviewLayout.panelsMin - 1 && bottomGap >= PreviewLayout.bottom - 1
                 && abs(dialogue.minX - frame.minX) < 0.5 && abs(signs.maxX - frame.maxX) < 0.5
+                && frame.width <= PreviewLayout.maxFrameWidth + 0.5 && abs(frame.midX - content.midX) < 1
         } else {
             parts.append("placeholder \(size(frame))")
         }

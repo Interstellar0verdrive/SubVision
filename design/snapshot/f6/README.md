@@ -16,7 +16,7 @@ Quasi tutte sono catture della finestra vera (`cacheDisplay`, senza permessi), u
 - E0, A0, F0: pagine vuote, finestra vera.
 - E1: finestra vera, tre video pronti (uno con «SRT già presente»), un `.mkv` illeggibile e la nota dei due elementi saltati (`cover.jpg`, `notes.txt`): tutto trascinato davvero con `add`.
 - E2, E3, E4, E5, I1, I2, I3-language, N1: stati alimentati a mano (`DebugSnapshot.processStates`), come in F5: un lotto sulle clip demo finisce in pochi secondi. In E3 i nomi di SRT e log sono barrati perché i file non esistono (stato a mano). N1 ora è a 760×640.
-- E6: il foglio di fine lotto reso con `ImageRenderer`; `real/E6-window-dark.png` è la finestra vera con il foglio sopra (`screencapture -l`) alla fine di un lotto vero (un file fatto, uno fermato con Ferma tutto, uno rimasto pronto).
+- E6: il foglio di fine lotto reso con `ImageRenderer`; `real/E6-window-dark.webp` è la finestra vera con il foglio sopra (`screencapture -l`) alla fine di un lotto vero (un file fatto, uno fermato con Ferma tutto, uno rimasto pronto).
 - E7: finestra vera con `vision off` (banner rosso, Avvia spento) e `disk-free 6` (la nota gialla legge 6 GB invece dello spazio vero): i due valori sono alimentati a mano, il resto è la pagina vera.
 - I2-langmenu: il menu delle lingue di Vision aperto dall'inspector, catturato con `screencapture -l` mentre AppKit lo tiene aperto (`menu-shot lang`). La parte del menu che esce dalla finestra esce grigia (dietro non c'è nulla della finestra da catturare). Il fumetto (?) della tavola non è riprodotto.
 - N2: finestra vera a 760×640, ricerca vera dei fotogrammi, inspector sovrapposto.
@@ -37,10 +37,10 @@ Come in F5 (`SUBVISION_SNAPSHOT_PREVIEW=1` e `_FIX=<srt>`): ricerca e prova OCR 
 
 ## Avvisi, menu, Dock (O1–O10)
 
-- O1, O2: lotto vero di tre clip, avviso aperto dal pulsante (`stop-file-ask`, `stop-all-ask`), finestra e avviso insieme (`capture-all`). `real/O1-alert-*.png`: lo stesso con `screencapture -l`.
+- O1, O2: lotto vero di tre clip, avviso aperto dal pulsante (`stop-file-ask`, `stop-all-ask`), finestra e avviso insieme (`capture-all`). `real/O1-alert-*.webp`: lo stesso con `screencapture -l`.
 - O3, O4: durante lo stesso lotto. O4 è la funzione vera (`Alerts.closeNotice`); O3 nell'app è modale (`runModal` fermerebbe i comandi), quindi è costruito come in `Alerts.confirmQuit` e mostrato senza ciclo modale: la scheda è la stessa.
 - O5, O6: non fatte. L'app non ha questi due avvisi: FFmpeg sparito all'avvio riporta la finestra strumenti (T4), Vision mancante mostra solo il banner di E7 con Avvia spento.
-- O7: vero, Avvia con la lingua `hu-HU` (Ungherese, che Vision qui non legge). `real/O7-alert-*.png` con `screencapture -l`.
+- O7: vero, Avvia con la lingua `hu-HU` (Ungherese, che Vision qui non legge). `real/O7-alert-*.webp` con `screencapture -l`.
 - O8: i quattro avvisi da soli, uno accanto all'altro (`compose`): cartella senza video e video già nell'elenco con il percorso vero (`add`), aggiornamento con la funzione vera; Importa (modale nell'app) costruito come in `Alerts.importList`.
 - O9: i sette menu aperti durante un lotto vero, ognuno con `screencapture -l` mentre è aperto (`menu-shot`), ritagliati e messi in griglia. Il fondo intorno a ogni menu è la finestra.
 - O10: il menu del Dock durante il lotto (vero) e la vista dell'icona del Dock con la barra (quella che l'app disegna; il numero sul badge lo disegna il Dock e non c'è). La frazione è quella vera del momento (inizio del primo file), quindi la barra è quasi vuota. Le notifiche di macOS non sono riprodotte.
@@ -50,11 +50,11 @@ Come in F5 (`SUBVISION_SNAPSHOT_PREVIEW=1` e `_FIX=<srt>`): ricerca e prova OCR 
 Finestra vera delle Impostazioni (`cacheDisplay`, barra degli strumenti compresa), scheda scelta col clic sul suo elemento (`settings-tab`), app attiva perché gli interruttori siano nell'accento.
 
 - ST1: Generali. ST2-download: Scarica di nuovo in corso (13 di 28 MB, alimentato a mano); ST2-own: «Uno mio…» che non parte (percorso ed errore alimentati a mano, non salvati). ST3: Elenchi (l'avviso di Importa della tavola è in O8). ST4-ok, ST4-available, ST4-error: i tre esiti alimentati a mano. ST5: Strumenti con `batch-fake on`.
-- `real/ST1-window-*.png`, `real/ST2-window-*.png`: le stesse finestre con `screencapture -l`, ombra compresa.
+- `real/ST1-window-*.webp`, `real/ST2-window-*.webp`: le stesse finestre con `screencapture -l`, ombra compresa.
 
 ## Design system (DS1–DS4)
 
-Non c'è una pagina dell'app per tavola: `DS-gallery-light.png` / `-dark.png` è `SVDesignGallery` di SVDesign (la stessa del test `galleryRenders`), resa con `ImageRenderer`. Copre testo, pulsanti, chip, barre, note, righe delle impostazioni, avvisi e barra laterale; è in inglese, i pezzi AppKit (area di trascinamento, menu) sono segnaposto, e non ha le tabelle dei token di DS1.
+Non c'è una pagina dell'app per tavola: `DS-gallery-light.webp` / `-dark.webp` è `SVDesignGallery` di SVDesign (la stessa del test `galleryRenders`), resa con `ImageRenderer`. Copre testo, pulsanti, chip, barre, note, righe delle impostazioni, avvisi e barra laterale; è in inglese, i pezzi AppKit (area di trascinamento, menu) sono segnaposto, e non ha le tabelle dei token di DS1.
 
 ## Differenze dalle tavole e cose da guardare
 
@@ -65,3 +65,5 @@ Non c'è una pagina dell'app per tavola: `DS-gallery-light.png` / `-dark.png` è
 - N1: a 760 pt le statistiche delle tappe si troncano con «…».
 - La nota «2 elementi saltati» resta anche dopo aver tolto tutti i video (visibile in E7, O1–O4, O7): sparisce solo con la ×.
 - T5: la barra laterale mostra i conteggi dell'elenco, la tavola i trattini.
+
+Formato: WebP dal 14/11/2026 (prima PNG, convertite con `cwebp` per alleggerire il ramo): senza perdita (`-lossless -z 9`) quando il file scende sotto il 60 % del PNG o non supera quello con perdita, altrimenti `-q 90`; stessa risoluzione, il testo resta nitido. Gli scenari QA salvano ancora le catture nuove in PNG.

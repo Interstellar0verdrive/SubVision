@@ -675,7 +675,8 @@ struct StepField: View {
 /// The frame's schema of the main window's Bande tab (C2-P2): the signs band
 /// at the top and the dialogue band at the bottom, as high and as wide as the
 /// sliders set them, each with its tag and a short light bar for a line of
-/// text; the signs band dashed and faded when it is off. Dark in both themes.
+/// text; the signs band dashed and faded when it is off. Dark in both themes,
+/// with square corners.
 struct BandSchema: View {
     var signsOn: Bool
     var topPct: Int
@@ -710,8 +711,10 @@ struct BandSchema: View {
         }
         .frame(height: 174)
         .background(Self.frameColour)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(SV.line))
+        // Square corners (design note 89): a band at 100 % width runs edge to edge,
+        // a rounded clip would cut its border and fill at the corners.
+        .clipShape(Rectangle())
+        .overlay(Rectangle().strokeBorder(SV.line))
         .accessibilityElement()
         .accessibilityLabel(label)
     }
