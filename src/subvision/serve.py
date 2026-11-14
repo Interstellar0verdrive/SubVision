@@ -53,6 +53,14 @@ a frame that could not be taken is null). It runs in the pool like
 `videos.probe`, never takes the job slot and never waits for it; during a
 batch it answers `{path, busy: true}` unless the frames are already there.
 
+`report.upgrade {path}`: the page to show for a review report. A report
+with the current template answers `{path, current: true}` (its own path);
+an older one (1.0, a 2.0 build before report v2) `{path, current: false,
+cached, source}`, `path` being a copy rendered with the current template in
+`<state>/tmp/reports/` (never next to the original), `source` "1.x" or
+"2.0". Errors `not_found`, `report_unreadable` (`detail` says why).
+Synchronous, never `busy` (report_upgrade.py).
+
 The events of a batch are described in batch.py; `batch.file.failed`
 carries `code`, `text` (short, for the row of the file), `detail`, `log`
 (the per-file log), `error`, `at_step` and `tool`/`path`/`line` when known.
@@ -97,7 +105,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TextIO
 
-from subvision import __version__, batch, core, fix, lists, preview, thumbs, tools
+from subvision import __version__, batch, core, fix, lists, preview, report_upgrade, thumbs, tools
 from subvision.core import EngineError, OcrParams, Stopped
 from subvision.paths import StatePaths, state_paths
 
@@ -636,6 +644,17 @@ def _srt_fix(params: dict) -> dict:
     return {"out_path": str(out), "count": count}
 
 
+def _report_upgrade(params: dict) -> dict:
+    """Synchronous and never `busy`, like `srt.fix` (see report_upgrade.py)."""
+    path = params.get("path")
+    if not isinstance(path, str) or not path:
+        raise bad_params("path", "must be the path of a review report")
+    try:
+        return report_upgrade.upgrade_report(path, _paths().root)
+    except EngineError as e:
+        raise _engine_error(e) from e
+
+
 METHODS: Dict[str, Callable[[dict], dict]] = {
     "hello": _hello,
     "tools.status": _tools_status,
@@ -652,6 +671,7 @@ METHODS: Dict[str, Callable[[dict], dict]] = {
     "preview.stop": _preview_stop,
     "preview.test": _preview_test,
     "srt.fix": _srt_fix,
+    "report.upgrade": _report_upgrade,
 }
 
 
@@ -710,6 +730,7 @@ def _clean_orphans() -> None:
     try:
         preview.clean_old(paths.root)
         thumbs.clean_old(paths.root)
+        report_upgrade.clean_old(paths.root)
     except Exception:  # noqa: BLE001
         pass
 
