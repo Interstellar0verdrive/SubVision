@@ -406,6 +406,8 @@
   "app.process.drawer.under_second": "< 1 s",
   "app.process.drawer.unreadable_text": "SubVision non riesce a leggerlo, quindi resta fuori dal lotto. Controlla che il file sia un video intero.",
   "app.process.drawer.video": "Il video",
+  "app.process.drawer.video_frames": "Fotogrammi del video",
+  "app.process.drawer.video_frames_note": "L’Anteprima ne cerca {n} con il testo",
   "app.process.drawer.what_happened": "Cosa è successo",
   "app.process.empty.drop": "Trascina qui video o cartelle",
   "app.process.empty.formats": ".mkv .mp4 .mov .avi .m4v .webm",

@@ -406,6 +406,8 @@
   "app.process.drawer.under_second": "< 1 s",
   "app.process.drawer.unreadable_text": "SubVision can’t read it, so it stays out of the batch. Check that the file is a whole video.",
   "app.process.drawer.video": "The video",
+  "app.process.drawer.video_frames": "Video frames",
+  "app.process.drawer.video_frames_note": "The Preview looks for {n} with text",
   "app.process.drawer.what_happened": "What happened",
   "app.process.empty.drop": "Drop videos or folders here",
   "app.process.empty.formats": ".mkv .mp4 .mov .avi .m4v .webm",

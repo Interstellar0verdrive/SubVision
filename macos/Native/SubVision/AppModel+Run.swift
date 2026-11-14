@@ -493,6 +493,8 @@ extension AppModel {
         saveVideos()
         updateDock()
         startQueuedRetries()
+        // The drawers' frames that waited for the batch to end (unless a batch of Retry starts now).
+        pumpVideoFrames()
         // The sheet comes up over the page in front: no jump to Video (C3-12).
         if let error = d.error {
             Alerts.error(self, title: t("app.notify.batch_done"), text: engineErrorText(error.split(separator: " ").first.map(String.init) ?? "unknown", detail: error))
