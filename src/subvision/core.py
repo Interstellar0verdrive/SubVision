@@ -1157,119 +1157,191 @@ def _esc(s: str) -> str:
 # set by the app, else the browser language) and fills every text from
 # the JSON (data-i18n* attributes, T object, flag codes of the rows).
 # window.__subvisionSetLang(lang) switches it in place, without a reload.
+# Two layouts (C3, report v2): inside the app (the "subvision" message
+# handler is there) the page starts with the summary box, the app draws
+# the title band above it; in a browser a plain page title comes first.
+# In both the header of the summary box (the report bar) sticks to the top
+# when the page scrolls, and the legend stays fixed at the bottom.
 _QC_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="__LANG__"><head><meta charset="utf-8">
-<title>__T_TITLE__ — __VIDEO__</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__T_TITLE__ __VIDEO__</title>
+<script id="appmode">
+ // In the SubVision app the title band is native: hide the page title
+ // before the first paint (the message handler exists from document start).
+ if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.subvision)
+   document.documentElement.classList.add('app');
+</script>
 <style>
- /* Two palettes: dark (the 1.0 look) and light, chosen by the system
-    appearance (the app's WKWebView follows the app's theme). The light
-    values borrow from the AnimeUp 2.1 design tokens (Tokens.swift, MIT). */
+ /* Two palettes, dark and light, chosen by the system appearance (the
+    app's WKWebView follows the app's theme): the tokens of the native app
+    (C3 boards R1/R2), cyan accent in the dark, blue in the light. */
  :root{color-scheme:light dark;
-   --bg:#14161a; --fg:#e8e8e8; --line:#333; --line2:#2a2d33; --panel:#1d2026;
-   --topbar:#14161acc; --accent:#2a6df4; --accent-fg:#fff; --accent-line:#7db1ff;
-   --accent-glow:#2a6df499; --sec:#3a3d45; --sec-fg:#fff;
-   --warn-bg:#241f0e; --warn-line:#665c20; --bad-bg:#2b1616; --bad-line:#663333;
-   --added-bg:#12281a; --added-line:#2f6b45; --time:#9ecbff;
-   --field-bg:#1d2026; --field-line:#3a3d45; --muted:#777; --muted2:#888; --muted3:#aaa;
-   --tag-bg:#444; --tag-fg:#ddd; --tag-off-bg:#26282e; --tag-off-fg:#777; --tag-off-line:#555;
-   --chip-bg:#26313f; --chip-line:#3d5470; --chip-fg:#bcd6f5; --chip-hover:#31435a;
-   --hl-bg:#f7d154; --hl-fg:#1a1a1a; --opt:#bbb; --ok:#7fd07f; --link:#9ecbff}
+   --bg:#101113; --surface:#16181B; --raised:#1C1F23; --inset:rgba(0,0,0,.25);
+   --glass:rgba(255,255,255,.07); --glass-hover:rgba(255,255,255,.11); --glass-line:rgba(255,255,255,.10);
+   --line:#26292E; --fg:#E8EAED; --fg2:#9BA1A9; --fg3:#80868E;
+   --accent:#2AC9DE; --accent-hover:#4FD5E7; --on-accent:#06252A; --accent-text:#2AC9DE;
+   --accent-soft:rgba(42,201,222,.07); --accent-line:rgba(42,201,222,.28);
+   --ok:#7FE3AC; --warn-fg:#F5CB78; --warn-bg:#2A2110; --warn-line:rgba(242,184,75,.45);
+   --bad-fg:#F59B9B; --bad-bg:rgba(242,109,109,.08); --bad-dot:rgba(242,109,109,.16);
+   --bad-line:rgba(242,109,109,.55); --mark-bg:#F2B84B; --mark-fg:#2A1C00}
  @media (prefers-color-scheme: light){
   :root{
-   --bg:#F6F7F9; --fg:#16181B; --line:#E1E4E8; --line2:#E1E4E8; --panel:#FFFFFF;
-   --topbar:#F6F7F9d9; --accent:#0275B6; --accent-fg:#FFFFFF; --accent-line:#067CC1;
-   --accent-glow:#0275b659; --sec:#DADDE2; --sec-fg:#16181B;
-   --warn-bg:#FFF0C4; --warn-line:#F5B40073; --bad-bg:#FDECEA; --bad-line:#D9402E73;
-   --added-bg:#E6F5EC; --added-line:#12A15059; --time:#206CA1;
-   --field-bg:#FFFFFF; --field-line:#00000040; --muted:#656B73; --muted2:#5C626A; --muted3:#5C626A;
-   --tag-bg:#EEF0F2; --tag-fg:#3A3F46; --tag-off-bg:#F3F4F6; --tag-off-fg:#656B73; --tag-off-line:#00000040;
-   --chip-bg:#2793DB12; --chip-line:#2793DB47; --chip-fg:#206CA1; --chip-hover:#2793DB24;
-   --hl-bg:#FFC21F; --hl-fg:#2A1C00; --opt:#5C626A; --ok:#146C3E; --link:#0275B6}
+   --bg:#F6F7F9; --surface:#FFFFFF; --raised:#EEF0F2; --inset:rgba(0,0,0,.04);
+   --glass:rgba(0,0,0,.04); --glass-hover:rgba(0,0,0,.07); --glass-line:rgba(0,0,0,.12);
+   --line:#E1E4E8; --fg:#16181B; --fg2:#5C626A; --fg3:#656B73;
+   --accent:#0275B6; --accent-hover:#067CC1; --on-accent:#FFFFFF; --accent-text:#206CA1;
+   --accent-soft:rgba(39,147,219,.07); --accent-line:rgba(39,147,219,.28);
+   --ok:#146C3E; --warn-fg:#7F5300; --warn-bg:#FFF0C4; --warn-line:rgba(245,180,0,.45);
+   --bad-fg:#B42323; --bad-bg:rgba(205,55,37,.06); --bad-dot:#FDECEA;
+   --bad-line:rgba(217,64,46,.45); --mark-bg:#F2B84B; --mark-fg:#2A1C00}
  }
- body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
- .wrap{max-width:1100px;margin:0 auto;padding:18px 22px 80px}
- h1{font-size:20px} h2{font-size:16px;margin-top:36px;border-bottom:1px solid var(--line);padding-bottom:6px}
- .sum{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;line-height:1.7;font-size:14px}
- .topbar{position:sticky;top:0;z-index:10;background:var(--topbar);backdrop-filter:blur(8px);
-        border-bottom:1px solid var(--line);padding:10px 22px;display:flex;gap:12px;align-items:center}
- .topbar b{font-size:15px}
- #counter{color:var(--muted3);font-size:13px}
- button{background:var(--accent);color:var(--accent-fg);border:0;border-radius:8px;padding:8px 16px;
-        font-size:14px;cursor:pointer}
- button:hover{filter:brightness(1.15)}
- button.sec{background:var(--sec);color:var(--sec-fg)} button.mini{padding:2px 10px;font-size:12px;border-radius:6px}
- .row{display:flex;gap:12px;border-bottom:1px solid var(--line2);padding:10px 4px;align-items:flex-start}
- .row.warn{background:var(--warn-bg)} .row.bad{background:var(--bad-bg)} .row.excluded{opacity:.45}
- .row.added{background:var(--added-bg)}
+ *{box-sizing:border-box}
+ /* the sticky bar and the fixed legend must not hide a focused field */
+ html{scroll-padding-top:64px;scroll-padding-bottom:48px}
+ body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;font-size:13px;
+      line-height:1.5;margin:0;background:var(--bg);color:var(--fg);-webkit-font-smoothing:antialiased;
+      overflow-x:hidden}
+ .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-variant-numeric:tabular-nums}
+ .wrap{max-width:1236px;margin:0 auto;padding:16px 28px 72px}
+ .ptitle{margin:8px 0 18px;font-size:24px;font-weight:400;letter-spacing:-.01em;line-height:1.25;
+         overflow-wrap:anywhere}
+ .ptitle b{font-weight:700}
+ html.app .ptitle{display:none}
+ button{font-family:inherit;cursor:pointer}
+ input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;margin:0;cursor:pointer;flex:none}
+ svg.ic{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:1.4;
+        stroke-linecap:round;stroke-linejoin:round}
+ .btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;border-radius:999px;
+      white-space:nowrap;height:24px;padding:0 12px;font-size:12px;font-weight:500;flex:none;
+      border:1px solid var(--glass-line);background:var(--glass);color:var(--fg)}
+ .btn:hover{background:var(--glass-hover)}
+ .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+ .btn.pri:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+ /* the report bar: header of the summary box, sticky at the top */
+ .rhead{position:sticky;top:0;z-index:5}
+ .rhead::before{content:"";position:absolute;left:-28px;right:-28px;top:0;bottom:-10px;
+                background:var(--bg);z-index:-1;display:none}
+ .rhead.stuck::before{display:block}
+ .rbar{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 12px 6px 14px;
+       background:var(--raised);border:1px solid var(--line);border-radius:10px 10px 0 0;font-size:12.5px}
+ .rhead.stuck .rbar{border-top-color:transparent;border-radius:0 0 10px 10px}
+ .rbar .left{display:flex;align-items:center;gap:12px;flex:1 1 auto;min-width:0}
+ #counter{white-space:nowrap}
+ .rhead.flash #counter{display:none}
+ .savedmsg{display:none;align-items:center;gap:6px;color:var(--ok);white-space:nowrap;overflow:hidden;
+           text-overflow:ellipsis;min-width:0}
+ .rhead.flash .savedmsg{display:inline-flex}
+ .savedmsg.err{color:var(--bad-fg)}
+ .savedmsg .mono{font-size:12px;overflow:hidden;text-overflow:ellipsis}
+ label.opt{display:flex;align-items:center;gap:6px;color:var(--fg2);white-space:nowrap;cursor:pointer}
+ .rsum{background:var(--surface);border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;
+       padding:10px 14px;font-size:12.5px;line-height:1.65}
+ .hint{color:var(--fg2);font-size:12px;margin-top:3px}
+ h2{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;font-size:14px;font-weight:700;
+    margin:22px 0 0;padding-bottom:6px;border-bottom:1px solid var(--line)}
+ h2 .sub{font-size:12px;font-weight:400;color:var(--fg2)}
+ /* one line of the SRT */
+ .row{display:grid;grid-template-columns:16px 22px 104px 220px minmax(0,1fr) 92px;gap:12px;
+      padding:10px;border-bottom:1px solid var(--line);align-items:start}
+ .row.warn{background:var(--warn-bg)} .row.bad{background:var(--bad-bg)}
+ .row.added{background:var(--accent-soft)}
+ .row.excluded > :not(.cInc){opacity:.5}
  .cInc{padding-top:4px}
- .cT{width:120px;flex:none;font-size:12px;color:var(--time)}
- .cT input{width:112px;background:var(--field-bg);border:1px solid var(--field-line);border-radius:5px;
-          color:var(--time);font-size:12px;padding:3px 5px;margin-bottom:3px;font-family:ui-monospace,monospace}
- .cImg{flex:none} .cImg img{max-width:400px;border-radius:6px;display:block}
- .cTx{flex:1;min-width:220px}
- textarea{width:100%;box-sizing:border-box;background:var(--field-bg);border:1px solid var(--field-line);
-         border-radius:6px;color:var(--fg);font-size:15px;line-height:1.45;padding:6px 8px;
-         resize:vertical;min-height:38px;font-family:inherit}
- textarea.edited{border-color:var(--accent)}
- .cC{width:78px;flex:none;text-align:right;font-size:13px;white-space:nowrap}
- .dur{color:var(--muted);font-size:11px}
- .tag{display:inline-block;background:var(--tag-bg);border-radius:4px;font-size:11px;
-      padding:1px 7px;margin:4px 4px 0 0;color:var(--tag-fg)}
- .tag.top{background:var(--accent);color:var(--accent-fg);font-weight:700;cursor:pointer;
-          border:1px solid var(--accent-line);box-shadow:0 0 8px var(--accent-glow)}
- .tag.top.off{background:var(--tag-off-bg);color:var(--tag-off-fg);font-weight:400;
-          border:1px dashed var(--tag-off-line);box-shadow:none}
- .chip{display:inline-block;background:var(--chip-bg);border:1px solid var(--chip-line);border-radius:6px;
-       font-size:13px;padding:2px 9px;margin:5px 5px 0 0;color:var(--chip-fg);cursor:pointer}
- .chip:hover{background:var(--chip-hover)}
- .chip.orig{border-style:dashed}
- .hl{background:var(--hl-bg);color:var(--hl-fg);border-radius:3px;padding:0 3px;font-weight:600}
- label.opt{color:var(--opt);font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer}
- .hint{color:var(--muted2);font-size:12px;margin-top:4px}
- .n{color:var(--muted2);width:26px;flex:none;padding-top:6px;font-size:13px}
- .gap{border:1px dashed var(--warn-line);border-radius:8px;margin:10px 0;padding:10px;display:flex;gap:12px}
- .legend span{margin-right:16px;font-size:13px}
- .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
- .dot.warn{background:var(--warn-bg);border:1px solid var(--warn-line)}
- .dot.bad{background:var(--bad-bg);border:1px solid var(--bad-line)}
- .dot.added{background:var(--added-bg);border:1px solid var(--added-line)}
- .saved{color:var(--ok);font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s;
-        display:inline-grid;flex:none;white-space:nowrap}
- /* invisible sizer: the note is always as wide as its longest short message,
-    so "saved" -> "SRT saved" does not move the controls of the top bar */
- .saved::after{content:attr(data-wide);height:0;visibility:hidden}
- /* a long message (file name, error) wraps and shrinks as it always did */
- .saved.long{flex:0 1 auto;white-space:normal}
- .foot{margin-top:48px;padding-top:12px;border-top:1px solid var(--line2);color:var(--muted);
-       font-size:12px;text-align:center}
- .foot a{color:var(--link);text-decoration:none} .foot a:hover{text-decoration:underline}
+ .n{color:var(--fg3);padding-top:3px;font-size:12px}
+ .tin{display:block;width:104px;height:22px;font-size:11.5px;color:var(--accent-text);
+      border:1px solid var(--glass-line);border-radius:5px;padding:0 6px;background:var(--inset);outline:none}
+ .tin + .tin{margin-top:4px}
+ .tin:focus{border-color:var(--accent)}
+ .tin.bad{border-color:var(--bad-line);color:var(--bad-fg);background:var(--bad-bg)}
+ .tin::placeholder{color:var(--fg3);opacity:.6}
+ .rdur{font-size:11px;color:var(--fg3);margin-top:3px;padding-left:2px}
+ .rdur.bad{color:var(--bad-fg)}
+ .thumb{width:220px;height:auto;max-height:80px;object-fit:contain;border-radius:5px;display:block;background:#000}
+ .thumb.none{height:40px;display:grid;place-items:center;border:1px dashed var(--glass-line);
+             background:transparent;color:var(--fg3);font-size:11px}
+ textarea{width:100%;display:block;background:var(--surface);border:1px solid var(--glass-line);border-radius:6px;
+          color:var(--fg);font-family:inherit;font-size:13.5px;line-height:1.45;padding:4px 9px;
+          resize:none;overflow:hidden;min-height:30px;outline:none}
+ textarea:focus{border-color:var(--accent)}
+ textarea.edited{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent-line)}
+ .alts{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+ .altc{font-size:12px;border:1px solid var(--glass-line);background:var(--glass);border-radius:6px;
+       padding:1px 7px;line-height:18px;color:var(--fg);cursor:pointer}
+ .altc:hover{background:var(--glass-hover)}
+ .altc.cur{border-color:var(--accent)}
+ .hl{background:var(--mark-bg);color:var(--mark-fg);border-radius:3px;padding:0 2px}
+ .subl{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;margin-top:6px;font-size:12px;color:var(--fg2)}
+ .subl label{display:flex;align-items:center;gap:6px;cursor:pointer}
+ .link{display:inline-flex;align-items:center;gap:4px;background:none;border:0;padding:0;
+       color:var(--accent-text);font-size:12px}
+ .link:disabled{color:var(--fg3);opacity:.7;cursor:default}
+ .flag{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:10.5px;color:var(--fg3);
+       border:1px solid var(--glass-line);border-radius:999px;padding:0 7px;line-height:16px}
+ .cf{text-align:right;line-height:1.3;white-space:nowrap}
+ .cf b{font-size:13px;font-weight:600}
+ .cf .ag{display:block;font-size:11px;color:var(--fg3);margin-top:2px}
+ .cf.c-ok b{color:var(--ok)} .cf.c-warn b{color:var(--warn-fg)} .cf.c-bad b{color:var(--bad-fg)}
+ .cf.c-added b{color:var(--fg3)}
+ /* a long stretch without subtitles */
+ .gaprow{display:grid;grid-template-columns:200px 220px minmax(0,1fr);gap:16px;align-items:center;
+         padding:10px;border-bottom:1px solid var(--line);font-size:12.5px}
+ .gaprow .gt{font-size:12px}
+ .gaprow .gd{font-size:12px;color:var(--fg2)}
+ .gapact{display:flex;align-items:center;gap:10px}
+ .gapact .hint{margin:0}
+ .gapact .sp{flex:1}
+ .empty{color:var(--fg2);font-size:12px;padding:10px}
+ .foot{margin-top:40px;color:var(--fg3);font-size:11.5px;text-align:center}
+ .foot a{color:var(--accent-text);text-decoration:none} .foot a:hover{text-decoration:underline}
+ /* thin legend, fixed at the bottom */
+ .legend{position:fixed;left:0;right:0;bottom:0;height:34px;border-top:1px solid var(--line);
+         background:var(--raised);display:flex;align-items:center;gap:18px;padding:0 28px;
+         font-size:11.5px;color:var(--fg2);z-index:6;white-space:nowrap;overflow:hidden}
+ .legend .lg{display:inline-flex;align-items:center;gap:6px}
+ .legend b{color:var(--fg)}
+ .sw{display:inline-block;width:12px;height:12px;border-radius:3px;flex:none}
+ .sw.warn{background:var(--warn-bg);border:1px solid var(--warn-line)}
+ .sw.bad{background:var(--bad-dot);border:1px solid var(--bad-line)}
+ .sw.added{background:var(--accent-soft);border:1px solid var(--accent-line)}
+ @media (max-width:1000px){
+  .row{grid-template-columns:16px 22px 104px 140px minmax(0,1fr) 72px}
+  .thumb{width:140px}
+  .gaprow{grid-template-columns:180px 140px minmax(0,1fr)}
+ }
 </style></head><body>
-<div class="topbar">
- <b>🎬 <span data-i18n="TITLE">__T_TITLE__</span> — __VIDEO__</b>
- <span style="flex:1"></span>
- <span id="counter"></span>
- <label class="opt" title="__T_MERGE_TIP__" data-i18n-title="MERGE_TIP">
-   <input type="checkbox" id="mergeOnSave" checked> <span data-i18n="MERGE_LABEL">__T_MERGE_LABEL__</span></label>
- <button class="sec" onclick="resetAll()" data-i18n="RESET">__T_RESET__</button>
- <button onclick="exportSrt()" data-i18n="SAVE">__T_SAVE__</button>
- <span class="saved" id="savedNote" data-wide="__T_SRT_SAVED__">__T_SAVED__</span>
-</div>
 <div class="wrap">
-<div class="sum"><span id="summary">__SUMMARY__</span>
- <div class="legend" style="margin-top:6px">
-  <span><span class="dot warn"></span><span data-i18n="LEG_WARN">__T_LEG_WARN__</span></span>
-  <span><span class="dot bad"></span><span data-i18n="LEG_BAD">__T_LEG_BAD__</span></span>
-  <span><span class="dot added"></span><span data-i18n="LEG_ADDED">__T_LEG_ADDED__</span></span>
+<h1 class="ptitle"><span data-i18n="TITLE">__T_TITLE__</span> <b>__VIDEO__</b></h1>
+<div id="rsentinel" style="height:1px;margin-bottom:-1px"></div>
+<div class="rhead" id="rhead">
+ <div class="rbar">
+  <div class="left">
+   <span id="counter"></span>
+   <span class="savedmsg" id="savedNote" role="status"></span>
+   <label class="opt" title="__T_MERGE_TIP__" data-i18n-title="MERGE_TIP">
+    <input type="checkbox" id="mergeOnSave" checked> <span data-i18n="MERGE_LABEL">__T_MERGE_LABEL__</span></label>
+  </div>
+  <button type="button" class="btn" onclick="resetAll()" title="__T_RESET_TIP__" data-i18n-title="RESET_TIP"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.5-3.6"/><path d="M3 2.5v3h3"/></svg><span data-i18n="RESET">__T_RESET__</span></button>
+  <button type="button" class="btn pri" onclick="exportSrt()" data-i18n="SAVE">__T_SAVE__</button>
  </div>
+</div>
+<div class="rsum"><div id="summary">__SUMMARY__</div>
  <div class="hint" id="hint">__T_HINT__</div>
 </div>
-<h2><span data-i18n="ROWS_H">__T_ROWS_H__</span> <button class="mini sec" onclick="addRow(null)" data-i18n="ADDROW">__T_ADDROW__</button></h2>
+<h2><span data-i18n="ROWS_H">__T_ROWS_H__</span> <button type="button" class="btn" onclick="addRow(null)" data-i18n="ADDROW">__T_ADDROW__</button></h2>
 <div id="rows"></div>
-<h2 data-i18n="DROPPED_H">__T_DROPPED_H__</h2>
+<h2><span data-i18n="DROPPED_H">__T_DROPPED_H__</span> <span class="sub" data-i18n="DROPPED_SUB">__T_DROPPED_SUB__</span></h2>
 <div id="dropped"></div>
-<h2 data-i18n="GAPS_H">__T_GAPS_H__</h2>
+<h2><span id="gapsTitle"></span> <span class="sub" data-i18n="GAPS_SUB">__T_GAPS_SUB__</span></h2>
 <div id="gaps"></div>
 <div class="foot" id="foot">__FOOTER__</div>
+</div>
+<div class="legend" role="note">
+ <span class="lg"><i class="sw warn"></i><span data-i18n="LEG_WARN">__T_LEG_WARN__</span></span>
+ <span class="lg"><i class="sw bad"></i><span data-i18n="LEG_BAD">__T_LEG_BAD__</span></span>
+ <span class="lg"><i class="sw added"></i><span data-i18n="LEG_ADDED">__T_LEG_ADDED__</span></span>
+ <span class="lg"><span class="hl" data-i18n="LEG_WORD">__T_LEG_WORD__</span><span data-i18n="LEG_WORD_TXT">__T_LEG_WORD_TXT__</span></span>
+ <span class="lg" data-i18n="LEG_CONF">__T_LEG_CONF__</span>
 </div>
 <script type="application/json" id="qcdata">__DATA__</script>
 <script type="application/json" id="qci18n">__I18N__</script>
@@ -1297,9 +1369,10 @@ function flagText(code){
 }
 const LSKEY = 'voc26_rev_' + DATA.srtName;
 // Bridge to the SubVision app (WKWebView): the app registers the script
-// message handler "subvision" and receives {type:"export", name, srt} and
-// {type:"state", json}. Absent in Safari/Chrome: everything below falls
-// back to the 1.0 behaviour (localStorage, save dialog or download).
+// message handler "subvision" and receives {type:"export", name, srt},
+// {type:"state", json} and {type:"confirm", ...}. Absent in Safari/Chrome:
+// everything below falls back to the browser (localStorage, save dialog
+// or download, confirm()).
 const BRIDGE = (window.webkit && window.webkit.messageHandlers &&
                 window.webkit.messageHandlers.subvision) || null;
 // Initial state: the app injects the saved editor state as
@@ -1316,30 +1389,50 @@ if (!ignoreInjected && window.__subvisionState && typeof window.__subvisionState
   try { saved = JSON.parse(localStorage.getItem(LSKEY) || '{}'); } catch(e) {}
 }
 let addCounter = 0;
-let flashing = false;
+let flashTimer = null;
+// Every row on the page by id (OCR rows, dropped ones, rows added by hand).
+const ROWS = {};
+const ICONS = {
+  reset: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.5-3.6"/><path d="M3 2.5v3h3"/></svg>',
+  remove: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>',
+  check: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.3l3 3 6-6.6"/></svg>',
+};
+
+function esc(s){
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+// Numbers in the language of the page: "2,38 s" / "2.38 s", "98 %" / "98%".
+function num(x, d){
+  const s = x.toFixed(d);
+  return T.decimal === ',' ? s.replace('.', ',') : s;
+}
+function pct(x){ return T.pct.replace('{n}', Math.round(x * 100)); }
+function secs(x, d){ return T.secs.replace('{n}', num(x, d)); }
+function gapWarnText(){
+  const g = +DATA.gapWarn || 0;
+  return num(g, Number.isInteger(g) ? 0 : 1);
+}
 
 // Static texts of the page in the current language (markup with data-i18n*,
-// title, <html lang>, hint, summary, footer, resting note of the top bar).
+// title, <html lang>, hint, summary, footer, title of the gaps).
 // The in-app hint replaces the browser one when the bridge is present.
 function applyStatic(){
   const L = I18N[LANG];
   document.documentElement.lang = LANG;
-  document.title = L.html.TITLE + ' — ' + DATA.videoName;
+  document.title = L.html.TITLE + ' ' + DATA.videoName;
   document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = L.html[el.dataset.i18n]; });
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = L.html[el.dataset.i18nTitle]; });
   document.querySelectorAll('[data-i18n-js]').forEach(el => { el.innerHTML = T[el.dataset.i18nJs]; });
   document.getElementById('hint').innerHTML = BRIDGE ? T.hintApp : L.html.HINT;
   document.getElementById('summary').innerHTML = L.summary;
   document.getElementById('foot').innerHTML = L.footer;
-  const n = document.getElementById('savedNote');
-  n.dataset.wide = L.html.SRT_SAVED;
-  if (!flashing) n.textContent = T.saved;
+  document.getElementById('gapsTitle').textContent = T.gapsTitle.replace('{n}', gapWarnText());
 }
 // Texts built by makeRow / the gaps: every row and gap keeps a refresher
 // that rewrites its labels and tooltips only (inputs, ticks, edits, chosen
 // alternatives and added rows are left as they are).
 function refreshRows(){
-  document.querySelectorAll('.row, .gap').forEach(el => { if (el._i18n) el._i18n(); });
+  document.querySelectorAll('.row, .gaprow').forEach(el => { if (el._i18n) el._i18n(); });
 }
 // Called by the app (evaluateJavaScript) when its language changes while
 // the report is open: everything visible switches in place, no reload.
@@ -1360,6 +1453,7 @@ function persistState(){
 }
 
 function ts(sec){
+  if (sec == null) return '';
   sec = Math.max(0, sec);
   const ms = Math.round(sec*1000);
   const h = Math.floor(ms/3600000), m = Math.floor(ms/60000)%60,
@@ -1372,7 +1466,7 @@ function parseTs(t){
   if(!m) return null;
   return (+m[1])*3600 + (+m[2])*60 + (+m[3]) + (+m[4].padEnd(3,'0'))/1000;
 }
-// ---- similarita' testi (replica della logica Python della pipeline)
+// ---- text similarity (mirror of the pipeline's Python logic)
 function normCmp(s){
   return (s||'').toLowerCase().replace(/["“”‘’„«»‹›]/g,'')
          .replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
@@ -1401,7 +1495,7 @@ function similar(a,b,ratio){
   const L=Math.max(a.length,b.length);
   return editDist(a,b) <= Math.max(2, Math.round(L*ratio));
 }
-// ---- diff a parole (LCS): ritorna i token di b marcando quelli diversi da a
+// ---- word diff (LCS): returns the tokens of b, marking those that differ from a
 function wordDiff(a,b){
   const A=(a||'').split(/\s+/).filter(Boolean), B=(b||'').split(/\s+/).filter(Boolean);
   const m=A.length,n=B.length;
@@ -1421,10 +1515,10 @@ function state(id){ return saved[id] || {}; }
 function setState(id, patch){
   saved[id] = Object.assign({}, saved[id]||{}, patch);
   persistState();
-  const n = document.getElementById('savedNote');
-  n.style.opacity = 1; setTimeout(()=>n.style.opacity=0, 900);
   updateCounter();
 }
+// The current values of a row: the saved edits over what the OCR gave.
+// start/end may be null (a line added with "+ Add line" starts without times).
 function rowValues(r){
   const s = state(r.id);
   return {
@@ -1435,128 +1529,216 @@ function rowValues(r){
     top: (s.top !== undefined) ? s.top : !!r.top,
   };
 }
+function el(tag, cls){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  return e;
+}
+function checkbox(){
+  const c = document.createElement('input'); c.type = 'checkbox';
+  return c;
+}
 
-function makeRow(r, container){
+// One line of the SRT (OCR, dropped or added by hand). Returns the element;
+// the caller puts it in its place.
+function makeRow(r){
+  ROWS[r.id] = r;
   const v = rowValues(r);
-  const div = document.createElement('div');
-  div.className = 'row ' + (r.added ? 'added' : r.cls || '');
+  const div = el('div', 'row ' + (r.added ? 'added' : (r.cls || '')));
   if(!v.included) div.classList.add('excluded');
   div.dataset.id = r.id;
 
-  const inc = document.createElement('div'); inc.className='cInc';
-  const cb = document.createElement('input'); cb.type='checkbox'; cb.checked=v.included;
-  cb.title=T.includeTip;
-  cb.onchange = () => { setState(r.id,{included:cb.checked});
+  const inc = el('div', 'cInc');
+  const cb = checkbox(); cb.checked = v.included;
+  cb.onchange = () => { setState(r.id, {included: cb.checked});
                         div.classList.toggle('excluded', !cb.checked); };
   inc.appendChild(cb); div.appendChild(inc);
 
-  const num = document.createElement('div'); num.className='n'; num.textContent=r.n||''; div.appendChild(num);
+  const numEl = el('div', 'n'); numEl.textContent = r.added ? '+' : String(r.n == null ? '' : r.n);
+  div.appendChild(numEl);
 
-  const ct = document.createElement('div'); ct.className='cT';
-  const ti1 = document.createElement('input'); ti1.value = ts(v.start); ti1.title=T.start;
-  const ti2 = document.createElement('input'); ti2.value = ts(v.end); ti2.title=T.end;
-  const dur = document.createElement('div'); dur.className='dur';
-  const updDur = () => {
-    const a=parseTs(ti1.value), b=parseTs(ti2.value);
-    dur.textContent = (a!=null && b!=null) ? (b-a).toFixed(2)+'s' : T.tsFormat;
+  // start, end and the duration under them; invalid times in red
+  const ct = el('div', 'cT');
+  const ti1 = el('input', 'tin mono'), ti2 = el('input', 'tin mono');
+  ti1.value = ts(v.start); ti2.value = ts(v.end);
+  ti1.placeholder = ti2.placeholder = '00:00:00,000';
+  ti1.spellcheck = ti2.spellcheck = false;
+  const dur = el('div', 'rdur mono');
+  const checkTimes = () => {
+    const a = parseTs(ti1.value), b = parseTs(ti2.value);
+    ti1.classList.toggle('bad', a == null);
+    ti2.classList.toggle('bad', b == null || (a != null && b <= a));
+    if (a != null && b != null) {
+      dur.textContent = secs(b - a, 2);
+      dur.classList.toggle('bad', b <= a);
+    } else {
+      const empty = !ti1.value.trim() && !ti2.value.trim();
+      dur.textContent = empty ? T.noTimes : T.tsFormat;
+      dur.classList.add('bad');
+    }
   };
-  updDur();
-  ti1.onchange = () => { const t=parseTs(ti1.value); if(t!=null) setState(r.id,{start:t}); updDur(); };
-  ti2.onchange = () => { const t=parseTs(ti2.value); if(t!=null) setState(r.id,{end:t}); updDur(); };
+  checkTimes();
+  ti1.oninput = checkTimes; ti2.oninput = checkTimes;
+  ti1.onchange = () => { setState(r.id, {start: parseTs(ti1.value)}); checkTimes(); };
+  ti2.onchange = () => { setState(r.id, {end: parseTs(ti2.value)}); checkTimes(); };
   ct.append(ti1, ti2, dur); div.appendChild(ct);
 
-  if(r.thumb){
-    const ci = document.createElement('div'); ci.className='cImg';
-    const img = document.createElement('img'); img.src='data:image/jpeg;base64,'+r.thumb;
-    ci.appendChild(img); div.appendChild(ci);
+  // frame: the row's own, the mid-gap one for a row added from a gap, or none
+  let thumb;
+  if (r.thumb) {
+    thumb = el('img', 'thumb'); thumb.src = 'data:image/jpeg;base64,' + r.thumb;
+  } else {
+    thumb = el('div', 'thumb none');
   }
+  div.appendChild(thumb);
 
-  const cx = document.createElement('div'); cx.className='cTx';
+  const cx = el('div', 'cTx');
   const ta = document.createElement('textarea'); ta.value = v.text;
-  ta.rows = Math.max(1, v.text.split('\n').length);
-  if(v.text !== r.text) ta.classList.add('edited');
-  ta.oninput = () => { setState(r.id,{text:ta.value});
-                       ta.classList.toggle('edited', ta.value !== r.text); };
+  // as tall as its text (lines and wraps); measured again once on the page
+  const fit = () => {
+    ta.rows = Math.max(1, ta.value.split('\n').length);
+    if (ta.isConnected) { ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 2) + 'px'; }
+  };
+  ta._fit = fit;
+  fit();
   cx.appendChild(ta);
 
-  const tags = document.createElement('div');
-  const an8 = document.createElement('span');
-  const an8Label = on => on ? T.signOn : T.signOff;
-  an8.className = 'tag top' + (v.top?'':' off');
-  an8.textContent = an8Label(v.top);
-  an8.title=T.signTip;
-  an8.onclick = () => { const nv=!(state(r.id).top!==undefined?state(r.id).top:!!r.top);
-                        setState(r.id,{top:nv}); an8.classList.toggle('off',!nv);
-                        an8.textContent = an8Label(nv); };
-  tags.appendChild(an8);
-  const flagEls = [];
-  (r.flags||[]).forEach(f => { const t=document.createElement('span');
-                               t.className='tag'; t.textContent=flagText(f); tags.appendChild(t);
-                               flagEls.push([t, f]); });
-  cx.appendChild(tags);
-
+  // alternative readings, the words that differ from the OCR text highlighted
   const altChips = [];
-  let origChip = null;
-  if((r.alts||[]).length || r.text){
-    const alt = document.createElement('div');
-    (r.alts||[]).forEach(a => {
-      const c = document.createElement('span'); c.className='chip'; c.dataset.txt=a;
-      c.title=T.altTip; altChips.push(c);
-      // evidenzia le parole che differiscono dal testo originale della riga
-      wordDiff((r.text||'').replace(/\n/g,' '), a.replace(/\n/g,' ')).forEach(([w,d],k)=>{
-        if(k) c.appendChild(document.createTextNode(' '));
-        const s=document.createElement('span');
-        if(d) s.className='hl';
-        s.textContent=w;
+  if ((r.alts||[]).length) {
+    const alts = el('div', 'alts');
+    r.alts.forEach(a => {
+      const c = el('span', 'altc'); c.dataset.txt = a; altChips.push(c);
+      wordDiff((r.text||'').replace(/\n/g,' '), a.replace(/\n/g,' ')).forEach(([w,d],k) => {
+        if (k) c.appendChild(document.createTextNode(' '));
+        const s = el('span', d ? 'hl' : '');
+        s.textContent = w;
         c.appendChild(s);
       });
-      c.onclick = () => { ta.value=c.dataset.txt; ta.dispatchEvent(new Event('input')); };
-      alt.appendChild(c);
+      c.onclick = () => { ta.value = c.dataset.txt; ta.dispatchEvent(new Event('input')); };
+      alts.appendChild(c);
     });
-    if(r.text){
-      const o = document.createElement('span'); o.className='chip orig'; o.textContent=T.orig;
-      origChip = o;
-      o.onclick = () => { ta.value=r.text; ta.dispatchEvent(new Event('input')); };
-      alt.appendChild(o);
-    }
-    cx.appendChild(alt);
+    cx.appendChild(alts);
   }
+
+  // "It's a sign (goes on top)", the flags, Original (or Remove for a row added by hand)
+  const subl = el('div', 'subl');
+  const lab = el('label');
+  const cbTop = checkbox(); cbTop.checked = v.top;
+  const labTxt = el('span');
+  lab.append(cbTop, labTxt);
+  subl.appendChild(lab);
+  const act = el('button', 'link'); act.type = 'button';
+  const flagEls = [];
+  const addFlags = () => (r.flags||[]).forEach(f => {
+    const t = el('span', 'flag'); subl.appendChild(t); flagEls.push([t, f]);
+  });
+  if (r.added) { addFlags(); subl.appendChild(act); }
+  else { subl.appendChild(act); addFlags(); }
+  cx.appendChild(subl);
   div.appendChild(cx);
 
-  const cc = document.createElement('div'); cc.className='cC';
-  const confHtml = () => r.conf!=null ? Math.round(r.conf*100)+'%<div class="dur">'+T.agree+' '+
-                         Math.round((r.agree||1)*100)+'%</div>' : '—';
-  cc.innerHTML = confHtml();
+  // the box with the text, the alternative in use and Original follow the edits
+  const sync = () => {
+    ta.classList.toggle('edited', !r.added && ta.value !== r.text);
+    altChips.forEach(c => c.classList.toggle('cur', ta.value === c.dataset.txt));
+    if (!r.added) act.disabled = (ta.value === r.text && cbTop.checked === !!r.top);
+  };
+  ta.oninput = () => { setState(r.id, {text: ta.value}); fit(); sync(); };
+  cbTop.onchange = () => { setState(r.id, {top: cbTop.checked}); sync(); };
+  if (r.added) {
+    act.onclick = () => removeRow(r, div);
+  } else {
+    // back to the row as the OCR gave it: text and "It's a sign"
+    act.onclick = () => {
+      ta.value = r.text; cbTop.checked = !!r.top;
+      setState(r.id, {text: r.text, top: !!r.top});
+      fit(); sync();
+    };
+  }
+  sync();
+
+  const cc = el('div', 'cf c-' + (r.added ? 'added' : (r.cls || 'ok')));
   div.appendChild(cc);
 
   // language switch: labels and tooltips only (see refreshRows)
   div._i18n = () => {
-    cb.title=T.includeTip; ti1.title=T.start; ti2.title=T.end; updDur();
-    an8.textContent = an8Label(!an8.classList.contains('off')); an8.title=T.signTip;
-    flagEls.forEach(([t, f]) => { t.textContent = flagText(f); });
+    cb.title = T.includeTip; ti1.title = T.start; ti2.title = T.end; checkTimes();
+    if (r.thumb) thumb.alt = T.rowThumbAlt.replace('{n}', r.added ? '+' : r.n);
+    else thumb.textContent = T.noFrame;
     altChips.forEach(c => { c.title = T.altTip; });
-    if (origChip) origChip.textContent = T.orig;
-    cc.innerHTML = confHtml();
+    labTxt.textContent = T.sign; lab.title = T.signTip;
+    flagEls.forEach(([t, f]) => { t.textContent = flagText(f); });
+    act.innerHTML = r.added ? ICONS.remove + esc(T.remove) : ICONS.reset + esc(T.orig);
+    act.title = r.added ? T.removeTip : T.origTip;
+    cc.innerHTML = r.conf != null
+      ? '<b>' + pct(r.conf) + '</b><span class="ag">' + esc(T.agree) + ' ' +
+        pct(r.agree == null ? 1 : r.agree) + '</span>'
+      : '<b>—</b>';
   };
-
-  container.appendChild(div);
+  div._i18n();
   return div;
 }
 
+// "Remove" of a row added by hand: gone from the page and from the state.
+function removeRow(r, div){
+  delete saved[r.id];
+  persistState();
+  DATA.extraRows = DATA.extraRows.filter(x => x !== r);
+  delete ROWS[r.id];
+  div.remove();
+  updateCounter();
+}
+
+function round3(x){ return Math.round(x * 1000) / 1000; }
+
+// A row added by hand. From a gap: under the gap, with the mid-gap frame
+// and times 0.5 s after the gap start, 2 s long. From "+ Add line": at the
+// end of the rows, no frame, EMPTY times (red until filled). The row stays
+// where it is while it is edited; the SRT is sorted by time on save, and on
+// the next open the row shows among the others at its time.
 function addRow(gap){
   addCounter++;
-  const id = 'new'+Date.now()+'_'+addCounter;
-  const base = gap ? {start: gap.start+0.5, end: Math.min(gap.end-0.5, gap.start+2.5)}
-                   : {start: 0, end: 2};
-  const r = {id:id, n:'+', start:base.start, end:base.end, text:'', alts:[],
-             flags:[ADDED_FLAG], conf:null, added:true, dropped:false,
-             thumb: gap ? gap.thumb : ''};
+  const id = 'new' + Date.now() + '_' + addCounter;
+  let start = null, end = null;
+  const gi = gap ? DATA.gaps.indexOf(gap) : -1;
+  if (gap) {
+    start = round3(gap.start + Math.min(0.5, (gap.end - gap.start) / 4));
+    end = round3(Math.min(gap.end, start + 2));
+  }
+  const r = {id:id, n:'+', start:start, end:end, text:'', alts:[], flags:[ADDED_FLAG],
+             conf:null, added:true, dropped:false, thumb: gap ? gap.thumb : ''};
   DATA.extraRows.push(r);
-  setState(id, {text:'', start:base.start, end:base.end, included:true, added:true});
-  const div = makeRow(r, document.createElement('div'));   // creato staccato...
-  if(gap) gap._el.after(div);                              // ...poi spostato dove serve
-  else document.getElementById('rows').appendChild(div);
-  div.querySelector('textarea').focus();
+  const st = {text:'', start:start, end:end, included:true, added:true, top:false};
+  if (gi >= 0) st.gap = gi;
+  setState(id, st);
+  const div = makeRow(r);
+  if (gap) {
+    // under the gap, after the rows already added there
+    let after = gap._el;
+    while (after.nextElementSibling && after.nextElementSibling.classList.contains('added'))
+      after = after.nextElementSibling;
+    after.after(div);
+  } else {
+    document.getElementById('rows').appendChild(div);
+  }
+  updateCounter();
+  const ta = div.querySelector('textarea');
+  ta._fit(); ta.focus();
+}
+
+// A restored row added by hand goes before the first row that starts later
+// (rows without times go at the end).
+function placeByTime(container, div, start){
+  if (start != null) {
+    for (const other of container.children) {
+      const o = ROWS[other.dataset.id];
+      if (!o) continue;
+      const os = rowValues(o).start;
+      if (os != null && os > start) { container.insertBefore(div, other); return; }
+    }
+  }
+  container.appendChild(div);
 }
 
 function updateCounter(){
@@ -1586,8 +1768,8 @@ function collectRows(){
   return rows;
 }
 
-// unisce righe adiacenti (stessa banda) con testo uguale/simile:
-// vince il testo editato a mano; a parita', quello della riga piu' lunga.
+// merges adjacent rows (same band) with equal/similar text:
+// the text edited by hand wins; otherwise the one of the longer row.
 function mergeRows(rows, gap){
   gap = gap==null ? 0.6 : gap;
   const out=[]; let merged=0;
@@ -1604,6 +1786,8 @@ function mergeRows(rows, gap){
   return [out, merged];
 }
 
+// The SRT, sorted by time and numbered again; a sign gets its position
+// tag in the file only (never shown on the page).
 function buildSrt(){
   let rows = collectRows();
   if(!rows) return null;
@@ -1625,15 +1809,20 @@ function stamp(){
   const p = n => String(n).padStart(2,'0');
   return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes());
 }
-// `tip`: what does not fit in the top bar (the path of the file), as the
-// tooltip of the note for as long as the note is shown.
-function flash(msg, tip){
-  const n = document.getElementById('savedNote');
-  flashing = true;
-  n.textContent = msg; n.title = tip || ''; n.style.opacity = 1;
-  n.classList.toggle('long', msg !== T.srtSaved);
-  setTimeout(()=>{ flashing = false; n.style.opacity=0; n.textContent=T.saved; n.title='';
-                   n.classList.remove('long'); }, 2500);
+// The outcome of a save, in the report bar in place of the counter for a
+// few seconds (green; red for an error). `tip`: the full path and the
+// merge note, as the tooltip of the message.
+function flash(html, tip, bad){
+  const head = document.getElementById('rhead'), n = document.getElementById('savedNote');
+  n.innerHTML = (bad ? '' : ICONS.check) + html;
+  n.title = tip || '';
+  n.classList.toggle('err', !!bad);
+  head.classList.add('flash');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { head.classList.remove('flash'); n.title = ''; }, 6000);
+}
+function savedHtml(key, name){
+  return esc(T[key]).replace('{name}', '<span class="mono">' + esc(name) + '</span>');
 }
 async function exportSrt(){
   const out = buildSrt();
@@ -1643,15 +1832,14 @@ async function exportSrt(){
   const mergeNote = mi > 0 ? ' · ' + mi + ' ' + T.mergedDupes : '';
   // 1) SubVision app (WKWebView): the app writes the file next to the original.
   //    With WKScriptMessageHandlerWithReply postMessage returns a promise
-  //    ({ok, path, bytes}); with the plain handler it returns undefined.
+  //    ({ok, path, name, bytes}); with the plain handler it returns undefined.
   if (BRIDGE) {
     try {
       const r = await Promise.resolve(BRIDGE.postMessage({type:'export', name: fname, srt: out}));
-      // in the app only the short message: the path (and the merge note) go
-      // in the tooltip, a long text would push the title and the buttons
-      flash(T.srtSaved, ((r && r.path) || fname) + mergeNote);
+      // the file name in the bar, the full path (and the merge note) in the tooltip
+      flash(savedHtml('savedAs', (r && r.name) || fname), ((r && r.path) || fname) + mergeNote);
     } catch(e) {
-      flash(T.srtError + ' ' + e);   // no fallback: WKWebView has no useful dialog
+      flash(esc(T.srtError + ' ' + e), '', true);   // no fallback: WKWebView has no useful dialog
     }
     return;
   }
@@ -1665,7 +1853,7 @@ async function exportSrt(){
       });
       const w = await h.createWritable();
       await w.write(out); await w.close();
-      flash(T.srtSaved + ' (' + fname + ')' + mergeNote);
+      flash(savedHtml('savedAs', h.name || fname) + esc(mergeNote));
       return;
     }catch(e){
       if(e && e.name === 'AbortError') return;   // cancelled by the user
@@ -1678,11 +1866,26 @@ async function exportSrt(){
   a.download = fname;
   a.click();
   URL.revokeObjectURL(a.href);
-  flash(T.srtDownloaded + ' (' + fname + ')' + mergeNote);
+  flash(savedHtml('srtDownloaded', fname) + esc(mergeNote));
 }
 
-function resetAll(){
-  if(!confirm(T.confirmReset)) return;
+// "Reset all…" asks first and says what is lost. In the app: the message
+// {type:"confirm", title, text, confirm, cancel, destructive} answered with
+// {confirmed: true|false} (destructive button + Cancel as the default).
+// An app that does not know the message (the promise fails) and a browser
+// get confirm() with the title, a blank line and the text.
+async function askReset(){
+  if (BRIDGE) {
+    try {
+      const r = await Promise.resolve(BRIDGE.postMessage({type:'confirm', title: T.resetTitle,
+        text: T.resetText, confirm: T.resetConfirm, cancel: T.resetCancel, destructive: true}));
+      if (r && typeof r.confirmed === 'boolean') return r.confirmed;
+    } catch(e) {}
+  }
+  return confirm(T.resetTitle + '\n\n' + T.resetText);
+}
+async function resetAll(){
+  if(!(await askReset())) return;
   saved = {}; persistState();
   try { localStorage.removeItem(LSKEY); sessionStorage.setItem(LSKEY + ':reset', '1'); } catch(e) {}
   location.reload();
@@ -1692,44 +1895,81 @@ function resetAll(){
 applyStatic();
 DATA.extraRows = [];
 const rowsEl = document.getElementById('rows');
-DATA.rows.filter(r=>!r.dropped).forEach(r => makeRow(r, rowsEl));
+DATA.rows.filter(r=>!r.dropped).forEach(r => rowsEl.appendChild(makeRow(r)));
 const dropEl = document.getElementById('dropped');
 const droppedRows = DATA.rows.filter(r=>r.dropped);
-if(droppedRows.length) droppedRows.forEach(r => makeRow(r, dropEl));
-else dropEl.innerHTML = '<div class="hint" data-i18n-js="noneDropped">'+T.noneDropped+'</div>';
+if(droppedRows.length) droppedRows.forEach(r => dropEl.appendChild(makeRow(r)));
+else dropEl.innerHTML = '<div class="empty" data-i18n-js="noneDropped">'+T.noneDropped+'</div>';
 const gapsEl = document.getElementById('gaps');
 if(DATA.gaps.length){
-  DATA.gaps.forEach((g,gi) => {
-    const d = document.createElement('div'); d.className='gap'; g._el = d;
-    const img = g.thumb ? '<img src="data:image/jpeg;base64,'+g.thumb+
-                '" style="max-width:400px;border-radius:6px">' : '';
-    d.innerHTML = '<div class="cT">'+ts(g.start)+'<br>→ '+ts(g.end)+
-                  '<div class="dur"></div></div>'+
-                  '<div>'+img+'</div><div style="flex:1"><div class="hint"></div></div>';
-    const durEl = d.querySelector('.dur'), hintEl = d.querySelector('.hint');
-    const btn = document.createElement('button'); btn.className='mini';
+  DATA.gaps.forEach(g => {
+    const d = el('div', 'gaprow'); g._el = d;
+    const tc = el('div');
+    tc.innerHTML = '<div class="gt mono">' + ts(g.start) + ' → ' + ts(g.end) + '</div><div class="gd"></div>';
+    const gd = tc.querySelector('.gd');
+    let thumb;
+    if (g.thumb) { thumb = el('img', 'thumb'); thumb.src = 'data:image/jpeg;base64,' + g.thumb; }
+    else thumb = el('div', 'thumb none');
+    const act = el('div', 'gapact');
+    const hint = el('span', 'hint');
+    const btn = el('button', 'btn'); btn.type = 'button';
     btn.onclick = () => addRow(g);
-    d.lastElementChild.appendChild(btn);
-    d._i18n = () => { durEl.textContent = (g.end-g.start).toFixed(1)+T.gapNoSub;
-                      hintEl.innerHTML = T.gapHint; btn.textContent = T.addHere; };
+    act.append(hint, el('span', 'sp'), btn);
+    d.append(tc, thumb, act);
+    d._i18n = () => {
+      gd.textContent = T.gapNoSub.replace('{n}', secs(g.end - g.start, 1));
+      hint.textContent = g.edge === 'start' ? T.gapStart : g.edge === 'end' ? T.gapEnd : T.gapHint;
+      if (g.thumb) thumb.alt = T.gapThumbAlt; else thumb.textContent = T.noFrame;
+      btn.textContent = T.addHere;
+    };
     d._i18n();
     gapsEl.appendChild(d);
   });
-} else gapsEl.innerHTML = '<div class="hint" data-i18n-js="noneGaps">'+T.noneGaps+'</div>';
+} else gapsEl.innerHTML = '<div class="empty" data-i18n-js="noneGaps">'+T.noneGaps+'</div>';
 
-// restore the lines added in previous sessions
+// the lines added in previous sessions, among the others at their time
+// (still with "+"); the ones from a gap get the gap's frame back
+const restored = [];
 for(const [id, s] of Object.entries(saved)){
-  if(s.added && !DATA.rows.find(r=>r.id===id) && !DATA.extraRows.find(r=>r.id===id)){
-    const r = {id:id, n:'+', start:s.start||0, end:s.end||2, text:s.text||'', alts:[],
-               flags:[ADDED_FLAG], conf:null, added:true, dropped:false, thumb:''};
-    DATA.extraRows.push(r);
-    makeRow(r, rowsEl);
+  if(s && s.added && !ROWS[id]){
+    const g = (s.gap != null) ? DATA.gaps[s.gap] : null;
+    restored.push({id:id, n:'+', start: s.start === undefined ? null : s.start,
+                   end: s.end === undefined ? null : s.end, text:s.text||'', alts:[],
+                   flags:[ADDED_FLAG], conf:null, added:true, dropped:false,
+                   thumb: g ? g.thumb : ''});
   }
 }
+const startKey = r => { const s = rowValues(r).start; return s == null ? Infinity : s; };
+restored.sort((a, b) => startKey(a) - startKey(b));
+restored.forEach(r => {
+  DATA.extraRows.push(r);
+  placeByTime(rowsEl, makeRow(r), rowValues(r).start);
+});
 updateCounter();
+// the text boxes follow their text, also when the page changes width
+function fitAll(){ document.querySelectorAll('textarea').forEach(t => { if (t._fit) t._fit(); }); }
+fitAll();
+let fitTimer = null;
+window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fitAll, 100); });
+
+// the report bar sticks at the top: square top corners and a strip of
+// page background under it while the rest of the page passes beneath
+function updateStuck(){
+  const top = document.getElementById('rsentinel').getBoundingClientRect().top;
+  document.getElementById('rhead').classList.toggle('stuck', top < 0);
+}
+document.addEventListener('scroll', updateStuck, {capture: true, passive: true});
+window.addEventListener('resize', updateStuck);
+updateStuck();
 </script>
 </body></html>
 """
+
+
+def _fmt_seconds(value: float, lang: str) -> str:
+    """A threshold in seconds as the report shows it: "6", "3,5" / "3.5"."""
+    text = f"{value:.0f}" if float(value).is_integer() else f"{value:.1f}"
+    return text.replace(".", ",") if lang == "it" else text
 
 
 # Review-report strings (text only, zero logic). Both languages go in every
@@ -1737,122 +1977,152 @@ updateCounter();
 # "html": __T_*__ tokens / data-i18n keys of the markup; "js": the T object
 # used by the scripts; "flags": texts of the segment flag codes (FLAG_*) set
 # by the pipeline; "summary": the recap at the top of the report.
+# No emoji and no {\an8} anywhere in the texts (C3, report v2).
 _QC_I18N = {
     "it": {
         "html": {
-            "TITLE": "Revisione",
+            "TITLE": "Revisione di",
             "MERGE_TIP": "Al salvataggio: unisce le righe adiacenti con testo uguale o "
-                         "molto simile (resa diversa dall'OCR). Se una delle due l'hai "
+                         "molto simile (resa diversa dall’OCR). Se una delle due l’hai "
                          "editata a mano, vince il tuo testo.",
             "MERGE_LABEL": "unisci duplicati",
-            "RESET": "↺ Ripristina tutto",
-            "SAVE": "💾 Salva SRT revisionato",
-            "SAVED": "salvato ✓",
-            "SRT_SAVED": "SRT salvato ✓",
-            "LEG_WARN": "da ricontrollare",
-            "LEG_BAD": "molto dubbio / scartato",
-            "LEG_ADDED": "riga aggiunta a mano",
-            "HINT": "Modifica il testo nelle caselle, clicca una <b>lettura alternativa</b> per usarla,\n"
-                    " spunta/de-spunta le righe da includere. Le modifiche restano salvate in questo browser.<br>\n"
-                    " <b>💾 Salva SRT revisionato</b> crea <code>nome-reviewed-data.srt</code>: con <b>Chrome/Edge</b> si apre\n"
-                    " il dialogo Salva che <b>ricorda la cartella</b> (scegli la cartella dei video la prima volta);\n"
-                    " con <b>Safari</b> il file va in Download.",
+            "RESET": "Ripristina tutto…",
+            "RESET_TIP": "Chiede conferma prima di annullare tutte le modifiche",
+            "SAVE": "Salva SRT revisionato",
+            "HINT": "Correggi il testo nelle caselle o clicca una lettura alternativa; togli la "
+                    "spunta alle righe da escludere. Le modifiche restano in questo browser; "
+                    "«Salva SRT revisionato» scarica l’SRT.",
             "ROWS_H": "Righe SRT",
-            "ADDROW": "➕ aggiungi riga",
-            "DROPPED_H": "⚠️ Scartate (flash brevi / rumore) — spunta ✔ per recuperarle nell'SRT",
-            "GAPS_H": "🕳️ Intervalli lunghi senza sottotitoli — possibili righe saltate",
+            "ADDROW": "+ Aggiungi riga",
+            "DROPPED_H": "Scartate",
+            "DROPPED_SUB": "flash brevi o rumore · spunta per rimetterle nell’SRT",
+            "GAPS_SUB": "possibili righe saltate",
+            "LEG_WARN": "da ricontrollare",
+            "LEG_BAD": "molto dubbio o scartato",
+            "LEG_ADDED": "aggiunta a mano",
+            "LEG_WORD": "parola",
+            "LEG_WORD_TXT": "dove la lettura alternativa è diversa",
+            "LEG_CONF": "<b>98 %</b> confidenza dell’OCR · accordo = tra le letture dei diversi "
+                        "fotogrammi limitrofi analizzati",
         },
         "js": {
-            "includeTip": "includi nell'SRT",
+            "includeTip": "includi nell’SRT",
             "start": "inizio", "end": "fine",
-            "tsFormat": "⚠️ formato: HH:MM:SS,mmm",
-            "signOn": "✓ CARTELLO ↑ {\\an8}", "signOff": "cartello ↑ {\\an8}",
-            "signTip": "clicca per attivare/disattivare la posizione in alto",
-            "altTip": "usa questa lettura (in giallo le parole che differiscono)",
-            "orig": "↺ originale",
+            "tsFormat": "formato HH:MM:SS,mmm",
+            "noTimes": "mancano i tempi",
+            "decimal": ",", "pct": "{n} %", "secs": "{n} s",
+            "sign": "È un cartello (va in alto)",
+            "signTip": "Spuntata, la riga va in alto nell’SRT",
+            "altTip": "Usa questa lettura (evidenziate le parole diverse)",
+            "orig": "Originale",
+            "origTip": "Riporta il testo e la casella «È un cartello» come li ha letti l’OCR",
+            "remove": "Togli",
+            "removeTip": "Toglie questa riga aggiunta a mano",
+            "noFrame": "nessun fotogramma",
+            "rowThumbAlt": "Fotogramma della riga {n}",
             "counter": "{inc} righe incluse su {tot}",
             "agree": "accordo",
             "badTimes": "Tempi non validi nella riga:",
-            "saved": "salvato ✓",
             "mergedDupes": "duplicati uniti",
             "srtDesc": "Sottotitoli SubRip",
-            "srtSaved": "SRT salvato ✓",
-            "srtDownloaded": "SRT scaricato in Download",
+            "savedAs": "Salvato: {name}",
+            "srtDownloaded": "Scaricato in Download: {name}",
             "srtError": "Errore nel salvataggio:",
-            "hintApp": "Modifica il testo nelle caselle, clicca una <b>lettura alternativa</b> per usarla,\n"
-                       " spunta/de-spunta le righe da includere. Le modifiche vengono salvate accanto al report.<br>\n"
-                       " <b>💾 Salva SRT revisionato</b> crea <code>nome-reviewed-data.srt</code> accanto al video.",
-            "confirmReset": "Annullare tutte le modifiche fatte in questo report?",
+            "hintApp": "Correggi il testo nelle caselle o clicca una lettura alternativa; togli la "
+                       "spunta alle righe da escludere. «Salva SRT revisionato» lo scrive accanto "
+                       "all’originale.",
+            "resetTitle": "Ripristinare tutto il report?",
+            "resetText": "Perderai tutte le modifiche fatte in questo report: testi corretti, "
+                         "letture scelte, tempi, spunte, cartelli e righe aggiunte a mano. "
+                         "Gli SRT revisionati già salvati non cambiano.",
+            "resetConfirm": "Ripristina tutto",
+            "resetCancel": "Annulla",
             "noneDropped": "Nessuna.", "noneGaps": "Nessuno.",
-            "gapNoSub": "s senza sub",
-            "gapHint": "Thumbnail a metà intervallo. Se qui mancava una riga, aggiungila:",
-            "addHere": "➕ aggiungi riga qui",
+            "gapsTitle": "Buchi senza sottotitoli oltre {n} s",
+            "gapNoSub": "{n} senza sottotitoli",
+            "gapStart": "Inizio del video.",
+            "gapEnd": "Fine del video.",
+            "gapHint": "Fotogramma a metà del buco: se qui c’era una riga, aggiungila.",
+            "gapThumbAlt": "Fotogramma a metà del buco",
+            "addHere": "+ Aggiungi una riga qui",
             "addedFlag": "aggiunta a mano",
         },
         "flags": {
-            FLAG_TOO_SHORT: "scartato: troppo breve",
-            FLAG_NOISE: "scartato: probabile rumore grafico",
-            FLAG_MERGED_FADE: "unito da fade/typo",
+            FLAG_TOO_SHORT: "scartata: troppo breve",
+            FLAG_NOISE: "scartata: probabile rumore grafico",
+            FLAG_MERGED_FADE: "unita da fade/typo",
         },
         "summary": (
-            "SRT: <b>{srt}</b><br>"
-            "Righe: <b>{rows}</b> · da ricontrollare: <b>{warn}</b> · "
-            "scartate (recuperabili): <b>{dropped}</b> · "
-            "buchi lunghi: <b>{gaps}</b><br>"
-            "Frame: {frames} · OCR: {ocr} · "
-            "confini raffinati: {refined} · tempo: {elapsed}"
+            "SRT <b>{srt}</b> · righe <b>{rows}</b> · da ricontrollare <b>{warn}</b> · "
+            "scartate (recuperabili) <b>{dropped}</b> · buchi oltre {gap} s <b>{gaps}</b> · "
+            "{frames} fotogrammi · {ocr} letture OCR · {refined} confini raffinati · {elapsed}"
         ),
         "footer": "Generato con SubVision v{version} — <a href=\"{url}\">{host}</a>",
     },
     "en": {
         "html": {
-            "TITLE": "Review",
+            "TITLE": "Review of",
             "MERGE_TIP": "On save: merges adjacent lines with equal or very similar "
                          "text (rendered differently by the OCR). If you edited one "
                          "of the two by hand, your text wins.",
             "MERGE_LABEL": "merge duplicates",
-            "RESET": "↺ Reset all",
-            "SAVE": "💾 Save reviewed SRT",
-            "SAVED": "saved ✓",
-            "SRT_SAVED": "SRT saved ✓",
-            "LEG_WARN": "to re-check",
-            "LEG_BAD": "very doubtful / dropped",
-            "LEG_ADDED": "line added by hand",
-            "HINT": "Edit the text in the boxes, click an <b>alternative reading</b> to use it,\n"
-                    " check/uncheck the lines to include. Changes stay saved in this browser.<br>\n"
-                    " <b>💾 Save reviewed SRT</b> creates <code>name-reviewed-date.srt</code>: with <b>Chrome/Edge</b> the\n"
-                    " Save dialog opens and <b>remembers the folder</b> (pick the videos folder the first time);\n"
-                    " with <b>Safari</b> the file goes to Downloads.",
+            "RESET": "Reset all…",
+            "RESET_TIP": "Asks before undoing all the changes",
+            "SAVE": "Save reviewed SRT",
+            "HINT": "Fix the text in the boxes or click an alternative reading; untick the lines "
+                    "to leave out. Changes stay in this browser; “Save reviewed SRT” downloads the SRT.",
             "ROWS_H": "SRT lines",
-            "ADDROW": "➕ add line",
-            "DROPPED_H": "⚠️ Dropped (short flashes / noise) — tick ✔ to recover them into the SRT",
-            "GAPS_H": "🕳️ Long intervals without subtitles — possibly skipped lines",
+            "ADDROW": "+ Add line",
+            "DROPPED_H": "Dropped",
+            "DROPPED_SUB": "short flashes or noise · tick to put them back in the SRT",
+            "GAPS_SUB": "possibly skipped lines",
+            "LEG_WARN": "to re-check",
+            "LEG_BAD": "very doubtful or dropped",
+            "LEG_ADDED": "added by hand",
+            "LEG_WORD": "word",
+            "LEG_WORD_TXT": "where the alternative reading differs",
+            "LEG_CONF": "<b>98%</b> OCR confidence · agreement = among the readings of the "
+                        "neighbouring frames analysed",
         },
         "js": {
             "includeTip": "include in the SRT",
             "start": "start", "end": "end",
-            "tsFormat": "⚠️ format: HH:MM:SS,mmm",
-            "signOn": "✓ SIGN ↑ {\\an8}", "signOff": "sign ↑ {\\an8}",
-            "signTip": "click to toggle the top position",
-            "altTip": "use this reading (differing words in yellow)",
-            "orig": "↺ original",
+            "tsFormat": "format HH:MM:SS,mmm",
+            "noTimes": "times missing",
+            "decimal": ".", "pct": "{n}%", "secs": "{n} s",
+            "sign": "It’s a sign (goes on top)",
+            "signTip": "Ticked, the line goes on top in the SRT",
+            "altTip": "Use this reading (differing words highlighted)",
+            "orig": "Original",
+            "origTip": "Puts back the text and the “It’s a sign” box as the OCR read them",
+            "remove": "Remove",
+            "removeTip": "Removes this line added by hand",
+            "noFrame": "no frame",
+            "rowThumbAlt": "Frame of line {n}",
             "counter": "{inc} lines included out of {tot}",
             "agree": "agreement",
             "badTimes": "Invalid times in line:",
-            "saved": "saved ✓",
             "mergedDupes": "duplicates merged",
             "srtDesc": "SubRip subtitles",
-            "srtSaved": "SRT saved ✓",
-            "srtDownloaded": "SRT downloaded to Downloads",
+            "savedAs": "Saved: {name}",
+            "srtDownloaded": "Downloaded to Downloads: {name}",
             "srtError": "Could not save:",
-            "hintApp": "Edit the text in the boxes, click an <b>alternative reading</b> to use it,\n"
-                       " check/uncheck the lines to include. Changes are saved next to the report.<br>\n"
-                       " <b>💾 Save reviewed SRT</b> creates <code>name-reviewed-date.srt</code> next to the video.",
-            "confirmReset": "Undo all the changes made in this report?",
+            "hintApp": "Fix the text in the boxes or click an alternative reading; untick the lines "
+                       "to leave out. “Save reviewed SRT” writes it next to the original.",
+            "resetTitle": "Reset the whole report?",
+            "resetText": "You will lose all the changes made in this report: corrected texts, "
+                         "chosen readings, times, ticks, signs and lines added by hand. "
+                         "Reviewed SRTs already saved do not change.",
+            "resetConfirm": "Reset all",
+            "resetCancel": "Cancel",
             "noneDropped": "None.", "noneGaps": "None.",
-            "gapNoSub": "s without subs",
-            "gapHint": "Thumbnail at mid-interval. If a line was missing here, add it:",
-            "addHere": "➕ add line here",
+            "gapsTitle": "Gaps without subtitles over {n} s",
+            "gapNoSub": "{n} without subtitles",
+            "gapStart": "Start of the video.",
+            "gapEnd": "End of the video.",
+            "gapHint": "Frame from the middle of the gap: if a line was missing here, add it.",
+            "gapThumbAlt": "Frame from the middle of the gap",
+            "addHere": "+ Add a line here",
             "addedFlag": "added by hand",
         },
         "flags": {
@@ -1861,12 +2131,9 @@ _QC_I18N = {
             FLAG_MERGED_FADE: "merged across fade/typo",
         },
         "summary": (
-            "SRT: <b>{srt}</b><br>"
-            "Lines: <b>{rows}</b> · to re-check: <b>{warn}</b> · "
-            "dropped (recoverable): <b>{dropped}</b> · "
-            "long gaps: <b>{gaps}</b><br>"
-            "Frames: {frames} · OCR: {ocr} · "
-            "boundaries refined: {refined} · time: {elapsed}"
+            "SRT <b>{srt}</b> · lines <b>{rows}</b> · to re-check <b>{warn}</b> · "
+            "dropped (recoverable) <b>{dropped}</b> · gaps over {gap} s <b>{gaps}</b> · "
+            "{frames} frames · {ocr} OCR readings · {refined} boundaries refined · {elapsed}"
         ),
         "footer": "Generated with SubVision v{version} — <a href=\"{url}\">{host}</a>",
     },
@@ -1880,14 +2147,18 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
     """
     INTERACTIVE, self-contained review report (a single offline HTML file):
     - every line's text is editable; alternative readings apply with one
-      click; lines can be included/excluded (dropped ones recoverable);
-    - new lines can be added in the "gaps" (prefilled times);
-    - editable times; {\\an8} tag toggleable per line;
+      click; "Original" puts back the text and the sign box of the OCR;
+      lines can be included/excluded (dropped ones recoverable);
+    - new lines can be added from the top (empty times) or in the "gaps"
+      (prefilled times, mid-gap frame); they come back at their time;
+    - editable times with the line's duration; "It's a sign" box per line
+      ({\\an8} in the SRT only);
     - "Save reviewed SRT" generates the final SRT; changes stay saved in
       the browser (localStorage) across sessions.
     Inside the SubVision app (WKWebView with the "subvision" message
-    handler) the SRT and the editor state go to the app through the bridge
-    and the saved state comes back injected as window.__subvisionState.
+    handler) the SRT, the editor state and the reset question go to the app
+    through the bridge and the saved state comes back injected as
+    window.__subvisionState; the page then has no title of its own.
     The report carries the texts of BOTH languages and picks one when it
     opens: window.__subvisionLang ("it" | "en", set by the app) or else the
     browser language; window.__subvisionSetLang(lang) switches it live.
@@ -1911,7 +2182,7 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
     for i, s in enumerate(list(segs) + list(dropped), 1):
         is_dropped = s in dropped
         rows.append({
-            "id": f"s{i}", "n": i if not is_dropped else "✂",
+            "id": f"s{i}", "n": i,
             "start": round(s.start, 3), "end": round(s.end, 3),
             "text": s.text, "top": s.top, "conf": round(s.conf, 3),
             "agree": round(s.agree, 3), "alts": s.alts,
@@ -1919,11 +2190,21 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
             "thumb": s.thumb, "dropped": is_dropped,
             "cls": "bad" if is_dropped else row_cls(s),
         })
+
+    def gap_edge(a: float, b: float) -> str:
+        # a gap from 0 is the start of the video; one with no line after it, the end
+        if a <= 1e-3:
+            return "start"
+        if not any(s.start >= b - 1e-3 for s in segs):
+            return "end"
+        return ""
+
     data = {
         "srtName": srt_name, "videoName": video_name,
         "rows": rows,
-        "gaps": [{"start": round(a, 3), "end": round(b, 3), "thumb": th}
+        "gaps": [{"start": round(a, 3), "end": round(b, 3), "thumb": th, "edge": gap_edge(a, b)}
                  for a, b, th in gaps],
+        "gapWarn": p.qc_gap_warn,
     }
     warn_rows = sum(1 for s in segs
                     if s.conf < p.qc_conf_warn or s.agree < p.qc_agree_warn or s.flags)
@@ -1933,7 +2214,8 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
             "html": ltr["html"], "js": ltr["js"], "flags": ltr["flags"],
             "summary": ltr["summary"].format(
                 srt=_esc(srt_name), rows=len(segs), warn=warn_rows,
-                dropped=len(dropped), gaps=len(gaps), frames=stats.frames,
+                dropped=len(dropped), gap=_fmt_seconds(p.qc_gap_warn, lang),
+                gaps=len(gaps), frames=stats.frames,
                 ocr=stats.ocr_calls, refined=stats.refined,
                 elapsed=fmt_hms(stats.elapsed)),
             "footer": ltr["footer"].format(version=__version__, url=REPO_URL,
