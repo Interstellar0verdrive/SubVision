@@ -81,6 +81,8 @@ public enum SV {
     public static let onPrimary = Color(dark: "#06252A", light: "#FFFFFF")
     public static let primaryText = Color(dark: "#2AC9DE", light: "#206CA1")
     public static let focus = Color(dark: "rgba(42,201,222,.5)", light: "rgba(39,147,219,.45)")
+    /// The keyboard's ring on a list row: neutral, so the row's left bar stays its only colour.
+    public static let rowFocus = Color(dark: "rgba(255,255,255,.28)", light: "rgba(0,0,0,.24)")
     public static let sel = Color(dark: "rgba(42,201,222,.16)", light: "rgba(39,147,219,.14)")
     /// A selected row of a list: a softer `sel`, so the rows under it still read (design note 58).
     public static let selSoft = Color(dark: "rgba(42,201,222,.10)", light: "rgba(39,147,219,.09)")

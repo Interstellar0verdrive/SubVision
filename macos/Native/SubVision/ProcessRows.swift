@@ -121,7 +121,8 @@ struct VideoRow: View {
         .background(background)
         // 3 pt inside the list's 1 pt border, which is drawn over the rows (as on the boards).
         .overlay(alignment: .leading) { Rectangle().fill(edge).frame(width: 3).padding(.leading, 1) }
-        .overlay { if focused && model.focusRingVisible { FocusRing().stroke(SV.focus, lineWidth: 1).allowsHitTesting(false) } }
+        // The keyboard's ring in a neutral grey: only the thick left bar is coloured (the owner's note).
+        .overlay { if focused && model.focusRingVisible { FocusRing().stroke(SV.rowFocus, lineWidth: 1).allowsHitTesting(false) } }
         .contentShape(Rectangle())
         .onHover { hover = $0 }
         .contextMenu { RowMenuButtons(video: video) }
