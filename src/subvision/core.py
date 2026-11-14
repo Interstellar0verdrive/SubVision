@@ -1839,7 +1839,8 @@ async function exportSrt(){
       // the file name in the bar, the full path (and the merge note) in the tooltip
       flash(savedHtml('savedAs', (r && r.name) || fname), ((r && r.path) || fname) + mergeNote);
     } catch(e) {
-      flash(esc(T.srtError + ' ' + e), '', true);   // no fallback: WKWebView has no useful dialog
+      // the app's reply is the reason in words: without the "Error:" of the JS object
+      flash(esc(T.srtError + ' ' + ((e && e.message) || e)), '', true);   // no fallback: WKWebView has no useful dialog
     }
     return;
   }

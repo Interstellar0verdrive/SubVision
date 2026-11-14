@@ -224,7 +224,7 @@ def test_report_save_message_in_the_bar(tmp_path: Path):
         assert "color:var(--ok)" in re.search(r"\.savedmsg\{([^}]*)\}", css).group(1)
         bridge = js[js.index("if (BRIDGE) {"):js.index("window.showSaveFilePicker")]
         assert "flash(savedHtml('savedAs', (r && r.name) || fname), ((r && r.path) || fname) + mergeNote);" in bridge
-        assert "flash(esc(T.srtError + ' ' + e), '', true);" in bridge
+        assert "flash(esc(T.srtError + ' ' + ((e && e.message) || e)), '', true);" in bridge
         browser = js[js.index("window.showSaveFilePicker"):js.index("async function askReset()")]
         assert "flash(savedHtml('savedAs', h.name || fname) + esc(mergeNote));" in browser
         assert "flash(savedHtml('srtDownloaded', fname) + esc(mergeNote));" in browser
