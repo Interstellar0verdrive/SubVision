@@ -262,8 +262,13 @@ extension AppModel {
         stopAlert = StopAlert(kind: kind, presentation: presentation)
     }
 
-    /// The file an open O1 names is over (or the batch, for O2 too): the alert goes by itself.
+    /// The file an open O1 names is over (or the batch, for O2 and O3 too): the alert goes by itself.
     private func closeStopAlert(file idx: Int? = nil) {
+        if idx == nil, let quit = quitAlert {
+            // Nothing left to stop: the quit question is moot (a new ⌘Q quits at once).
+            quit.close()
+            quitAlert = nil
+        }
         guard let open = stopAlert else { return }
         if let idx {
             guard case .file(let asked, _) = open.kind, asked == idx else { return }

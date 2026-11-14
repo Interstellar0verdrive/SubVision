@@ -12,14 +12,15 @@ enum Alerts {
     /// The last non-modal alert that is not O1/O2 (O7, an error), while it is up: for `DebugQA`.
     static weak var shown: SVAlertPresentation?
 
-    /// O3: ⌘Q with a batch running. True quits.
-    static func confirmQuit(_ model: AppModel) -> Bool {
+    /// O3: ⌘Q with a batch running; `answer` gets true for Quit and Stop. Not modal (as
+    /// O1/O2): a modal loop held the batch's events, and the rows stood still under it.
+    static func confirmQuit(_ model: AppModel, answer: @escaping @MainActor (Bool) -> Void) -> SVAlertPresentation {
         let b = model.batch
         let a = SVAlert(icon: AlertIconName.quit, tone: .yellow, title: model.t("app.alerts.quit_title"),
                         text: model.t("app.alerts.quit_text", ["name": b.name, "i": b.index, "n": b.total]))
         a.button(model.t("app.alerts.quit_btn"), role: .primary)
-        a.button(model.t("app.common.cancel"))
-        return a.runModal() == 0
+        a.button(model.t("app.common.cancel"), cancel: true)
+        return a.present(over: WindowSizer.main(model.config).flatMap { $0.isVisible ? $0 : nil }) { answer($0 == 0) }
     }
 
     /// O4: the window closed with a batch running, the first time only.
