@@ -107,6 +107,9 @@ def launcher_state(tmp_path: Path) -> Path:
     (state / "bin").mkdir(parents=True)
     shutil.copy2(uv, state / "bin" / "uv")
     shutil.copytree(venv, state / ".venv", symlinks=True)
+    # The dev venv has its own marker once the Debug app has launched with it:
+    # each test sets the marker it means.
+    (state / ".venv" / ".subvision-lock-sha256").unlink(missing_ok=True)
     return state
 
 
