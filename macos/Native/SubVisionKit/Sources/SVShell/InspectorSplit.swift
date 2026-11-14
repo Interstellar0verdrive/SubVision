@@ -38,7 +38,12 @@ public struct InspectorSplit<Page: View, Inspector: View>: View {
     public var body: some View {
         let overlays = chrome.inspectorOverlays(windowWidth: windowWidth)
         HStack(spacing: 0) {
-            page().frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The page takes the room left and never more: a page whose content asks for more
+            // than the window would widen the split past the window's right edge, and the panel,
+            // beside it or laid over it from the trailing edge, would be cut off there.
+            page()
+                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
             if !overlays {
                 pane
             }
