@@ -118,6 +118,8 @@ lang en
 ! sleep 1
 window-shot $OUT/subfix_dark_en.png
 ? png$
+# Back to Italian before the batch shots (the next two are the _it ones)
+lang it
 tab process
 # 3, 4 · video (E2): a batch of the three, the first done, the second in its OCR, the third waiting
 drawer 0 close
