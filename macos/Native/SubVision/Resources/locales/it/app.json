@@ -563,6 +563,8 @@
   "app.review.report.when_date": "elaborato il {date} alle {time}",
   "app.review.report.when_today": "elaborato oggi alle {time}",
   "app.review.report.when_yesterday": "elaborato ieri alle {time}",
+  "app.review.report_missing": "revisione mancante",
+  "app.review.report_missing_help": "Il report di revisione non è più accanto al video.",
   "app.review.reviewed": "SRT revisionato",
   "app.review.reviewed_help": "C’è già un SRT revisionato accanto al video.",
   "app.review.save_menu": "Salva SRT revisionato",

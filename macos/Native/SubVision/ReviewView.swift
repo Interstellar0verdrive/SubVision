@@ -42,12 +42,20 @@ extension AppModel {
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 
-    /// "3 video elaborati · 38 righe · 9 buchi" (RV1).
+    /// "3 video elaborati · 38 righe · 9 buchi" (RV1), without what is zero ("2 video elaborati · 24 righe").
     var reviewTotals: String {
         let totals = ReviewData.totals(reviewVideos.map { (lines: $0.segments, gaps: $0.gaps?.count) })
-        var parts = [tn("app.review.sum.videos", totals.videos), tn("app.review.sum.lines", totals.lines)]
-        if let gaps = totals.gaps { parts.append(tn("app.review.sum.gaps", gaps)) }
-        return join(parts)
+        return join([tn("app.review.sum.videos", totals.videos)]
+                    + ReviewData.details(lines: totals.lines, gaps: totals.gaps).map(detailText))
+    }
+
+    /// One item of a line of details: "12 righe", "2 da ricontrollare", "3 buchi".
+    func detailText(_ detail: ReviewData.Detail) -> String {
+        switch detail {
+        case .lines(let n): tn("app.review.sum.lines", n)
+        case .toCheck(let n): t("app.review.report.to_check", ["n": n])
+        case .gaps(let n): tn("app.review.sum.gaps", n)
+        }
     }
 }
 
@@ -209,6 +217,8 @@ struct ReviewRow: View {
     @State private var hover = false
 
     private var hasReport: Bool { video.reviewReport != nil }
+    /// The batch wrote a report that is no longer on disk: the chip, and a click shows R3.
+    private var reportMissing: Bool { hasReport && video.outputReport == nil }
 
     var body: some View {
         HStack(alignment: .center, spacing: Self.gap) {
@@ -219,6 +229,10 @@ struct ReviewRow: View {
                     if model.hasReviewedSRT(video) {
                         StatusChip(model.t("app.review.reviewed"), tone: .green)
                             .help(model.t("app.review.reviewed_help"))
+                    }
+                    if reportMissing {
+                        StatusChip(model.t("app.review.report_missing"), tone: .neutral)
+                            .help(model.t("app.review.report_missing_help"))
                     }
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 6) {

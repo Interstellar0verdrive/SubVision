@@ -10,7 +10,8 @@ import Foundation
 public enum ReviewData {
     // MARK: - The report's own data
 
-    /// What the title band says of a report: "12 righe · 2 da ricontrollare · 3 buchi".
+    /// What the title band says of a report: "12 righe · 2 da ricontrollare · 3 buchi"
+    /// (`details` leaves out what is zero).
     public struct Counts: Equatable, Sendable {
         /// The lines of the SRT (the rows not dropped).
         public var lines: Int
@@ -73,6 +74,23 @@ public enum ReviewData {
         let lines = rows.compactMap(\.lines).reduce(0, +)
         let known = rows.compactMap(\.gaps)
         return Totals(videos: rows.count, lines: lines, gaps: known.isEmpty ? nil : known.reduce(0, +))
+    }
+
+    /// One item of a line of details (the title band of R1, the totals under the list).
+    public enum Detail: Equatable, Sendable {
+        case lines(Int)
+        case toCheck(Int)
+        case gaps(Int)
+    }
+
+    /// The items worth saying, in this order: the counts known and not zero.
+    /// "12 righe · elaborato oggi alle 08:57", never "12 righe · 0 da ricontrollare · 0 buchi".
+    public static func details(lines: Int?, toCheck: Int? = nil, gaps: Int?) -> [Detail] {
+        var out: [Detail] = []
+        if let lines, lines > 0 { out.append(.lines(lines)) }
+        if let toCheck, toCheck > 0 { out.append(.toCheck(toCheck)) }
+        if let gaps, gaps > 0 { out.append(.gaps(gaps)) }
+        return out
     }
 
     /// When a file was processed, as the list ("oggi 08:57") and the title band

@@ -563,6 +563,8 @@
   "app.review.report.when_date": "processed on {date} at {time}",
   "app.review.report.when_today": "processed today at {time}",
   "app.review.report.when_yesterday": "processed yesterday at {time}",
+  "app.review.report_missing": "review missing",
+  "app.review.report_missing_help": "The review report is no longer next to the video.",
   "app.review.reviewed": "Reviewed SRT",
   "app.review.reviewed_help": "A reviewed SRT is already next to the video.",
   "app.review.save_menu": "Save Reviewed SRT",
