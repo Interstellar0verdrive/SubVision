@@ -47,6 +47,12 @@ only those zones are searched, the frames of the others stay. `reason` of
 while a preview job runs stops it (the progress events already carry its
 frames) and starts the batch once it has ended, instead of `busy`.
 
+`videos.thumbs {path, duration?}` answers `{path, frames, cached, seconds}`:
+five frames at 10/30/50/70/90 % of the video for the to-do drawer (thumbs.py;
+a frame that could not be taken is null). It runs in the pool like
+`videos.probe`, never takes the job slot and never waits for it; during a
+batch it answers `{path, busy: true}` unless the frames are already there.
+
 The events of a batch are described in batch.py; `batch.file.failed`
 carries `code`, `text` (short, for the row of the file), `detail`, `log`
 (the per-file log), `error`, `at_step` and `tool`/`path`/`line` when known.
@@ -91,7 +97,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TextIO
 
-from subvision import __version__, batch, core, fix, lists, preview, tools
+from subvision import __version__, batch, core, fix, lists, preview, thumbs, tools
 from subvision.core import EngineError, OcrParams, Stopped
 from subvision.paths import StatePaths, state_paths
 
@@ -432,6 +438,28 @@ def _videos_probe(params: dict) -> dict:
     return {"videos": [_probe(p) for p in _strings(params, "paths")]}
 
 
+def _videos_thumbs(params: dict) -> dict:
+    """
+    `{path, duration?}` -> `{path, frames, cached, seconds}` (thumbs.py): five
+    frames for the to-do drawer. Synchronous, in the pool, outside the job
+    slot. During a batch, `{path, busy: true}` unless the frames are already
+    there: the app asks again when the batch has ended.
+    """
+    path = params.get("path")
+    if not isinstance(path, str) or not path:
+        raise bad_params("path", "must be the path of a video")
+    duration = params.get("duration")
+    if duration is not None and (isinstance(duration, bool) or not isinstance(duration, (int, float))):
+        raise bad_params("duration", "must be a number of seconds")
+    root = _paths().root
+    if _current_job("batch") is not None:
+        cached = thumbs.cached_frames(path, root)
+        if cached is None:
+            return {"path": path, "busy": True}
+        return {"path": path, "frames": cached, "cached": True, "seconds": 0.0}
+    return {"path": path, **thumbs.video_frames(path, root, duration=duration)}
+
+
 # --- long jobs (one at a time) ---------------------------------------------
 
 def _start_job(kind: str, stop: Any, target: Callable[[], None]) -> bool:
@@ -617,6 +645,7 @@ METHODS: Dict[str, Callable[[dict], dict]] = {
     "lists.status": _lists_status,
     "lists.import": _lists_import,
     "videos.probe": _videos_probe,
+    "videos.thumbs": _videos_thumbs,
     "batch.start": _batch_start,
     "batch.stop": _batch_stop,
     "preview.frames": _preview_frames,
@@ -680,6 +709,7 @@ def _clean_orphans() -> None:
         shutil.rmtree(d, ignore_errors=True)
     try:
         preview.clean_old(paths.root)
+        thumbs.clean_old(paths.root)
     except Exception:  # noqa: BLE001
         pass
 

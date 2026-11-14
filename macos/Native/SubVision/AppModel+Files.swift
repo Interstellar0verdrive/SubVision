@@ -350,6 +350,8 @@ extension AppModel {
                 videos[i].bytes = size?.int64Value
             }
             saveVideos()
+            // The drawer's five frames, in the background, one video at a time.
+            queueVideoFrames(ids)
         } catch {
             log.error("videos.probe: \(error)")
         }

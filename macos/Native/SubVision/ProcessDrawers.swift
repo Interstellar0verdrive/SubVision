@@ -257,36 +257,49 @@ struct TodoDrawer: View {
     }
 }
 
-/// «Dall'Anteprima»: five of the frames the Preview found, the count and Open the Preview;
-/// before it ran, five empty boxes and Preview (C3-02, C3-03).
+/// The frames under a to-do drawer. «Dall'Anteprima»: five of the frames the Preview found,
+/// the count and Open the Preview (C3-02, C3-03). Before the Preview ran, «Fotogrammi del
+/// video»: five frames taken as the video entered the list (`AppModel+VideoFrames.swift`),
+/// shimmering while they are taken; empty boxes when they could not be. A click on a frame
+/// opens the Preview (on that frame, for the Preview's own).
 struct FromPreview: View {
     @Environment(AppModel.self) private var model
     var video: VideoItem
     var narrow: Bool
 
     var body: some View {
-        let result = model.preview.results[video.id]
+        let strip = model.drawerStrip(video)
         HStack(spacing: 12) {
-            DrawerHeading(text: model.t("app.process.drawer.from_preview")).padding(.bottom, -6)
+            // The texts' capitals on the middle of the frames and the button (the line boxes of
+            // `svFont` put them half a point low).
+            DrawerHeading(text: model.t(heading(strip))).padding(.bottom, -6)
+                .svBaseline(ofCentred: 10.5)
             HStack(spacing: 6) {
-                if let result, !result.frames.isEmpty {
+                switch strip {
+                case .preview(let result):
                     ForEach(Array(shown(result).enumerated()), id: \.offset) { _, item in
-                        thumb(item.image, frame: item.frame)
+                        frameButton(index: item.index) { thumb(item.image, frame: item.frame) }
                     }
-                } else {
-                    ForEach(0..<5, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 4).strokeBorder(SV.glassLine, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
-                            .frame(width: 64, height: 36)
+                case .video(let images):
+                    ForEach(0..<VideoFramesState.count, id: \.self) { i in
+                        if let image = images.indices.contains(i) ? images[i] : nil {
+                            frameButton(index: nil) { videoThumb(image) }
+                        } else {
+                            emptyBox
+                        }
                     }
+                case .extracting:
+                    ForEach(0..<VideoFramesState.count, id: \.self) { i in ShimmerBox(delay: Double(i) * 0.12) }
+                case .none:
+                    ForEach(0..<VideoFramesState.count, id: \.self) { _ in emptyBox }
                 }
             }
             if !narrow {
-                Text(result.map { model.t("app.process.drawer.frames_found", ["n": $0.frames.count, "k": $0.found]) }
-                     ?? model.t("app.process.drawer.no_frames"))
-                    .svFont(12).foregroundStyle(SV.text2).lineLimit(1)
+                Text(caption(strip)).svFont(12).foregroundStyle(SV.text2).lineLimit(1)
+                    .svBaseline(ofCentred: 12)
             }
             Spacer(minLength: 0)
-            if result?.frames.isEmpty == false {
+            if case .preview = strip {
                 Button { model.openInPreview(video.id) } label: { Label(model.t("app.process.drawer.open_preview"), systemImage: "viewfinder") }
                     .svButton(.secondary, .small)
                     .disabled(!model.canPreview(video))
@@ -300,9 +313,38 @@ struct FromPreview: View {
         }
     }
 
-    /// Five frames, the ones with text first, in their order.
-    private func shown(_ result: PreviewState.Result) -> [(frame: PreviewFrame, image: NSImage?)] {
-        let all = result.frames.enumerated().map { (frame: $0.element, image: result.thumbnail($0.offset)) }
+    private func heading(_ strip: DrawerStrip) -> String {
+        switch strip {
+        case .preview, .none: "app.process.drawer.from_preview"
+        case .video, .extracting: "app.process.drawer.video_frames"
+        }
+    }
+
+    /// "20 fotogrammi · 17 con testo", "L'Anteprima ne cerca 20 con il testo", "Nessun fotogramma ancora".
+    private func caption(_ strip: DrawerStrip) -> String {
+        switch strip {
+        case .preview(let result): model.t("app.process.drawer.frames_found", ["n": result.frames.count, "k": result.found])
+        case .video, .extracting: model.t("app.process.drawer.video_frames_note", ["n": PreviewState.zones])
+        case .none: model.t("app.process.drawer.no_frames")
+        }
+    }
+
+    /// A frame that opens the Preview: on that frame (`index`, among the Preview's), or on the video.
+    private func frameButton<Content: View>(index: Int?, @ViewBuilder _ content: () -> Content) -> some View {
+        Button { model.openPreview(video.id, frame: index) } label: { content() }
+            .buttonStyle(.plain)
+            .disabled(!model.canPreview(video))
+            .help(model.t(index == nil ? "app.process.drawer.preview_help" : "app.process.row.preview_help"))
+    }
+
+    private var emptyBox: some View {
+        RoundedRectangle(cornerRadius: 4).strokeBorder(SV.glassLine, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+            .frame(width: 64, height: 36)
+    }
+
+    /// Five frames, the ones with text first, in their order; `index` is the frame's among all.
+    private func shown(_ result: PreviewState.Result) -> [(index: Int, frame: PreviewFrame, image: NSImage?)] {
+        let all = result.frames.enumerated().map { (index: $0.offset, frame: $0.element, image: result.thumbnail($0.offset)) }
         let withText = all.filter(\.frame.hasText), without = all.filter { !$0.frame.hasText }
         return Array((withText + without).prefix(5))
     }
@@ -325,6 +367,43 @@ struct FromPreview: View {
         .frame(width: 64, height: 36)
         .clipShape(RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(SV.line))
+        .contentShape(Rectangle())
+    }
+
+    /// A frame of the video: no dots (nobody has looked for text in it yet).
+    private func videoThumb(_ image: NSImage) -> some View {
+        Image(nsImage: image).resizable().aspectRatio(contentMode: .fill)
+            .frame(width: 64, height: 36).clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(SV.line))
+            .contentShape(Rectangle())
+    }
+}
+
+/// A box of the strip while the video's frames are taken: a soft light that sweeps across
+/// it; still, as a plain box, with Reduce Motion.
+private struct ShimmerBox: View {
+    var delay: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 4).fill(SV.raised)
+            .overlay {
+                if !reduceMotion {
+                    GeometryReader { geo in
+                        LinearGradient(colors: [.clear, SV.glassLine, .clear], startPoint: .leading, endPoint: .trailing)
+                            .frame(width: geo.size.width * 0.8)
+                            .offset(x: phase * geo.size.width * 1.4)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(SV.line))
+            .frame(width: 64, height: 36)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: false).delay(delay)) { phase = 1 }
+            }
     }
 }
 

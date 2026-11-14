@@ -118,6 +118,8 @@ final class AppModel {
     var fixPath: URL?
     // One property per page (F5.2–5.4), each with its own `AppModel+X.swift`.
     var preview = PreviewState()
+    /// The five frames of each video for the to-do drawers (`AppModel+VideoFrames.swift`).
+    var videoFrames = VideoFramesState()
     var fix = FixState()
     var report = ReportState()
 
@@ -319,6 +321,8 @@ final class AppModel {
         lists = try? await engine.listsStatus()
         status = .ready
         await refreshVideos()
+        // The drawers' frames of the videos already in the list (from the engine's cache when it has them).
+        queueVideoFrames(videos.map(\.id))
         if firstRun { autoCheckUpdatesIfDue() }
     }
 
@@ -353,6 +357,8 @@ final class AppModel {
                 toolsStatus = done.status
                 redownload = nil
                 if !done.ok { log.error("tools.install did not finish") }
+                // ffmpeg is there now: the drawers' frames that could not be taken without it.
+                if done.ok { queueVideoFrames(videos.map(\.id)) }
             case .warmupDone(let w):
                 log.info("warmup done in \(w.seconds) s for \(w.languages)")
                 if hello?.vision == true { defaults.set(Self.macOSBuild, forKey: DefaultsKey.warmupBuild) }

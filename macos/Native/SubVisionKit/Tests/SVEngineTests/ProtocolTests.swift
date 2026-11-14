@@ -124,6 +124,14 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
             """#, as: VideosProbeReply.self)
         #expect(probe.videos[0].fps == 23.976 && probe.videos[1].error == "probe_failed" && probe.videos[1].duration == nil)
         #expect(probe.videos[0].videoCodec == "hevc" && probe.videos[0].audioCodec == "aac" && probe.videos[1].videoCodec == nil)
+        let thumbs = try reply(#"{"path":"/v/a.mkv","frames":["/s/t/0.jpg",null,"/s/t/2.jpg","/s/t/3.jpg","/s/t/4.jpg"],"cached":false,"seconds":0.31}"#,
+                               as: VideoThumbsReply.self)
+        #expect(thumbs.frames?.count == 5 && thumbs.paths.count == 4 && !thumbs.isBusy && thumbs.cached == false)
+        let thumbsBusy = try reply(#"{"path":"/v/a.mkv","busy":true}"#, as: VideoThumbsReply.self)
+        #expect(thumbsBusy.isBusy && thumbsBusy.paths.isEmpty)
+        let thumbsBad = try reply(#"{"path":"/v/b.mkv","frames":[null,null,null,null,null],"cached":false,"error":"probe_failed","seconds":0.02}"#,
+                                  as: VideoThumbsReply.self)
+        #expect(thumbsBad.error == "probe_failed" && thumbsBad.paths.isEmpty)
         #expect(try reply(#"{"out_path":"/v/a-fixed-20261113.srt","count":118}"#, as: SrtFixReply.self).count == 118)
         #expect(try reply(#"{"ok":false,"reason":"no_batch"}"#, as: StopReply.self) == StopReply(ok: false, reason: "no_batch"))
         #expect(try event("ready", #"{"version":"2.0.0","protocol":1,"pid":42}"#)
