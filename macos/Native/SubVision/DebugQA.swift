@@ -6,6 +6,10 @@
 //   tab process|review|fix · add <path>[,<path>…] · remove-all · select-all
 //   sidebar · inspector [open|close] · lang en|it · theme system|light|dark
 //   size <w>x<h> · windowid · capture <path> · settings · quit
+//   key <combo> [main|front|<window>]   a key press posted to the app's event queue, e.g. key cmd+return, key esc
+//   mouse click|double|right <x>,<y> [main|front|<window>] [pick <title>]   real mouse events sent to a window
+//   deactivate · notifications · notification-click <n>|file <idx>   the app behind; its delivered notifications; a click on one
+//   mouse drag <x>,<y> <x2>,<y2> [main|front|<window>] · mouse scroll <x>,<y> <dy> [main|front|<window>]
 //   Preview (F5.2, its own window since C2): preview-open, preview-close, preview-size, preview-capture,
 //   preview-layout, preview-select, preview-menu, find-frames, stop-frames, wait-frames, frame, frames,
 //   frame-bands, band-set, drag-handle, try-ocr, wait-ocr, preview-state (see the block below)
@@ -52,6 +56,7 @@
 import AppKit
 import SVShell
 import SwiftUI
+import UserNotifications
 
 @MainActor
 enum DebugQA {
@@ -98,6 +103,36 @@ enum DebugQA {
             frame.origin.y += frame.height - dims[1]
             frame.size = NSSize(width: dims[0], height: dims[1])
             window.setFrame(frame, display: true)
+        case "key":
+            return await sendKey(argument, model)
+        case "deactivate":
+            // The app no longer in front (another app's turn), as when the person works elsewhere.
+            NSApp.deactivate()
+            try? await Task.sleep(for: .milliseconds(300))
+            return "active \(NSApp.isActive)"
+        case "notifications":
+            // The app's notifications in Notification Center: "title — body {userInfo}" per line, " ¦ " between.
+            let delivered = await UNUserNotificationCenter.current().deliveredNotifications()
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            let lines = delivered.map { n in
+                "\(n.request.content.title) — \(n.request.content.body) \(n.request.content.userInfo.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: ","))"
+            }
+            return "authorization \(settings.authorizationStatus.rawValue) · \(lines.count) delivered" + (lines.isEmpty ? "" : ": " + lines.joined(separator: " ¦ "))
+        case "notification-click":
+            // The click on the delivered notification n (0 = the newest), as macOS hands it to the app;
+            // "file <idx>": the one a finished file of the list sends (when macOS does not let the app post).
+            var info: [String: String] = [:]
+            if argument.hasPrefix("file "), let i = Int(argument.dropFirst(5)), model.videos.indices.contains(i) {
+                info = ["page": Tab.review.rawValue, "video": model.videos[i].id.uuidString]
+            } else {
+                let delivered = await UNUserNotificationCenter.current().deliveredNotifications().sorted { $0.date > $1.date }
+                guard let n = Int(argument), delivered.indices.contains(n) else { return "no notification \(argument)" }
+                for (k, v) in delivered[n].request.content.userInfo { if let k = k as? String, let v = v as? String { info[k] = v } }
+            }
+            ShellNotifications.shared.onClick(info)
+            try? await Task.sleep(for: .milliseconds(400))
+        case "mouse":
+            return await sendMouse(argument, model)
         case "windowid":
             return WindowSizer.main(model.config).map { "\($0.windowNumber)" } ?? "no window"
         case "settingswindow":
@@ -748,6 +783,179 @@ enum DebugQA {
         try? await Task.sleep(for: .milliseconds(300))
         let ran = model.fix.running || model.fix.outcome != before
         return items.joined(separator: " · ") + " · key window \(key) · fix ran \(ran)"
+    }
+
+    /// `key <combo> [main|front|<window number>]`: a key press as a real one goes, the app
+    /// active, the window key and `NSApp.sendEvent` (menus' key equivalents, the focused
+    /// field, the window's own handlers). The combo is modifiers and one key joined by "+":
+    /// cmd, shift, opt, ctrl; a letter, a digit, ".", ",", return, esc, tab, space, delete,
+    /// left, right, up, down. With no window, the key window (else the main one).
+    private static func sendKey(_ argument: String, _ model: AppModel) async -> String {
+        let parts = argument.split(separator: " ").map(String.init)
+        guard let combo = parts.first else { return "usage: key <combo> [main|front|<window>]" }
+        var flags: NSEvent.ModifierFlags = []
+        var key = ""
+        for token in combo.lowercased().split(separator: "+").map(String.init) {
+            switch token {
+            case "cmd": flags.insert(.command)
+            case "shift": flags.insert(.shift)
+            case "opt", "alt": flags.insert(.option)
+            case "ctrl": flags.insert(.control)
+            default: key = token
+            }
+        }
+        let named: [String: (UInt16, String)] = [
+            "return": (36, "\r"), "esc": (53, "\u{1b}"), "tab": (48, "\t"), "space": (49, " "), "delete": (51, "\u{7f}"), "backspace": (51, "\u{8}"),
+            "left": (123, String(UnicodeScalar(NSLeftArrowFunctionKey)!)), "right": (124, String(UnicodeScalar(NSRightArrowFunctionKey)!)),
+            "down": (125, String(UnicodeScalar(NSDownArrowFunctionKey)!)), "up": (126, String(UnicodeScalar(NSUpArrowFunctionKey)!)),
+            ".": (47, "."), ",": (43, ","),
+        ]
+        let letters: [Character: UInt16] = [
+            "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
+            "e": 14, "r": 15, "y": 16, "t": 17, "1": 18, "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "9": 25, "7": 26,
+            "8": 28, "0": 29, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40, "n": 45, "m": 46,
+        ]
+        let code: UInt16, chars: String
+        if let n = named[key] { (code, chars) = n }
+        else if key.count == 1, let c = letters[key.first!] { code = c; chars = key }
+        else { return "unknown key \(key)" }
+        NSApp.activate(ignoringOtherApps: true)
+        let target: NSWindow?
+        switch parts.count > 1 ? parts[1] : "" {
+        case "main": target = WindowSizer.main(model.config)
+        case "front", "": target = NSApp.keyWindow ?? WindowSizer.main(model.config)
+        case let number: target = Int(number).flatMap { NSApp.window(withWindowNumber: $0) }
+        }
+        guard let window = target else { return "no window" }
+        window.makeKeyAndOrderFront(nil)
+        try? await Task.sleep(for: .milliseconds(300))
+        // A real arrow key carries the function and numeric pad flags too (menus match on them).
+        if (123...126).contains(code) { flags.formUnion([.function, .numericPad]) }
+        let shown = flags.contains(.shift) && chars.count == 1 ? chars.uppercased() : chars
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            guard let event = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
+                                               windowNumber: window.windowNumber, context: nil, characters: shown,
+                                               charactersIgnoringModifiers: shown, isARepeat: false, keyCode: code)
+            else { return "no event" }
+            // Into the event queue, as the window server delivers a press: AppKit takes it from
+            // there, not from inside this command (a modal alert it opens does not hold the command).
+            NSApp.postEvent(event, atStart: false)
+        }
+        try? await Task.sleep(for: .milliseconds(400))
+        let responder = NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "none"
+        return "key \(combo) · window \(window.windowNumber) · key window \(NSApp.keyWindow?.windowNumber ?? 0) · responder \(responder)"
+    }
+
+    /// `mouse click|double|right <x>,<y> [main|front|<window>] [pick <item title>]`: a click sent to
+    /// the window as real mouse events (x, y in points from the window's top-left corner, as its
+    /// captures). Taps, double taps and context menus see them; a DragGesture does not (see
+    /// drag-handle). A right click replies with the context menu's items (read while it tracks) and
+    /// closes it, or presses the item named after "pick".
+    private static func sendMouse(_ argument: String, _ model: AppModel) async -> String {
+        var parts = argument.split(separator: " ").map(String.init)
+        var pick: String?
+        if let p = parts.firstIndex(of: "pick") {
+            pick = parts[(p + 1)...].joined(separator: " ")
+            parts = Array(parts[..<p])
+        }
+        guard parts.count >= 2 else { return "usage: mouse click|double|right <x>,<y> [main|front|<window>] [pick <title>]" }
+        let xy = parts[1].split(separator: ",").compactMap { Double($0) }
+        guard xy.count == 2 else { return "bad point" }
+        let target: NSWindow?
+        let windowArgument = parts[0] == "drag" || parts[0] == "scroll" ? 3 : 2
+        switch parts.count > windowArgument ? parts[windowArgument] : "" {
+        case "main": target = WindowSizer.main(model.config)
+        case "front", "": target = NSApp.keyWindow ?? WindowSizer.main(model.config)
+        case let number: target = Int(number).flatMap { NSApp.window(withWindowNumber: $0) }
+        }
+        guard let window = target else { return "no window" }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        try? await Task.sleep(for: .milliseconds(300))
+        let point = NSPoint(x: xy[0], y: window.frame.height - xy[1])
+        func event(_ type: NSEvent.EventType, _ clicks: Int) -> NSEvent? {
+            NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                               windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)
+        }
+        if parts[0] == "scroll" {
+            // `mouse scroll <x>,<y> <dy> [window]`: wheel events of 10 pt each (positive: down the content).
+            guard parts.count > 2, let dy = Double(parts[2]) else { return "usage: mouse scroll <x>,<y> <dy> [window]" }
+            let steps = max(1, Int(abs(dy) / 10))
+            for _ in 0..<steps {
+                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
+                                       wheel1: Int32(dy > 0 ? -10 : 10), wheel2: 0, wheel3: 0) else { return "no event" }
+                cg.location = CGPoint(x: window.frame.minX + xy[0], y: (NSScreen.screens.first?.frame.height ?? 0) - window.frame.maxY + xy[1])
+                guard let wheel = NSEvent(cgEvent: cg) else { return "no event" }
+                window.sendEvent(wheel)
+                try? await Task.sleep(for: .milliseconds(15))
+            }
+            try? await Task.sleep(for: .milliseconds(400))
+            return "scroll \(Int(dy)) at \(Int(xy[0])),\(Int(xy[1])) · window \(window.windowNumber)"
+        }
+        if parts[0] == "drag" {
+            // `mouse drag <x>,<y> <x2>,<y2> [window]`: down, ten moves, up, each sent to the window.
+            let to = parts.count > 2 ? parts[2].split(separator: ",").compactMap { Double($0) } : []
+            guard to.count == 2 else { return "usage: mouse drag <x>,<y> <x2>,<y2> [window]" }
+            func at(_ type: NSEvent.EventType, _ x: Double, _ y: Double) -> NSEvent? {
+                NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: window.frame.height - y), modifierFlags: [],
+                                   timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                   context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+            }
+            guard let down = at(.leftMouseDown, xy[0], xy[1]) else { return "no event" }
+            window.sendEvent(down)
+            for i in 1...10 {
+                try? await Task.sleep(for: .milliseconds(30))
+                let f = Double(i) / 10
+                if let move = at(.leftMouseDragged, xy[0] + (to[0] - xy[0]) * f, xy[1] + (to[1] - xy[1]) * f) { window.sendEvent(move) }
+            }
+            if let up = at(.leftMouseUp, to[0], to[1]) { window.sendEvent(up) }
+            try? await Task.sleep(for: .milliseconds(400))
+            return "drag \(Int(xy[0])),\(Int(xy[1])) → \(Int(to[0])),\(Int(to[1])) · window \(window.windowNumber)"
+        }
+        guard ["click", "double", "right"].contains(parts[0]) else { return "unknown mouse action" }
+        // A menu that opens (a context menu, a ⋯ or pop-up button) runs its own tracking loop:
+        // its items are read when it starts and it is closed on the next turn, pressing "pick".
+        var titles: [String]?
+        var pressed = "-"
+        let observer = NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: nil) { note in
+            guard let opened = note.object as? NSMenu else { return }
+            nonisolated(unsafe) let menu = opened
+            MainActor.assumeIsolated {
+                menu.update()
+                titles = menu.items.filter { !$0.isHidden }.map { item in
+                    item.isSeparatorItem ? "—" : (item.state == .on ? "✓ " : "") + item.title + (item.isEnabled ? "" : " (off)")
+                }
+                let timer = Timer(timeInterval: 0.15, repeats: false) { _ in
+                    MainActor.assumeIsolated {
+                        if let pick, let i = menu.items.firstIndex(where: { $0.title == pick }) {
+                            pressed = pick
+                            menu.performActionForItem(at: i)
+                        }
+                        menu.cancelTracking()
+                    }
+                }
+                RunLoop.main.add(timer, forMode: .common)
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        if parts[0] == "right" {
+            guard let down = event(.rightMouseDown, 1), let up = event(.rightMouseUp, 1) else { return "no event" }
+            window.sendEvent(down)
+            window.sendEvent(up)
+        } else {
+            let times = parts[0] == "double" ? 2 : 1
+            for n in 1...times {
+                guard let down = event(.leftMouseDown, n), let up = event(.leftMouseUp, n) else { return "no event" }
+                window.sendEvent(down)
+                window.sendEvent(up)
+                try? await Task.sleep(for: .milliseconds(60))
+            }
+        }
+        _ = await wait(parts[0] == "right" ? 3 : 0.8) { titles != nil }
+        try? await Task.sleep(for: .milliseconds(300))
+        let head = "\(parts[0]) \(Int(xy[0])),\(Int(xy[1])) · window \(window.windowNumber)"
+        guard let titles else { return head + (parts[0] == "right" ? " · no menu" : "") }
+        return head + " · menu \(titles.joined(separator: " | ")) · pressed \(pressed)"
     }
 
     /// A JavaScript value as one line: strings as they are, the rest as JSON.

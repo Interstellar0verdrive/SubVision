@@ -82,6 +82,9 @@ final class AppModel {
     var run = BatchRun()
     /// O1 or O2 while it is up (`AppModel+Run.swift`).
     @ObservationIgnored var stopAlert: StopAlert?
+    /// O3 while it is up, and its answer "Quit and Stop" (the next quit goes through).
+    @ObservationIgnored var quitAlert: SVAlertPresentation?
+    @ObservationIgnored var quitConfirmed = false
     /// The video Preview shows (F5.2), chosen from the list.
     var previewVideoID: UUID? { didSet { defaults.set(previewVideoID?.uuidString, forKey: DefaultsKey.previewVideo) } }
     /// The SRT Sub fix works on (F5.3).
@@ -402,10 +405,22 @@ final class AppModel {
         DispatchQueue.main.async { Alerts.closeNotice(self) }
     }
 
-    /// ⌘Q: with a batch running, O3 asks first. True cancels the quit.
+    /// ⌘Q: with a batch running, O3 asks first. True cancels this quit: O3 is not modal,
+    /// and its "Quit and Stop" quits again, then without asking.
     func shouldBlockQuit() -> Bool {
-        guard batch.running else { return false }
-        return !Alerts.confirmQuit(self)
+        guard batch.running, !quitConfirmed else { return false }
+        if let open = quitAlert, open.isOpen {
+            open.focus()
+            return true
+        }
+        quitAlert = Alerts.confirmQuit(self) { [weak self] quit in
+            guard let self else { return }
+            quitAlert = nil
+            guard quit else { return }
+            quitConfirmed = true
+            quitApp()
+        }
+        return true
     }
 
     /// A sheet that is up (the end-of-batch summary, F5.1) keeps AppKit from

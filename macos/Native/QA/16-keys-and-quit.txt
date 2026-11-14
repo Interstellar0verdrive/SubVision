@@ -1,0 +1,62 @@
+# The menu bar's shortcuts with the app's state of now (manual tests, 14/11):
+# ⌫ and ⌘Z on a row, ⌘Y, ⌘→ ⌘← in Preview, ⌘↩, ⌘. and ⌥⌘. pressed without
+# opening a menu first (they did nothing until the menu had been opened once),
+# then ⌘Q during the batch: O3 is not modal, the batch goes on under it and
+# Esc cancels it. Key presses go through `key` (posted to the event queue,
+# with the app brought forward: no other app may hold the keyboard meanwhile).
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" a.mp4 && cp "$DEMO/sintel_eng_hardsub_demo.mp4" b.mp4
+@launch
+wait-ready 600
+? ^ready
+lang it
+params fast
+inspector-set langHint it-IT
+tab process
+add $WORK/a.mp4,$WORK/b.mp4
+select 0
+key delete main
+states
+? ^b.mp4=ready$
+key cmd+z main
+states
+? ^a.mp4=ready b.mp4=ready$
+select 0
+key cmd+y main
+wait-frames 300
+? ^20 frames
+key cmd+right
+preview-state
+? index 2
+key cmd+left
+preview-state
+? index 1
+preview-close
+select
+key cmd+return main
+states
+? ^a.mp4=running b.mp4=waiting$
+key cmd+. main
+alert-state
+? ^all ·
+key esc
+alert-state
+? ^none$
+key opt+cmd+. main
+alert-state
+? ^file 0 a.mp4
+alert-key esc
+? none
+key cmd+q main
+windows
+? AlertWindow
+wait-file 0 300
+? ^ok · a.mp4 done
+key esc
+windows
+?! AlertWindow
+states
+? ^a.mp4=done:12 b.mp4=(running|waiting)$
+stop-all
+wait-batch 120
+? ^batch done · done 1 failed 0 (stopped 1 skipped 0|stopped 0 skipped 1)
+params default

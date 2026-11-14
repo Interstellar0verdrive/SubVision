@@ -92,11 +92,12 @@ struct BatchRun: Equatable {
         steps.first { $0.state == .running } ?? steps.first { $0.state == .waiting }
     }
 
-    /// The file's fraction: by estimate when every step has one, else one share each.
+    /// The file's fraction: by estimate when every step has one (a step that had nothing
+    /// to do in the previous file weighs 0), else one share each.
     var fileFraction: Double {
         guard !steps.isEmpty else { return 0 }
         let weights = steps.map { $0.estimate ?? 0 }
-        let useWeights = steps.allSatisfy { ($0.estimate ?? 0) > 0 }
+        let useWeights = steps.allSatisfy { $0.estimate != nil } && weights.reduce(0, +) > 0
         var total = 0.0, done = 0.0
         for (i, step) in steps.enumerated() {
             let w = useWeights ? weights[i] : 1
@@ -262,8 +263,13 @@ extension AppModel {
         stopAlert = StopAlert(kind: kind, presentation: presentation)
     }
 
-    /// The file an open O1 names is over (or the batch, for O2 too): the alert goes by itself.
+    /// The file an open O1 names is over (or the batch, for O2 and O3 too): the alert goes by itself.
     private func closeStopAlert(file idx: Int? = nil) {
+        if idx == nil, let quit = quitAlert {
+            // Nothing left to stop: the quit question is moot (a new ⌘Q quits at once).
+            quit.close()
+            quitAlert = nil
+        }
         guard let open = stopAlert else { return }
         if let idx {
             guard case .file(let asked, _) = open.kind, asked == idx else { return }

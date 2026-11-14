@@ -522,3 +522,21 @@ def test_damaged_video_fails_in_the_middle_of_the_extraction(demo_ita: Path, ffm
     # the long gaps of the report travel with the event, as [start, end] pairs
     gaps = rec.of("batch.file.done")[0]["gaps"]
     assert isinstance(gaps, list) and all(len(g) == 2 and g[0] < g[1] for g in gaps)
+
+
+def test_a_step_with_nothing_to_do_still_has_a_time(tmp_path: Path):
+    """The refinement of a band without text sends no progress: it still gets
+    0 s, so the next file has an estimate for every step (the app's "the batch
+    ends around")."""
+    p = OcrParams(top_band=True, refine_timing=True)
+    plan = batch.step_plan(p)
+    log = batch._FileLog(tmp_path / "x.log", "it")
+    tracker = batch._StepTracker(plan, p, log, batch._LOG_I18N["it"], lambda *_: None, 0)
+    for step in ("extract", "group", "ocr", "refine"):
+        tracker.on_progress(core.ProgressEvent(step, "bottom", 1.0, 1, 1, "frames"))
+    for step in ("extract", "group", "ocr"):          # the signs band: no refine progress
+        tracker.on_progress(core.ProgressEvent(step, "top", 1.0, 1, 1, "frames"))
+    tracker.finish_all()
+    times = tracker.times()
+    assert set(times) == {f"{st['key']}:{st['band']}" for st in plan}
+    assert times["refine:top"] == 0

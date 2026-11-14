@@ -634,5 +634,8 @@ class _StepTracker:
         return None
 
     def times(self) -> Dict[str, float]:
+        # A step that had nothing to do (no progress: the refinement of a band
+        # without text) still ends with the file: it counts as 0 s, so the next
+        # file has an estimate for every step and the app its "ends around".
         return {sid: round(self.rows[sid]["dur"], 3) for sid in self.order
-                if self.rows[sid]["start"] is not None}
+                if self.rows[sid]["start"] is not None or self.rows[sid]["done"]}
