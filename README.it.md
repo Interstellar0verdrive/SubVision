@@ -19,7 +19,6 @@ controllo e correggo le poche righe di cui l'OCR non era sicuro. È fatta per
 **l'accuratezza prima di tutto**: i predefiniti privilegiano sempre la qualità
 sulla velocità, così c'è il meno possibile da sistemare a mano.
 
-<!-- TODO screenshot: video_dark_it.webp e video_light_it.webp, la pagina Video durante un lotto (vedi design/immagini-readme-2.0.md) -->
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_light_it.webp">
   <img alt="SubVision: la pagina Video durante un lotto, un file finito, uno che legge i fotogrammi con le sue tappe, velocità e tempo che manca, la barra del lotto in basso e il pannello Parametri a destra" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_it.webp">
@@ -131,7 +130,6 @@ modo per tornare all'elenco.
 
 ### Video
 
-<!-- TODO screenshot: video_rows_dark_it.webp, la pagina Video prima di un lotto con una riga finita e una da elaborare aperte (vedi design/immagini-readme-2.0.md) -->
 <img alt="La pagina Video prima di un lotto: una riga finita aperta con il tempo di ogni tappa, il risultato e i file, e una riga spuntata da elaborare aperta con quello che SubVision ne sa, la stima e cinque fotogrammi del video" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_it.webp">
 
 - **L'elenco dei tuoi video**, con durata, frame rate e dimensioni, che resta
@@ -193,12 +191,10 @@ modo per tornare all'elenco.
   sull'icona del Dock, e un clic sull'icona riapre la finestra. **⌘Q** prima
   chiede, poi ferma il lotto; gli SRT già fatti restano.
 
-<!-- TODO screenshot: video_finished_dark_it.webp, il foglio di fine lotto con un file non riuscito (vedi design/immagini-readme-2.0.md) -->
 <img alt="Il foglio di fine lotto davanti alla pagina Video: due SRT pronti, ognuno con il suo pulsante Rivedi, e un file non riuscito, con il motivo e il suo log" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_it.webp">
 
 ### Il pannello Parametri
 
-<!-- TODO screenshot: parameters_light_it.webp, il pannello sulla scheda Bande con un valore cambiato (vedi design/immagini-readme-2.0.md) -->
 <img alt="Il pannello Parametri sulla scheda Bande, in chiaro: lo schema del fotogramma con la banda dei cartelli in alto e quella dei dialoghi in basso, i loro cursori e un valore diverso dal predefinito, in ambra" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_it.webp" width="360" align="right">
 
 A destra della pagina Video, Anteprima compresa, il pannello **Parametri** è
@@ -257,7 +253,6 @@ Quanto ci mette, per un episodio di 20–24 minuti su un Mac Apple Silicon:
 
 ### Anteprima
 
-<!-- TODO screenshot: preview_dark_it.webp, l'Anteprima dentro la pagina Video dopo Prova OCR, un pannello superato (vedi design/immagini-readme-2.0.md) -->
 <img alt="L'Anteprima dentro la pagina Video: la fascia del titolo con il nome del video e le frecce per il video sopra e sotto, un fotogramma con disegnate la banda dei cartelli e quella dei dialoghi, due righe di dieci miniature e sotto i pannelli Dialoghi e Cartelli dopo Prova OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_it.webp">
 
 L'Anteprima è dove regolo le bande prima di un lotto lungo. Si apre dentro
@@ -290,7 +285,6 @@ nell'elenco (⌘↑ ⌘↓).
 
 ### Revisione
 
-<!-- TODO screenshot: review_dark_it.webp, un report di revisione aperto nella pagina Revisione (vedi design/immagini-readme-2.0.md) -->
 <img alt="Un report di revisione aperto nella pagina Revisione: la fascia del titolo con il nome del video, la barra del report con Salva SRT revisionato, e le righe con fotogramma, tempi e durata, una dubbia con le sue letture alternative e le parole diverse evidenziate" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_it.webp">
 
 La pagina **Revisione** elenca i video elaborati, con le righe, i buchi
@@ -338,7 +332,6 @@ browser, dove funziona da solo, offline. **File › Apri una revisione…**
 
 ### Sub fix
 
-<!-- TODO screenshot: subfix_dark_it.webp, la pagina Sub fix con le schede in alto (vedi design/immagini-readme-2.0.md) -->
 <img alt="La pagina Sub fix: a sinistra l'SRT scelto con cosa correggere, a destra i valori condivisi con Video, e la nota verde della copia corretta appena creata" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_it.webp">
 
 **Sub fix** pulisce un `.srt` esistente **senza rifare l'OCR**, in pochi
