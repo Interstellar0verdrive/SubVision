@@ -14,6 +14,7 @@
 //   queued                         the rows Retry queued during the batch ("queued b.mp4", "queued -")
 //   row-menu <idx>                 opens the row's ⋯ menu, reads its items ("title ⌘key", "(off)", "✓", "—") and closes it
 //   row-menu-shot <idx> <path>     the main window with that ⋯ menu open over it (`screencapture`, the scheme in use)
+//   screen-shot <path>             the main window as the screen shows it (`screencapture`), the scheme in use
 //   video-fake before|drawers|batch|failed|outcomes|stopped|off
 //                                  the first three videos of the list in the states of the boards, fed by hand
 //                                  (a batch on the demo clips is over too fast to catch); off puts them back
@@ -65,6 +66,13 @@ enum DebugVideo {
             return await rowMenu(model, idx, shot: args[1])
         case "video-fake":
             return fake(argument, model)
+        case "screen-shot":
+            // The main window as the screen shows it (`screencapture`), not drawn again by `capture`.
+            guard !argument.isEmpty else { return "usage: screen-shot <path>" }
+            NSApp.activate(ignoringOtherApps: true)
+            WindowSizer.main(model.config)?.makeKeyAndOrderFront(nil)
+            try? await Task.sleep(for: .milliseconds(400))
+            return capture(model, argument)
         default:
             return nil
         }

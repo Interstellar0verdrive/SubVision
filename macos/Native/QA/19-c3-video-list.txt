@@ -174,6 +174,9 @@ theme dark
 video-fake batch
 capture $OUT/C3-04-dark.png
 ? C3-04-dark.png$
+# As the screen shows it (the running circle as wide as the done one, 22 pt)
+screen-shot $OUT/C3-04-screen-dark.png
+? C3-04-screen-dark\.png$
 theme light
 capture $OUT/C3-04-light.png
 theme dark
@@ -218,6 +221,8 @@ capture $OUT/N2-dark.png
 theme light
 capture $OUT/N2-light.png
 theme dark
+screen-shot $OUT/N2-screen-dark.png
+? N2-screen-dark\.png$
 # The panel has no ×: the top bar's button (toggleInspector) closes it
 inspector
 ? ^inspector closed$
