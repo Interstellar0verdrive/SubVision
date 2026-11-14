@@ -149,6 +149,8 @@ final class AppModel {
     func setLanguage(_ code: String) {
         localizer.setLanguage(code)
         texts = ShellTexts(localizer)
+        // The first-launch window's rows too (its texts come from `texts`).
+        tools.relabel(AppConfig.tools { [localizer] in localizer.t($0, $1) })
         defaults.set(localizer.language, forKey: DefaultsKey.language)
         followLanguage(localizer.language)
         // The open reports follow too (design note 72).

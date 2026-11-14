@@ -349,3 +349,25 @@ final class FakeGitHub: URLProtocol, @unchecked Sendable {
         #expect(out == "tab preview\tok tab preview\nstate\tok state\n")
     }
 }
+
+// MARK: - The first-launch window in another language
+
+@Suite struct ToolsRelabelTests {
+    @MainActor
+    @Test func relabelKeepsEachRowsProgress() {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("svshell-relabel-\(UUID().uuidString)")
+        let state = ToolsSetupState(tools: demoTools, engine: nil)
+        state.prepareIfFirstLaunch(stateFolder: dir)   // no .venv there: the runtime row is running
+        let before = state.rows.map(\.state)
+        #expect(state.rows.first?.tool.detail == "engine and recognition")
+        let italian = [
+            ToolRow(key: "python", name: "uv + Python", version: "3.13", detail: "motore e riconoscimento", megabytes: 42, kind: .runtime),
+            ToolRow(key: "ffmpeg", name: "FFmpeg", version: "9.0.2", detail: "legge i fotogrammi", megabytes: 38),
+            ToolRow(key: "warmup", name: "Preparazione del riconoscimento", detail: "i modelli di Vision per questo Mac", kind: .task),
+        ]
+        state.relabel(italian)
+        #expect(state.rows.map(\.tool.detail) == ["motore e riconoscimento", "legge i fotogrammi", "i modelli di Vision per questo Mac"])
+        #expect(state.rows.map(\.state) == before)
+        #expect(state.tools.last?.name == "Preparazione del riconoscimento")
+    }
+}
