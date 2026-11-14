@@ -1,15 +1,15 @@
 """Checks the EN/IT catalogs of the app (macos/Native/SubVision/Resources/locales/{en,it}/app.json):
 same keys, same placeholders in each pair, both plural forms (.uno/.altri), only {name}
 placeholders (no Python formats), {{ }} for literal braces, keys sorted, keys in the known areas.
-Run from anywhere:  python3 -I design/tavole/check_locales.py   (exit code 1 on any problem)."""
+Run from anywhere:  python3 -I tools/check_locales.py   (exit code 1 on any problem)."""
 import json
 import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 LOC = ROOT / 'macos/Native/SubVision/Resources/locales'
-AREAS = {'sidebar', 'process', 'inspector', 'preview', 'fix', 'report', 'settings', 'tools', 'alerts',
+AREAS = {'sidebar', 'process', 'review', 'inspector', 'preview', 'fix', 'report', 'settings', 'tools', 'alerts',
          'menu', 'notify', 'errors', 'steps', 'common'}
 PLACEHOLDER = re.compile(r'(?<!\{)\{([^{}]*)\}(?!\})')
 

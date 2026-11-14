@@ -1,5 +1,7 @@
 # Snapshot F6 (tutte le tavole, codice finale)
 
+> Le tavole di F3 citate qui (`design/tavole/`) non sono più nel ramo: le tavole definitive sono nel file di design https://claude.ai/artifact/6hPbiA85ZJxGauwq1w4evQ.
+
 Immagini a 2× della build Debug di F6 (`native-2.0` a 0b92056), in chiaro e in scuro, una per tavola di `design/tavole/png/` (più varianti col suffisso dove la tavola ne mostra più d'una). Il nome è il codice della tavola. Interfaccia in italiano, finestra principale a 1360×840, N1 e N2 a 760×640 (la finestra intera, come nelle tavole). Le cartelle `f4/` e `f5/` restano come storia: sono state fatte su build intermedie (in `f5/` l'inspector di A3 era vuoto perché precedeva l'unione dei rami).
 
 Due strade, le stesse di F4 e F5:

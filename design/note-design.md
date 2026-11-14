@@ -70,6 +70,8 @@ Note di lavoro della fase F3 (design). Le risposte di C1 vanno scritte sotto ogn
 
 ## Tavole
 
+> **14/11/2026:** la cartella `design/tavole/` (tavole HTML e PNG di F3) è stata tolta dal ramo: le tavole definitive, approvate, sono nel file di design https://claude.ai/artifact/6hPbiA85ZJxGauwq1w4evQ (scuro e chiaro, «Native screens»). Quello che segue descrive le tavole di F3 com'erano; il controllo dei cataloghi è ora `python3 -I tools/check_locales.py`.
+
 Pagine HTML in `design/tavole/` (aprire `index.html`): ognuna con il selettore Chiaro / Scuro / Sistema e il selettore EN / IT; `?theme=light|dark`, `?lang=en|it`, `?board=<codice>`. Token, testo e componenti copiati da AnimeUp 2.1 (`tavole.css`, `tavole.js`, `kit.js`); i testi dell'interfaccia sono tutti in `strings.js` ([inglese, italiano], base di 3.3). PNG in `design/tavole/png/<codice>-light.png` e `-dark.png`, in italiano, rifatti da `screenshot.sh` (Chrome headless; `LANGS="it en"` aggiunge quelli in inglese in `png/en/`). Il fotogramma dell'Anteprima è della clip demo Sintel (© Blender Foundation, CC-BY 3.0), in `design/tavole/img/`.
 
 | Codice | Pagina | PNG |
