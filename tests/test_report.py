@@ -361,3 +361,189 @@ def test_report_rows_data(tmp_path: Path):
     core.write_qc_html(out, "v.mp4", "v.srt", segs, [], [(5.0, 12.0, "")],
                        RunStats(), OcrParams(), ui_lang="it")
     assert [g["edge"] for g in _data_block(out.read_text())["gaps"]] == [""]
+
+
+# ---------------------------------------------------------------- in a browser
+CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+needs_chrome = pytest.mark.skipif(not CHROME.exists(), reason="Google Chrome not available")
+
+
+def _run_in_chrome(tmp_path: Path, html: str, head: str = "", tail: str = "") -> dict:
+    """
+    Opens the report in headless Chrome with `head` injected first in <head>
+    and `tail` (an async function body, run after the report's own script)
+    at the end of <body>; returns what `tail` returns, as JSON.
+    """
+    head = "<script>window.__subvisionLang = 'it';</script>" + head
+    html = html.replace('<head><meta charset="utf-8">', '<head><meta charset="utf-8">' + head, 1)
+    runner = ("<script>(async () => { let out; try { out = await (async () => {" + tail +
+              "})(); } catch (e) { out = {error: String(e && e.stack || e)}; }"
+              " const pre = document.createElement('pre'); pre.id = 'qa-out';"
+              " pre.textContent = JSON.stringify(out); document.body.appendChild(pre); })();</script>")
+    html = html.replace("</body>", runner + "</body>", 1)
+    page = tmp_path / "qa.review.html"
+    page.write_text(html, encoding="utf-8")
+    res = subprocess.run([str(CHROME), "--headless=new", "--disable-gpu", "--no-first-run",
+                          f"--user-data-dir={tmp_path / 'chrome'}", "--virtual-time-budget=5000",
+                          "--dump-dom", page.as_uri()],
+                         capture_output=True, text=True, timeout=120)
+    m = re.search(r'<pre id="qa-out">(.*?)</pre>', res.stdout, re.S)
+    assert m, res.stderr[-2000:]
+    raw = m.group(1).replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&amp;", "&")
+    out = json.loads(raw)
+    assert not (isinstance(out, dict) and "error" in out), out
+    return out
+
+
+def _with_state(state: dict) -> str:
+    return "<script>window.__subvisionState = " + json.dumps(state) + ";</script>"
+
+
+@needs_chrome
+def test_manual_rows_come_back_at_their_time(tmp_path: Path):
+    state = {
+        "newA": {"text": "tra la 2 e la 3", "start": 4.2, "end": 4.8, "included": True, "added": True},
+        "newB": {"text": "prima di tutte", "start": 0.1, "end": 0.4, "included": True, "added": True},
+        "newC": {"text": "", "start": None, "end": None, "included": True, "added": True},
+        "newD": {"text": "in fondo", "start": 99.0, "end": 100.0, "included": True, "added": True},
+        "newE": {"text": "dal buco", "start": 10.5, "end": 12.5, "included": True, "added": True, "gap": 0},
+    }
+    out = _run_in_chrome(tmp_path, _fixed_report(tmp_path, "it"), _with_state(state), """
+      const rows = [...document.querySelectorAll('#rows .row')];
+      return {ids: rows.map(r => r.dataset.id), nums: rows.map(r => r.querySelector('.n').textContent),
+              thumbs: rows.map(r => r.querySelector('.thumb').tagName + ':' + r.querySelector('.thumb').textContent),
+              emptyTimes: [...rows[rows.length - 1].querySelectorAll('.tin')].map(i => i.value + '|' + i.className),
+              removeLabel: rows[0].querySelector('.link').textContent,
+              origLabel: rows[1].querySelector('.link').textContent};
+    """)
+    assert out["ids"] == ["newB", "s1", "s2", "newA", "s3", "newE", "newD", "newC"]
+    assert out["nums"] == ["+", "1", "2", "+", "3", "+", "+", "+"]
+    # the row from the gap gets the gap's frame back; the others have none
+    assert out["thumbs"][5] == "IMG:" and out["thumbs"][3] == "DIV:nessun fotogramma"
+    assert out["emptyTimes"] == ["|tin mono bad", "|tin mono bad"]
+    assert out["removeLabel"] == "Togli" and out["origLabel"] == "Originale"
+
+
+@needs_chrome
+def test_original_restores_text_and_sign(tmp_path: Path):
+    out = _run_in_chrome(tmp_path, _fixed_report(tmp_path, "it"), "", """
+      const row = id => document.querySelector('.row[data-id="' + id + '"]');
+      const look = id => { const r = row(id), ta = r.querySelector('textarea');
+        return {text: ta.value, edited: ta.classList.contains('edited'),
+                sign: r.querySelector('.subl input').checked, orig: !r.querySelector('.link').disabled,
+                cur: [...r.querySelectorAll('.altc.cur')].map(c => c.dataset.txt)}; };
+      const res = {start: look('s2')};
+      row('s2').querySelector('.altc').click();               // an alternative reading
+      const sign = row('s2').querySelector('.subl input'); sign.click();   // and the sign box
+      res.changed = look('s2'); res.savedChanged = saved.s2;
+      row('s2').querySelector('.link').click();               // Originale
+      res.back = look('s2'); res.savedBack = saved.s2;
+      // a sign of the OCR unticked by hand comes back ticked
+      row('s3').querySelector('.subl input').click();
+      res.s3changed = look('s3');
+      row('s3').querySelector('.link').click();
+      res.s3back = look('s3');
+      res.durS2 = row('s2').querySelector('.rdur').textContent;
+      res.conf = row('s2').querySelector('.cf').textContent;
+      res.confCls = row('s2').querySelector('.cf').className;
+      const t2 = row('s2').querySelectorAll('.tin')[1];
+      t2.value = '00:00:03,000'; t2.dispatchEvent(new Event('input'));
+      res.durEdited = row('s2').querySelector('.rdur').textContent;
+      t2.value = '00:00:02,000'; t2.dispatchEvent(new Event('input'));
+      res.badOrder = [t2.className, row('s2').querySelector('.rdur').className];
+      return res;
+    """)
+    assert out["start"] == {"text": "Bene, grazie", "edited": False, "sign": False, "orig": False, "cur": []}
+    assert out["changed"] == {"text": "Bene grazie", "edited": True, "sign": True, "orig": True,
+                              "cur": ["Bene grazie"]}
+    assert out["savedChanged"]["text"] == "Bene grazie" and out["savedChanged"]["top"] is True
+    assert out["back"] == out["start"]
+    assert out["savedBack"]["text"] == "Bene, grazie" and out["savedBack"]["top"] is False
+    assert out["s3changed"]["sign"] is False and out["s3changed"]["orig"] is True
+    assert out["s3back"]["sign"] is True and out["s3back"]["orig"] is False
+    # duration under the times, recomputed; invalid times in red
+    assert out["durS2"] == "1,50 s" and out["durEdited"] == "0,50 s"
+    assert out["badOrder"] == ["tin mono bad", "rdur mono bad"]
+    assert out["conf"] == "70 %accordo 60 %" and out["confCls"] == "cf c-warn"
+
+
+@needs_chrome
+def test_no_an8_on_the_page_but_in_the_srt(tmp_path: Path):
+    out = _run_in_chrome(tmp_path, _fixed_report(tmp_path, "it"), "", """
+      return {text: document.body.innerText, srt: buildSrt()};
+    """)
+    assert "an8" not in out["text"]
+    assert "È un cartello (va in alto)" in out["text"]
+    assert "{\\an8}CARTELLO" in out["srt"]
+
+
+@needs_chrome
+def test_added_rows_times_and_places(tmp_path: Path):
+    out = _run_in_chrome(tmp_path, _fixed_report(tmp_path, "it"), "", """
+      const alerts = []; window.alert = m => alerts.push(m);
+      addRow(null);
+      const rows = [...document.querySelectorAll('#rows .row')], top = rows[rows.length - 1];
+      const res = {topTimes: [...top.querySelectorAll('.tin')].map(i => i.value + '|' + i.className),
+                   topThumb: top.querySelector('.thumb').textContent, topNum: top.querySelector('.n').textContent,
+                   topState: saved[top.dataset.id], dur: top.querySelector('.rdur').textContent};
+      res.srtEmpty = buildSrt() !== null && alerts.length === 0;     // an empty line is skipped
+      const ta = top.querySelector('textarea'); ta.value = 'Nuova'; ta.dispatchEvent(new Event('input'));
+      res.srtNoTimes = buildSrt(); res.alerts = alerts.slice();
+      addRow(DATA.gaps[0]);
+      const g = DATA.gaps[0]._el.nextElementSibling;
+      res.gapRow = {cls: g.className, times: [...g.querySelectorAll('.tin')].map(i => i.value),
+                    thumb: g.querySelector('.thumb').tagName, state: saved[g.dataset.id]};
+      top.querySelector('.link').click();                          // Togli
+      res.afterRemove = {inPage: !!document.querySelector('.row[data-id="' + top.dataset.id + '"]'),
+                         inState: top.dataset.id in saved};
+      return res;
+    """)
+    assert out["topTimes"] == ["|tin mono bad", "|tin mono bad"]
+    assert out["topThumb"] == "nessun fotogramma" and out["topNum"] == "+"
+    assert out["topState"]["start"] is None and out["topState"]["end"] is None
+    assert out["dur"] == "mancano i tempi"
+    assert out["srtEmpty"] is True
+    assert out["srtNoTimes"] is None and out["alerts"] == ['Tempi non validi nella riga: "Nuova"']
+    assert out["gapRow"]["cls"] == "row added"
+    assert out["gapRow"]["times"] == ["00:00:10,500", "00:00:12,500"]
+    assert out["gapRow"]["thumb"] == "IMG" and out["gapRow"]["state"]["gap"] == 0
+    assert out["afterRemove"] == {"inPage": False, "inState": False}
+
+
+@needs_chrome
+def test_reset_asks_first(tmp_path: Path):
+    html = _fixed_report(tmp_path, "it")
+    expected = ("Ripristinare tutto il report?\n\nPerderai tutte le modifiche fatte in questo report: "
+                "testi corretti, letture scelte, tempi, spunte, cartelli e righe aggiunte a mano. "
+                "Gli SRT revisionati già salvati non cambiano.")
+    # a browser: confirm() with title, blank line, text; "no" keeps everything
+    out = _run_in_chrome(tmp_path, html, _with_state({"s1": {"text": "x"}}), """
+      const asked = []; window.confirm = m => { asked.push(m); return false; };
+      await resetAll();
+      return {asked: asked, kept: saved.s1};
+    """)
+    assert out == {"asked": [expected], "kept": {"text": "x"}}
+    # the app: a "confirm" message with the title, the text and the buttons
+    bridge = """<script>window.__posted = [];
+      window.webkit = {messageHandlers: {subvision: {postMessage(m) { window.__posted.push(m);
+        return Promise.resolve(m.type === 'confirm' ? {confirmed: false} : {ok: true}); }}}};</script>"""
+    out = _run_in_chrome(tmp_path, html, bridge, """
+      const asked = []; window.confirm = m => { asked.push(m); return true; };
+      await resetAll();
+      return {asked: asked, posted: window.__posted.filter(m => m.type === 'confirm'),
+              app: document.documentElement.classList.contains('app'),
+              title: getComputedStyle(document.querySelector('.ptitle')).display};
+    """)
+    assert out["asked"] == [] and out["app"] is True and out["title"] == "none"
+    assert out["posted"] == [{"type": "confirm", "title": "Ripristinare tutto il report?",
+                              "text": expected.split("\n\n", 1)[1], "confirm": "Ripristina tutto",
+                              "cancel": "Annulla", "destructive": True}]
+    # an app that does not know the message: confirm() as in a browser
+    old = bridge.replace("{confirmed: false}", "Promise.reject('unknown type confirm')").replace(
+        "return Promise.resolve(m.type === 'confirm' ? Promise.reject", "return (m.type === 'confirm' ? Promise.reject")
+    out = _run_in_chrome(tmp_path, html, old, """
+      const asked = []; window.confirm = m => { asked.push(m); return false; };
+      await resetAll();
+      return {asked: asked};
+    """)
+    assert out == {"asked": [expected]}
