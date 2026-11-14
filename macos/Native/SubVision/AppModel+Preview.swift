@@ -95,7 +95,7 @@ struct PreviewState {
     var leaving = false
     /// What the list had when the page came: its selection (put back on the way out, so
     /// the list's keys do not act on rows nobody sees) and the panel's tab.
-    var savedSelection: Set<UUID> = []
+    var savedFocus: UUID?
     var savedTab: String?
     /// `AppModel.backGeneration` right after the page set `backAction`.
     var backGeneration: Int?
@@ -203,9 +203,9 @@ extension AppModel {
     /// searched starts its search.
     func openPreview(_ id: UUID?, frame: Int? = nil) {
         if !preview.shown {
-            // The list's selection and the panel's tab wait for the way back; the panel shows Bande.
-            preview.savedSelection = selection
-            selection = []
+            // The list's focus and the panel's tab wait for the way back; the panel shows Bande.
+            preview.savedFocus = focusedRow
+            focusedRow = nil
             preview.savedTab = defaults.string(forKey: InspectorTab.key)
             defaults.set(InspectorTab.bands.rawValue, forKey: InspectorTab.key)
             preview.shown = true
@@ -234,8 +234,8 @@ extension AppModel {
         preview.leaving = false
         preview.drag = nil
         let ids = Set(videos.map(\.id))
-        selection = preview.savedSelection.intersection(ids)
-        preview.savedSelection = []
+        focusedRow = preview.savedFocus.flatMap { ids.contains($0) ? $0 : nil }
+        preview.savedFocus = nil
         if let saved = preview.savedTab, defaults.string(forKey: InspectorTab.key) == InspectorTab.bands.rawValue {
             defaults.set(saved, forKey: InspectorTab.key)
         }

@@ -300,7 +300,7 @@ struct FromPreview: View {
 
     /// Five frames, the ones with text first, in their order.
     private func shown(_ result: PreviewState.Result) -> [(frame: PreviewFrame, image: NSImage?)] {
-        let all = result.frames.enumerated().map { (frame: $0.element, image: result.thumbnails.indices.contains($0.offset) ? result.thumbnails[$0.offset] : nil) }
+        let all = result.frames.enumerated().map { (frame: $0.element, image: result.thumbnail($0.offset)) }
         let withText = all.filter(\.frame.hasText), without = all.filter { !$0.frame.hasText }
         return Array((withText + without).prefix(5))
     }

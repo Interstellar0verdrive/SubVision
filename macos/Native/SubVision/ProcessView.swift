@@ -71,7 +71,7 @@ struct ProcessView: View {
             let code = event.keyCode
             guard [126, 125, 49, 124, 123, 51, 117, 53].contains(code),
                   event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
-                  model.tab == .process, !model.videos.isEmpty,
+                  model.tab == .process, !model.preview.shown, !model.videos.isEmpty,
                   let window = event.window, window.isMainWindow, window.attachedSheet == nil,
                   !(window.firstResponder is NSText) else { return event }
             // The parameters laid over a narrow window keep their own keys.
