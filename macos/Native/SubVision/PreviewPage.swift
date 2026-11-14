@@ -119,7 +119,7 @@ struct PreviewTitleBand: View {
 
     var body: some View {
         TitleBand(prefix: model.t("app.preview.title_prefix"), name: model.previewVideo?.name ?? "",
-                  subtitle: model.previewDetails, backHelp: model.t("app.preview.back_help"),
+                  subtitle: model.previewDetails, backHelp: model.t("app.preview.back_help", ["key": model.backKey]),
                   maxContentWidth: 1000, shortcut: false, back: { model.leavePreview() }) {
             if let i = model.previewVideoIndex {
                 Text(model.t("app.preview.video_of", ["i": i + 1, "n": model.videos.count]))

@@ -175,7 +175,7 @@ struct ReportPage: View {
     var body: some View {
         VStack(spacing: 0) {
             TitleBand(prefix: model.t("app.review.report.of"), name: session.title, subtitle: model.reportDetails(session),
-                      backHelp: model.t("app.common.back_to_list"), maxContentWidth: Self.column, shortcut: false,
+                      backHelp: model.t("app.common.back_to_list", ["key": model.backKey]), maxContentWidth: Self.column, shortcut: false,
                       back: { model.closeReport() }) {
                 if session.phase != .gone, session.phase != .unreadable {
                     Button { session.showInFinder() } label: {

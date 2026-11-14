@@ -69,6 +69,13 @@ final class AppModel {
     /// becomes narrow starts with the panel retracted (N1).
     var inspectorOpen = false
     /// The page in front has a title band with its back button (the report in Review, Preview;
+    /// The key of View › Back as the menu shows it: SwiftUI adapts "[" to the keyboard
+    /// ("ò" on an Italian one), and the title band's help must name the same key.
+    var backKey: String {
+        let items = NSApp?.mainMenu?.items.compactMap(\.submenu).flatMap(\.items) ?? []
+        let key = items.first { $0.title == t("app.menu.back") }?.keyEquivalent ?? ""
+        return key.isEmpty ? "[" : key
+    }
     /// C3-07, C3-09): View › Back (⌘[) runs it. The page sets it when it shows the band and
     /// clears it when it goes, and builds its band with `TitleBand(shortcut: false)`.
     @ObservationIgnored var backAction: (@MainActor () -> Void)? {
