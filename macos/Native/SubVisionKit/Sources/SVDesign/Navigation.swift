@@ -15,33 +15,36 @@ import SwiftUI
 /// in 24 pt bold and the prefix regular and secondary, the details on a line
 /// under it; the secondary buttons on the right. With `maxContentWidth` the
 /// content keeps to a centred column that wide (1180 pt for the report), so it
-/// lines up with the column under the band.
+/// lines up with the column under the band. `shortcut: false` when the app's
+/// menu has the ⌘[ item (View › Back) that does the same.
 public struct TitleBand<Trailing: View>: View {
     var prefix: String
     var name: String
     var subtitle: String
     var backHelp: String
     var maxContentWidth: CGFloat?
+    var shortcut: Bool
     var back: () -> Void
     @ViewBuilder var trailing: () -> Trailing
 
     public static var height: CGFloat { 86 }
 
     public init(prefix: String, name: String, subtitle: String = "", backHelp: String,
-                maxContentWidth: CGFloat? = nil, back: @escaping () -> Void,
+                maxContentWidth: CGFloat? = nil, shortcut: Bool = true, back: @escaping () -> Void,
                 @ViewBuilder trailing: @escaping () -> Trailing) {
         self.prefix = prefix
         self.name = name
         self.subtitle = subtitle
         self.backHelp = backHelp
         self.maxContentWidth = maxContentWidth
+        self.shortcut = shortcut
         self.back = back
         self.trailing = trailing
     }
 
     public var body: some View {
         HStack(spacing: 16) {
-            BackCircleButton(help: backHelp, action: back)
+            BackCircleButton(help: backHelp, shortcut: shortcut, action: back)
             VStack(alignment: .leading, spacing: 3) {
                 title
                     .lineLimit(1)
@@ -73,22 +76,25 @@ public struct TitleBand<Trailing: View>: View {
 
 extension TitleBand where Trailing == EmptyView {
     public init(prefix: String, name: String, subtitle: String = "", backHelp: String,
-                maxContentWidth: CGFloat? = nil, back: @escaping () -> Void) {
+                maxContentWidth: CGFloat? = nil, shortcut: Bool = true, back: @escaping () -> Void) {
         self.init(prefix: prefix, name: name, subtitle: subtitle, backHelp: backHelp,
-                  maxContentWidth: maxContentWidth, back: back) { EmptyView() }
+                  maxContentWidth: maxContentWidth, shortcut: shortcut, back: back) { EmptyView() }
     }
 }
 
 /// The band's back button (`.tband .bk`): a 38 pt glass circle with a chevron;
 /// under the pointer the control's fill, an accent ring and chevron, and a small
-/// label under it ("Back to the list · ⌘["). ⌘[ presses it while it is on screen.
+/// label under it ("Back to the list · ⌘["). With `shortcut`, ⌘[ presses it while
+/// it is on screen.
 public struct BackCircleButton: View {
     var help: String
+    var shortcut: Bool
     var action: () -> Void
     @State private var hover = false
 
-    public init(help: String, action: @escaping () -> Void) {
+    public init(help: String, shortcut: Bool = true, action: @escaping () -> Void) {
         self.help = help
+        self.shortcut = shortcut
         self.action = action
     }
 
@@ -103,7 +109,7 @@ public struct BackCircleButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .keyboardShortcut("[", modifiers: .command)
+        .keyboardShortcut(shortcut ? KeyboardShortcut("[", modifiers: .command) : nil)
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.12), value: hover)
         .overlay(alignment: .topLeading) {

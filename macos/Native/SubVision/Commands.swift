@@ -76,6 +76,11 @@ struct AppCommands: Commands {
             pageItem(.process, "app.sidebar.tab.process", "1")
             pageItem(.review, "app.sidebar.tab.review", "2")
             pageItem(.fix, "app.sidebar.tab.fix", "3")
+            Divider()
+            // Board O9: the round ‹ of the title band, from the menu (C3-07, C3-09).
+            Button(model.t("app.menu.back")) { model.backAction?() }
+                .keyboardShortcut("[", modifiers: .command)
+                .disabled(!model.canGoBack)
             // The panel never closes beside a wide page (C3-03): the item, and ⌥⌘I, are there
             // only while a narrow window lays it over the page (N1, N2).
             if model.inspectorOverlays {

@@ -55,18 +55,24 @@ private struct PointingHand: ViewModifier {
 
 // MARK: - Popup menu
 
-/// One line of a `PopupMenu`.
+/// One line of a `PopupMenu`. The menus of the "⋯" and context kind (C3-05) are
+/// native menus: sections between separators, the system's highlight, and the
+/// item's shortcut on the right in the system's dimmed ink (`key`, `modifiers`:
+/// shown there; the main menu's item with the same shortcut does the work).
 public struct SVMenuItem {
     var title: String?
     /// Secondary text, in grey on the item's right (a version, a date).
     var detail: String? = nil
     var checked: Bool
     var enabled: Bool
+    var key: String = ""
+    var modifiers: NSEvent.ModifierFlags = .command
     var action: () -> Void
 
     public static func item(_ title: String, detail: String? = nil, checked: Bool = false, enabled: Bool = true,
+                            key: String = "", modifiers: NSEvent.ModifierFlags = .command,
                             action: @escaping () -> Void) -> SVMenuItem {
-        SVMenuItem(title: title, detail: detail, checked: checked, enabled: enabled, action: action)
+        SVMenuItem(title: title, detail: detail, checked: checked, enabled: enabled, key: key, modifiers: modifiers, action: action)
     }
 
     public static var separator: SVMenuItem { SVMenuItem(title: nil, checked: false, enabled: false, action: {}) }
@@ -118,7 +124,8 @@ public struct PopupMenu<Label: View>: View {
         paragraph.tabStops = [NSTextTab(textAlignment: .right, location: widest + 28 + detailWidest)]
         for item in list {
             guard let title = item.title else { menu.addItem(.separator()); continue }
-            let entry = NSMenuItem(title: title, action: #selector(MenuHandler.fire(_:)), keyEquivalent: "")
+            let entry = NSMenuItem(title: title, action: #selector(MenuHandler.fire(_:)), keyEquivalent: item.key)
+            entry.keyEquivalentModifierMask = item.modifiers
             if let detail = item.detail {
                 let text = NSMutableAttributedString(string: title + "\t", attributes: [.font: font, .paragraphStyle: paragraph])
                 text.append(NSAttributedString(string: detail, attributes: [.font: detailFont, .paragraphStyle: paragraph,

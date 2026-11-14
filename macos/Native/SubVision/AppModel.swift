@@ -68,6 +68,11 @@ final class AppModel {
     /// panel is always beside the page and this does not matter (C3-03); a window that
     /// becomes narrow starts with the panel retracted (N1).
     var inspectorOpen = false
+    /// The page in front has a title band with its back button (the report in Review, Preview;
+    /// C3-07, C3-09): View › Back (⌘[) runs it. The page sets it when it shows the band and
+    /// clears it when it goes, and builds its band with `TitleBand(shortcut: false)`.
+    @ObservationIgnored var backAction: (@MainActor () -> Void)? { didSet { canGoBack = backAction != nil } }
+    var canGoBack = false
     /// Goes up by one to open the inspector's language menu (O7's "Choose the Language").
     var languageMenuRequest = 0
     var checkingUpdates = false
