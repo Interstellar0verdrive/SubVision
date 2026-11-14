@@ -152,10 +152,12 @@ struct InspectorView: View {
             ForEach(InspectorTab.allCases, id: \.self) { item in
                 let on = item == tab
                 Button { tab = item } label: {
-                    HStack(spacing: 6) {
+                    // The dot on the middle of the word's capitals.
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(model.t("app.inspector.tab.\(item.rawValue)")).svControlFont(12, on ? .medium : .regular)
                         if tabChanged(item) {
                             Circle().fill(SV.modified).frame(width: 6, height: 6)
+                                .svOnCapsMiddle(12)
                                 .accessibilityLabel(model.t("app.inspector.changed"))
                         }
                     }
@@ -557,14 +559,16 @@ struct ParamRow<Control: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+            // The texts on one baseline; the (?), the dot and a control beside the title on the
+            // middle of its capitals.
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(title).svFont(12).foregroundStyle(SV.text).fixedSize(horizontal: false, vertical: true)
-                HelpButton(text: help, defaultText: defaultText, title: title)
+                HelpButton(text: help, defaultText: defaultText, title: title).svOnCapsMiddle(12)
                 Spacer(minLength: 8)
                 if let note { Text(note.0).svFont(11.5).foregroundStyle(note.1) }
-                if changed { ChangedDot() }
+                if changed { ChangedDot().svOnCapsMiddle(12) }
                 if let value { Text(value).svFont(SVFont.numbers).foregroundStyle(changed ? SV.modified : SV.textCode) }
-                if !below { control() }
+                if !below { control().svOnCapsMiddle(12) }
             }
             .frame(minHeight: 20)
             .opacity(enabled ? 1 : 0.45)

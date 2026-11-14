@@ -129,9 +129,10 @@ struct VideoRow: View {
         HStack(alignment: .center, spacing: columns.gap) {
             RowLead(video: video)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .center, spacing: 8) {
+                // The chips on the middle of the name's capitals.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(2).truncationMode(.middle)
-                    chips
+                    chips.svOnCapsMiddle(12.5)
                 }
                 Text(video.folder).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
                 RowStatusLine(video: video, outOfBatch: outOfBatch)
@@ -154,6 +155,9 @@ struct VideoRow: View {
                 .frame(width: ListColumns.more)
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))
+                // The symbol's ink sits 0.75 pt right of its box: turned down (an open drawer)
+                // it fell a point under the row's buttons (measured at 2x).
+                .offset(x: -0.75)
                 .frame(width: 18, height: 18)
                 .foregroundStyle(SV.text3)
                 .rotationEffect(.degrees(open ? 90 : 0))

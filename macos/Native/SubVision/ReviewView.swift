@@ -132,7 +132,8 @@ struct ReviewListPage: View {
     /// "3 video elaborati · 38 righe · 9 buchi" and Show SRTs in Finder.
     private var bottomBar: some View {
         HStack(spacing: 14) {
-            Text(model.reviewTotals).svFont(12.5, .semibold).foregroundStyle(SV.text).lineLimit(1)
+            // The font's own line box: centred on the button beside it.
+            Text(model.reviewTotals).svControlFont(12.5, .semibold).foregroundStyle(SV.text).lineLimit(1)
             Spacer(minLength: 8)
             Button { model.showReviewSRTs() } label: {
                 Label(model.t("app.process.finished.show_all"), systemImage: "macwindow")
@@ -224,15 +225,18 @@ struct ReviewRow: View {
         HStack(alignment: .center, spacing: Self.gap) {
             StatusCircle(video.state == .noSubs ? .warning : .done)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .center, spacing: 8) {
+                // The chips on the middle of the name's capitals.
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
                     if model.hasReviewedSRT(video) {
                         StatusChip(model.t("app.review.reviewed"), tone: .green)
                             .help(model.t("app.review.reviewed_help"))
+                            .svOnCapsMiddle(12.5)
                     }
                     if reportMissing {
                         StatusChip(model.t("app.review.report_missing"), tone: .neutral)
                             .help(model.t("app.review.report_missing_help"))
+                            .svOnCapsMiddle(12.5)
                     }
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 6) {

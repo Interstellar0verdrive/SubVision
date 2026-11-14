@@ -37,7 +37,9 @@ struct BatchBar: View {
             SegmentedProgressBar(weights: weights, fraction: batch.fraction ?? 0)
                 .frame(width: barWidth)
             Text(model.t("app.process.batchbar.percent", ["n": Int(((batch.fraction ?? 0) * 100).rounded())]))
-                .svFont(SVFont.smallNumbers).foregroundStyle(SV.text2)
+                // The font's own line box, centred on the bar like the line on the left (the fixed
+                // box of `svFont` set it a point low).
+                .font(SVFont.smallNumbers.font).foregroundStyle(SV.text2)
                 .frame(minWidth: 34, alignment: .trailing)
             Button { model.stopAll() } label: { Label(model.t("app.common.stop_all"), systemImage: "stop.fill") }
                 .svButton(.destructive, .small)

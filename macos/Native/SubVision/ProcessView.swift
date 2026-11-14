@@ -187,21 +187,23 @@ struct ProcessView: View {
             case .toProcess(let count, let seconds):
                 Text(model.join([model.tn("app.process.bar.to_process", count)]
                                 + (seconds.map { [model.t("app.process.row.about", ["t": model.durationText($0)])] } ?? [])))
-                    .svFont(12.5, .semibold).foregroundStyle(SV.text).fixedSize()
+                    .svControlFont(12.5, .semibold).foregroundStyle(SV.text).fixedSize()
                 if !narrow {
                     let retry = model.videos.contains { $0.state == .stopped && !$0.willRedo }
                     Text(model.t(retry ? "app.process.bar.retry_note" : "app.process.bar.outputs"))
-                        .svFont(12).foregroundStyle(SV.text2).lineLimit(2)
+                        .svControlFont(12).foregroundStyle(SV.text2).lineLimit(2)
+                        // Smaller: on the summary's baseline, the summary centred on the button.
+                        .svBaseline(ofCentred: 12.5)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     Spacer(minLength: 8)
                 }
             case .outcomes:
-                Text(model.outcomeText).svFont(12.5, .semibold).foregroundStyle(SV.text).lineLimit(1)
+                Text(model.outcomeText).svControlFont(12.5, .semibold).foregroundStyle(SV.text).lineLimit(1)
                 Spacer(minLength: 8)
                 Button(model.t("app.process.bar.clear_done")) { model.clearFinished() }.svButton(.secondary, .regular)
             case .nothingChecked:
-                Text(model.t("app.process.bar.none_checked")).svFont(12.5, .semibold).foregroundStyle(SV.text).fixedSize()
+                Text(model.t("app.process.bar.none_checked")).svControlFont(12.5, .semibold).foregroundStyle(SV.text).fixedSize()
                 Spacer(minLength: 8)
             }
             let count = model.checkedVideos.count
@@ -261,16 +263,19 @@ struct VideoDropStrip: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "film").svFont(13).foregroundStyle(targeted ? SV.primaryText : SV.text2)
-            Text(model.t("app.process.list.drop_strip")).svFont(12.5).foregroundStyle(targeted ? SV.primaryText : SV.text2)
+            // Centred on the strip: the icon, the sentence (its own line box, capitals in the
+            // middle) and the button; the formats, smaller, sit on the sentence's baseline.
+            Image(systemName: "film").svControlFont(13).foregroundStyle(targeted ? SV.primaryText : SV.text2)
+            Text(model.t("app.process.list.drop_strip")).svControlFont(12.5).foregroundStyle(targeted ? SV.primaryText : SV.text2)
                 .fixedSize(horizontal: false, vertical: true)
             Button { model.openVideos() } label: { Label(model.t("app.process.list.choose"), systemImage: "folder") }
                 .svButton(.secondary, .small)
                 .help(model.t("app.process.list.choose_help"))
                 .fixedSize()
             Text(model.t(model.batch.running ? "app.process.list.next_batch" : "app.process.list.formats_short"))
-                .svFont(11, mono: true).foregroundStyle(SV.text3)
+                .font(SVTextStyle(11, mono: true).font).foregroundStyle(SV.text3)
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                .svBaseline(ofCentred: 12.5)
                 .opacity(narrow && !model.batch.running ? 0 : 1)
                 .frame(maxWidth: narrow && !model.batch.running ? 0 : nil)
         }
@@ -307,13 +312,14 @@ struct VideoList: View {
     }
 
     private func header(_ c: ListColumns) -> some View {
-        HStack(spacing: c.gap) {
-            headerBox.frame(width: ListColumns.lead)
+        // The labels on one baseline, the header's box on the middle of their capitals.
+        HStack(alignment: .firstTextBaseline, spacing: c.gap) {
+            headerBox.frame(width: ListColumns.lead).svOnCapsMiddle(10.5)
             label(model.t("app.process.list.name")).frame(maxWidth: .infinity, alignment: .leading)
             label(model.t("app.process.list.duration")).frame(width: c.duration, alignment: .trailing)
             if let fps = c.fps { label(model.t("app.process.list.fps")).frame(width: fps, alignment: .trailing) }
             if let size = c.size { label(model.t("app.process.list.size")).frame(width: size, alignment: .trailing) }
-            Color.clear.frame(width: c.actions + ListColumns.more + ListColumns.chevron + 2 * c.gap)
+            Color.clear.frame(width: c.actions + ListColumns.more + ListColumns.chevron + 2 * c.gap, height: 0)
         }
         .padding(.leading, ListColumns.leading)
         .padding(.trailing, ListColumns.trailing)
