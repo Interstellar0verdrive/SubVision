@@ -492,3 +492,32 @@ Ramo `c3-thumbs` (da `native-2.0`). La tendina di un video da elaborare non most
 - **Verifiche:** `pytest` 130 superati e 4 saltati (8 test nuovi: `test_thumbs.py` e due nel sidecar); `swift test` verde (42 + 10 + 21 + 9, decodifica di `videos.thumbs`); test dei cataloghi dell'app verdi; `tools/check_locales.py` OK (718 chiavi per lingua); QA 19 su 19 al primo giro (il 10 saltato: servono i video del proprietario); `subvision --version` 2.0.0 dal checkout di `native-2.0`. Catture nella scratchpad della sessione, cartella `c3-thumbs-shots` (fotogrammi del video, dell'Anteprima, riflesso, larga e stretta, scuro e chiaro).
 
 **Da guardare:** nelle catture fatte con `capture` il riflesso è fermo a metà corsa (chiaro: riquadri grigi pieni); a schermo scorre. Il clic su un fotogramma del video apre l'Anteprima e la sua ricerca parte subito: è voluto, come il pulsante «Anteprima».
+
+## Prove in autonomia (13–14/11, notte)
+
+**Episodio vero** (Owarimonogatari ep. 02, 24:30, 1280×720, copiato dalla chiavetta; l'originale non è stato toccato), elaborato con l'app guidata con mouse e tastiera, parametri predefiniti, confrontato con l'SRT della 1.0 di ottobre:
+- **Tempo:** 22:35 contro 24:14 della 1.0. Lettura OCR dialoghi 11:56 (1.0: 13:29), cartelli 7:10 (6:47).
+- **Righe:** 407 contro 428. 373 abbinate per tempo, 77 % con testo identico, somiglianza media 0,965, tempi identici (scarto mediano 0 s).
+- **Meglio della 1.0:** dove la 1.0 spezzava la stessa battuta in 3 voci (40 s, 422 s, 724 s), la 2.0 ne scrive una; puntini puliti («Mah...» invece di «Mah.oo», «Ah... già.»).
+- **Un testo perso:** «Vietato l'ingr ai veicoli», un cartello del fansub sul bordo destro della banda dialoghi a 988 s. Oggi Vision non lo legge più nemmeno con il codice della 1.0: è cambiato il riconoscimento di macOS (27.2), non SubVision.
+- **Anteprima:** 20 fotogrammi trovati da soli in meno di 3 s, ⌘T, ⌘→, ⌘ò per tornare.
+- **Report** (407 righe, 581 scartate): barra ferma e legenda fissa verificate nell'app, «È un cartello» e «Originale», ⌘S, «Ripristina tutto…» con Invio = Annulla, cartella in sola lettura (prima «Sostituire…?» per lo stesso minuto, poi l'errore con «Scegli dove salvarlo…»).
+
+**Altre prove:**
+- **30 video** (una sottocartella e un file di testo): entrati tutti, il testo ignorato, miniature estratte in circa 8 s (0,27 s l'una) senza bloccare.
+- **Casella dell'intestazione:** nessuno, tutti, «−»; non tocca i video fatti.
+- **Finestra stretta:** il pannello sovrapposto non è tagliato e si chiude ricliccando l'icona.
+- **Finestra chiusa durante il lotto:** l'avviso «SubVision continua a lavorare», il foglio di fine lotto che aspetta alla riapertura (⌘0), «Vai a Revisione» con due video → elenco.
+- **Notifiche:** i banner reali non si vedono dalla mia sessione (il Centro Notifiche è escluso dalle catture e il registro di sistema non è accessibile); il percorso del codice è coperto dalla QA 16.
+- **Elenco salvato dalla versione prima di C3:** si riapre intatto (i campi nuovi sono facoltativi).
+
+**Correzioni fatte durante le prove:**
+- barra del lotto al 25 % dopo 20 s sul primo file, e senza ora di fine → quote tipiche delle tappe e stima dai parametri (`cf3753e`);
+- suggerimento «⌘[» con la tastiera italiana, dove funziona ⌘ò → legge il tasto del menu (`83067f4`);
+- VoiceOver: nomi degli interruttori, tendina come azione della riga, percentuale della barra, icone decorative mute, casella della riga con il nome del video (`a0beff0`, `f8a1bc7`);
+- anello del fuoco grigio neutro (`2e8d8ca`);
+- «Error:» tecnico nel messaggio di salvataggio del report (`7cfe5eb`);
+- **finestra principale assente al lancio** dopo averla chiusa durante un lotto: macOS ripristinava uno stato senza finestre → niente ripristino dello stato (`a062f37`, `7e831e9`). Bloccava anche tutte le prove QA;
+- campi numerici che non seguivano il cambio di lingua («0,6 s» in inglese) e colonna Durata stretta per «DURATION» (`f1db9aa`).
+
+**Verifiche finali:** QA 21 su 21 (anche la 10 con `_test-1.mkv` della chiavetta e la 21 nuova delle catture), `pytest` 130 superati e 4 saltati, `swift test` verde. Documentazione aggiornata (README it/en, CHANGELOG, note di rilascio, senza il paragrafo sull'altra app nei crediti). Catture del README in WebP rifatte sul ramo `assets` (`c963780`): solo clip Sintel, percorso «~/Movies/SubVision demo».
