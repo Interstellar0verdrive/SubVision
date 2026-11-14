@@ -276,7 +276,7 @@ struct VideoDropStrip: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-        .frame(maxWidth: .infinity, minHeight: 46)
+        .frame(maxWidth: .infinity, minHeight: 69)
         .svDropFrame(targeted: targeted, cornerRadius: 10)
     }
 }
