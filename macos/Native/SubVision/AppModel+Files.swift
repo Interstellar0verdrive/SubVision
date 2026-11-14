@@ -454,6 +454,7 @@ extension AppModel {
     /// ↑ ↓: the ring to the row above or below (the first or the last one when none has it).
     func moveFocus(by step: Int) {
         guard !videos.isEmpty else { return }
+        focusRingVisible = true
         guard let id = focusedRow, let i = videos.firstIndex(where: { $0.id == id }) else {
             focusedRow = (step > 0 ? videos.first : videos.last)?.id
             return

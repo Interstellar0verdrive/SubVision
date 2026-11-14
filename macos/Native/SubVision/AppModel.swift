@@ -91,6 +91,9 @@ final class AppModel {
     /// The row of Video the keyboard's ring is on (C3-02: no selection any more): ↑ ↓ move it,
     /// the menus' Review, Show in Finder, Open Log and Remove act on it.
     var focusedRow: UUID?
+    /// The thin ring shows only when the focus came from the keyboard (↑ ↓), as in macOS lists:
+    /// after a click the row keeps just its left bar (the owner's note on E3).
+    var focusRingVisible = false
     /// Seconds of work per second of video learned from the files done (`WorkEstimate`), nil before the first.
     var estimateRate: Double? { didSet { defaults.set(estimateRate, forKey: Self.estimateRateKey) } }
     /// A change opens that row's ⋯ menu, as a click does (the debug commands and the menu captures).

@@ -275,7 +275,7 @@ struct ReviewRow: View {
         .padding(.leading, 13)
         .padding(.trailing, 16)
         .background(hover && hasReport ? SV.hoverVeil : .clear)
-        .overlay(alignment: .leading) { Rectangle().fill(video.state == .noSubs ? SV.yellow : SV.green).frame(width: 3) }
+        .overlay(alignment: .leading) { Rectangle().fill(video.state == .noSubs ? SV.yellow : SV.green).frame(width: 3).padding(.leading, 1) }
         .contentShape(Rectangle())
         .onHover { hover = $0 }
         .onTapGesture { if hasReport { model.review(video) } }

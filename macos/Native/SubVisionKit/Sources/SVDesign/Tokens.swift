@@ -131,6 +131,11 @@ public enum SV {
     /// the panel), amber in light (4.9 : 1 on white, 4.5 : 1 on the window's background).
     public static let modified = Color(dark: "#E8C547", light: "#AB5E00")
     public static let modifiedTint = Color(dark: "rgba(232,197,71,.16)", light: "rgba(171,94,0,.12)")
+    /// A file the person stopped (boards E3, E5, DS3): its own colour, lilac, so it reads as a
+    /// state of its own, apart from done (green), warnings (yellow), errors (red) and the accent.
+    public static let stopped = Color(dark: "#A99BFF", light: "#6650C8")
+    public static let stoppedBg = Color(dark: "rgba(169,155,255,.14)", light: "rgba(102,80,200,.10)")
+    public static let stoppedLine = Color(dark: "rgba(169,155,255,.45)", light: "rgba(102,80,200,.40)")
     /// The tick of a slider's default value (C3-10, board I2): grey, under the track.
     public static let defaultTick = Color(dark: "#80868E", light: "#656B73")
 

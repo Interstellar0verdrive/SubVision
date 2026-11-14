@@ -509,7 +509,7 @@ struct StepsTable: View {
                         .overlay(alignment: .bottom) { line }
                     ForEach(bands, id: \.self) { band in
                         let step = steps.first { $0.id == "\(key):\(band)" }
-                        StepCell(step: step, failedRow: failed, barWidth: narrow ? 56 : 140)
+                        StepCell(step: step, failedRow: failed, stoppedRow: video.state == .stopped, barWidth: narrow ? 56 : 140)
                             .frame(maxWidth: .infinity, minHeight: 24, maxHeight: 24, alignment: .leading)
                             .overlay(alignment: .bottom) { line }
                     }
@@ -548,6 +548,8 @@ struct StepCell: View {
     @Environment(AppModel.self) private var model
     var step: StepRun?
     var failedRow: Bool
+    /// Stopped by the person, not failed: the step where it stopped in lilac, with the hand (boards E3, E5).
+    var stoppedRow = false
     var barWidth: CGFloat
 
     var body: some View {
@@ -565,7 +567,9 @@ struct StepCell: View {
         switch state {
         case .done: Image(systemName: "checkmark").svFont(10, .bold).foregroundStyle(SV.greenText)
         case .running: Spinner(size: 11)
-        case .aborted: Image(systemName: "xmark").svFont(10, .bold).foregroundStyle(SV.redText)
+        case .aborted:
+            if stoppedRow { Image(systemName: "hand.raised").svFont(10, .semibold).foregroundStyle(SV.stopped) }
+            else { Image(systemName: "xmark").svFont(10, .bold).foregroundStyle(SV.redText) }
         case .waiting: Circle().strokeBorder(SV.glassLine).frame(width: 9, height: 9)
         case .notRun: Circle().strokeBorder(SV.glassLine, style: StrokeStyle(lineWidth: 1, dash: [2, 1.5])).frame(width: 9, height: 9)
         }
@@ -584,7 +588,7 @@ struct StepCell: View {
         switch state {
         case .done: SV.green
         case .running: SV.primary
-        case .aborted: SV.red
+        case .aborted: stoppedRow ? SV.stopped : SV.red
         case .waiting, .notRun: SV.track
         }
     }
@@ -592,7 +596,7 @@ struct StepCell: View {
     private var color: Color {
         switch state {
         case .running: SV.text
-        case .aborted: SV.redText
+        case .aborted: stoppedRow ? SV.stopped : SV.redText
         case .waiting, .notRun: SV.text3
         case .done: SV.text2
         }
@@ -613,7 +617,7 @@ struct StepCell: View {
         case .waiting:
             if let e = step.estimate, e >= 1 { return model.t("app.process.row.about", ["t": Localizer.clock(e)]) }
             return model.t("app.steps.waiting")
-        case .aborted: return model.t("app.steps.aborted")
+        case .aborted: return model.t(stoppedRow ? "app.steps.stopped_here" : "app.steps.aborted")
         case .notRun: return model.t("app.steps.not_run")
         }
     }

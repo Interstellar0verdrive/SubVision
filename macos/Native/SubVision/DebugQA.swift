@@ -310,7 +310,7 @@ enum DebugQA {
             return model.ocrParams == OcrParams() ? "ok · defaults" : "not reset"
         case "focus":
             // The keyboard's ring on a row of Video (C3-02), as a click or ↑ ↓ put it; empty lets it go.
-            if let idx = Int(argument), model.videos.indices.contains(idx) { model.focusedRow = model.videos[idx].id } else { model.focusedRow = nil }
+            if let idx = Int(argument), model.videos.indices.contains(idx) { model.focusedRow = model.videos[idx].id; model.focusRingVisible = true } else { model.focusedRow = nil }
             return "focus \(model.focusedVideo?.name ?? "-") · " + bottomBar(model)
         case "bottom-bar":
             return bottomBar(model)

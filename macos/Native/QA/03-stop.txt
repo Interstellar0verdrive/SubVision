@@ -33,4 +33,11 @@ states
 ? ^a.mp4=stopped@[a-z]+:[a-z]+ b.mp4=stopped@[a-z]+:[a-z]+ c.mp4=ready$
 ! sleep 2; ! pgrep -fl "$STATE/bin/ffmpeg"
 ! test ! -e "$WORK/a.srt" && test ! -e "$WORK/b.srt"
+# The stopped rows in their own colour (lilac, a raised hand): boards E3, E5
+capture $OUT/stopped-dark.png
+? stopped-dark.png$
+theme light
+capture $OUT/stopped-light.png
+? stopped-light.png$
+theme dark
 params default

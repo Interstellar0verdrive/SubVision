@@ -490,8 +490,10 @@ public struct StatusCircle: View {
                 Circle().strokeBorder(SV.redLine)
                 Image(systemName: "xmark").svFont(10, .bold).foregroundStyle(SV.redText)
             case .stopped:
-                Circle().strokeBorder(SV.glassLine)
-                RoundedRectangle(cornerRadius: 1.5).fill(SV.text2).frame(width: 8, height: 8)
+                // A raised hand in a lilac circle: a state, not a stop button (boards E3, E5).
+                Circle().fill(SV.stoppedBg)
+                Circle().strokeBorder(SV.stoppedLine)
+                Image(systemName: "hand.raised").svFont(11, .semibold).foregroundStyle(SV.stopped)
             }
         }
         .frame(width: Self.size, height: Self.size)

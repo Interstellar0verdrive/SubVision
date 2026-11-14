@@ -81,7 +81,7 @@ struct VideoRow: View {
         case .done: return video.willRedo ? SV.primary : SV.green
         case .noSubs: return video.willRedo ? SV.primary : SV.yellow
         case .failed: return video.willRedo ? SV.primary : SV.red
-        case .stopped: return video.willRedo ? SV.primary : SV.text3
+        case .stopped: return video.willRedo ? SV.primary : SV.stopped
         case .ready:
             if missing { return SV.yellow }
             return video.isChecked ? SV.primary : SV.track
@@ -101,6 +101,10 @@ struct VideoRow: View {
             head
                 .contentShape(Rectangle())
                 .onTapGesture { click() }
+                // Opaque, above the drawer: while the drawer slides in or out it passes under the
+                // head and must not show through it (the owner's note).
+                .background { ZStack { SV.surface; background } }
+                .zIndex(1)
             if open {
                 VideoDrawer(video: video, columns: columns)
                     .padding(.leading, columns.textInset)
@@ -115,8 +119,9 @@ struct VideoRow: View {
         }
         .clipped()
         .background(background)
-        .overlay(alignment: .leading) { Rectangle().fill(edge).frame(width: 3) }
-        .overlay { if focused { FocusRing().stroke(SV.focus, lineWidth: 1).allowsHitTesting(false) } }
+        // 3 pt inside the list's 1 pt border, which is drawn over the rows (as on the boards).
+        .overlay(alignment: .leading) { Rectangle().fill(edge).frame(width: 3).padding(.leading, 1) }
+        .overlay { if focused && model.focusRingVisible { FocusRing().stroke(SV.focus, lineWidth: 1).allowsHitTesting(false) } }
         .contentShape(Rectangle())
         .onHover { hover = $0 }
         .contextMenu { RowMenuButtons(video: video) }
@@ -190,6 +195,7 @@ struct VideoRow: View {
     /// here. The second click of a double click does nothing more: a double click opens too.
     private func click() {
         model.focusedRow = video.id
+        model.focusRingVisible = false
         guard (NSApp.currentEvent?.clickCount ?? 1) < 2 else { return }
         withAnimation(.easeOut(duration: 0.2)) { model.toggleDrawer(video.id) }
     }
@@ -306,7 +312,7 @@ struct RowStatusLine: View {
             case .failed:
                 line(outOfBatchPrefix(model.rowFailedText(video)), SV.redText).help(video.errorDetail ?? "")
             case .stopped:
-                line(outOfBatchPrefix(model.rowStoppedText(video)), SV.text2)
+                line(outOfBatchPrefix(model.rowStoppedText(video)), SV.stopped)
             case .unreadable:
                 EmptyView()
             }

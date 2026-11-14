@@ -83,6 +83,11 @@ struct InspectorView: View {
                             }
                         }
                         .disabled(locked)
+                        // Locked during a batch: grey and faded, so it reads as off at a glance; the
+                        // accent of toggles and sliders goes grey too. The lock note above stays coloured.
+                        .saturation(locked ? 0 : 1)
+                        .opacity(locked ? 0.55 : 1)
+                        .animation(.easeOut(duration: 0.2), value: locked)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
