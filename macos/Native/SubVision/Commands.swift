@@ -40,7 +40,7 @@ struct AppCommands: Commands {
         }
         CommandGroup(after: .newItem) {
             Divider()
-            // Review (⌘R): the finished row selected on Video, the row last opened on Review;
+            // Review (⌘R): the row with the focus on Video (C3-02), the row last opened on Review;
             // the report opens in the Review page (C3-06).
             Button(model.t("app.menu.open_report")) {
                 if let video = model.reviewTarget { model.review(video) }
@@ -51,17 +51,18 @@ struct AppCommands: Commands {
             Button(model.t("app.review.save_menu")) { model.saveReviewedSRT() }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!model.canSaveReview)
-            Button(model.t("app.menu.show_in_finder")) { model.showInFinder(model.selection) }
+            // The row with the focus on Video: no selection any more (C3-02).
+            Button(model.t("app.menu.show_in_finder")) { if let id = model.focusedRow { model.showInFinder([id]) } }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(model.selection.isEmpty)
+                .disabled(model.focusedVideo?.exists != true || model.tab != .process)
             Button(model.t("app.menu.open_file_log")) {
-                if let video = model.selectedFinished { model.openLog(video) }
+                if let video = model.focusedVideo { model.openLog(video) }
             }
-            .disabled(model.selectedFinished?.logExists != true || model.tab != .process)
+            .disabled(model.focusedVideo?.logExists != true || model.tab != .process)
             Divider()
-            Button(model.t("app.menu.remove")) { model.removeSelection() }
+            Button(model.t("app.menu.remove")) { model.removeFocused() }
                 .keyboardShortcut(.delete, modifiers: [])
-                .disabled(!model.canRemoveSelection || model.tab != .process)
+                .disabled(!model.canRemoveFocused || model.tab != .process)
         }
         // One Select All (design note 44): the system's group is replaced, so Cut, Copy and
         // Paste go to the first responder as before, and ⌘A selects the text being edited
@@ -97,6 +98,7 @@ struct AppCommands: Commands {
             Divider()
         }
         CommandMenu(model.t("app.menu.process")) {
+            // "Elabora i video spuntati" (C3-02, DS2): the checked rows.
             Button(model.t("app.menu.start")) { model.startBatch() }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!model.canStart || model.tab == .fix)
@@ -110,8 +112,8 @@ struct AppCommands: Commands {
             Button(model.t("app.menu.restore_defaults")) { model.resetAllParameters() }
                 .disabled(model.batch.running)
             Divider()
-            // The Preview page (C3-09): on the row selected, else on the video shown last.
-            Button(model.t("app.menu.preview")) { model.openPreview(model.selectedSingle?.id) }
+            // The Preview page (C3-09): on the row with the focus, else on the video shown last.
+            Button(model.t("app.menu.preview")) { model.openPreview(model.focusedRow) }
                 .keyboardShortcut("y", modifiers: .command)
                 .disabled(model.videos.isEmpty)
             // On the Preview page (board O9); each has its button on the page too.

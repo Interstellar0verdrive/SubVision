@@ -40,7 +40,7 @@ enum DebugSnapshot {
                 model.add(add.split(separator: ",").map { URL(fileURLWithPath: String($0)) })
                 _ = await DebugQA.wait(60) { model.videos.allSatisfy(\.probed) }
                 try? await Task.sleep(for: .seconds(1))
-                model.selection = []
+                model.focusedRow = nil
                 await capture(model, "\(base)-process-videos.png", schemes: schemes)
                 model.openPreview(nil)
                 await capture(model, "\(base)-preview-videos.png", schemes: schemes)
@@ -115,7 +115,7 @@ enum DebugSnapshot {
         let ids = model.videos.prefix(3).map(\.id)
         model.resetOcrParams()
         model.defaults.set("read", forKey: "inspector.tab")
-        model.selection = []
+        model.focusedRow = nil
         // I1: the inspector open with the defaults, the list ready.
         model.inspectorOpen = true
         await settle()

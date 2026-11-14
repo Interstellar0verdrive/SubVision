@@ -18,7 +18,7 @@ params default
 inspector-set langHint it-IT
 inspector-tab read
 add $WORK/sintel_ita_hardsub_demo.mp4,$WORK/sintel_eng_hardsub_demo.mp4
-select 1
+focus 1
 preview-state
 ? ^page hidden
 menu-dump 4

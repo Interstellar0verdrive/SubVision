@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: MIT
-// The rows of the Process list in their seven states (design boards E1–E5,
-// DS3): the status ring and edge, name, folder and outcome line, the numbers,
-// the actions column (Stop, Open Report, ⋯), and under the row the steps of
-// the file in progress (bars per band with count, ETA and rate), the failed
-// step with its error, or the times and files of a finished row.
+// The rows of the Video list (design round C3, boards C3-02–C3-05, E1–E9,
+// N1, DS3). No selection: on the left a checkbox, "process it", where the
+// batch's circles show later (waiting, running, done, no subtitles, failed,
+// stopped); the name, the folder and a line of state; the numbers; one action
+// as a primary button (Preview, Review, Retry, or Stop on the running row);
+// the ⋯ menu, the same as the context menu; and the chevron. A click anywhere
+// outside the buttons opens the row's drawer: what is known of a video to do,
+// the steps of the running one, the times, result and files of a finished one,
+// where and why a failed one stopped. One border per row: the state's bar on
+// the left, a thin ring on the other sides when the keyboard's focus is there.
 
 import AppKit
 import SVShell
@@ -13,8 +18,9 @@ import SwiftUI
 let signsBlue = Color(dark: "#4F8EF7", light: "#2F6FD6")
 
 extension VideoItem {
-    /// The row's circle (design note 63): none for a ready row, a dashed ring while it
-    /// waits in the batch, the spinner, then the outcome, which stays after the batch.
+    /// The row's outcome circle (22 pt, C3-04): a dashed ring while it waits in the batch,
+    /// the spinner, then the outcome, which stays after the batch. None for a video to do
+    /// (its checkbox is there).
     var circle: StatusCircle.State? {
         switch state {
         case .unreadable: return .failed
@@ -29,636 +35,471 @@ extension VideoItem {
     }
 }
 
-/// One video (E1–E5). Click selects, ⌘-click adds, double-click opens a
-/// finished row, the context menu and ⌫ act on the selection.
+/// The columns of the list (`.c3l` of C3-02; `.c3n1`, Duration only, in a narrow window, N1).
+struct ListColumns: Equatable {
+    var narrow: Bool
+
+    var gap: CGFloat { narrow ? 10 : 12 }
+    var duration: CGFloat { narrow ? 48 : 52 }
+    var fps: CGFloat? { narrow ? nil : 48 }
+    var size: CGFloat? { narrow ? nil : 78 }
+    var actions: CGFloat { narrow ? 96 : 104 }
+    static let lead: CGFloat = 22
+    static let more: CGFloat = 22
+    static let chevron: CGFloat = 16
+    /// The bar and the padding before the checkbox column.
+    static let leading: CGFloat = 16
+    static let trailing: CGFloat = 16
+    /// Where the name starts, and the drawers with it.
+    var textInset: CGFloat { Self.leading + Self.lead + gap }
+}
+
+/// One video of the list (C3-02).
 struct VideoRow: View {
     @Environment(AppModel.self) private var model
-    /// The widths of the number and action columns (`VideoList.widths`).
-    struct Widths: Equatable {
-        var duration: CGFloat
-        var fps: CGFloat
-        var size: CGFloat?
-        var actions: CGFloat
-    }
-
     var video: VideoItem
-    var widths: Widths
-    /// Some row of the list has a state: every row keeps the circle's column (design note 63).
-    var showsStatus = true
+    var columns: ListColumns
     @State private var hover = false
 
-    /// Where the text starts: after the circle's column, or at the left edge without it.
-    private var textInset: CGFloat { showsStatus ? StatusCircle.size + 14 : 0 }
-
-    private var selected: Bool { model.selection.contains(video.id) }
-    private var missing: Bool { !video.exists }
+    private var open: Bool { model.run.expanded.contains(video.id) }
+    private var focused: Bool { model.focusedRow == video.id }
     private var unreadable: Bool { video.state == .unreadable }
-    private var dim: Bool { unreadable || (missing && !video.state.isFinished) }
-    private var running: Bool { video.state == .running }
-    private var expanded: Bool { model.run.expanded.contains(video.id) }
+    private var missing: Bool { !video.exists }
+    /// A batch runs and this row is not in it (C3-04): dimmed, its box can't change.
+    private var outOfBatch: Bool { model.batch.running && !model.run.ids.contains(video.id) }
+    private var dim: Double { unreadable || (missing && !video.state.isFinished) ? 0.55 : outOfBatch ? 0.6 : 1 }
 
+    /// The bar on the left: the state's colour, solid (C3-02, one border per row).
     private var edge: Color {
         if unreadable { return SV.red }
         switch video.state {
         case .running: return SV.primary
-        case .done: return SV.green
-        case .noSubs: return SV.yellow
-        case .failed: return SV.red
-        case .stopped: return SV.text3
-        default: return missing ? SV.yellow : SV.track
+        case .done: return video.willRedo ? SV.primary : SV.green
+        case .noSubs: return video.willRedo ? SV.primary : SV.yellow
+        case .failed: return video.willRedo ? SV.primary : SV.red
+        case .stopped: return video.willRedo ? SV.primary : SV.text3
+        case .ready:
+            if missing { return SV.yellow }
+            return video.isChecked ? SV.primary : SV.track
+        default: return SV.track
         }
+    }
+
+    private var background: Color {
+        if video.state == .running { return SV.soft }
+        if hover { return SV.hoverVeil }
+        return open ? SV.openVeil : .clear
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 14) {
-                if showsStatus {
-                    if let circle = video.circle {
-                        StatusCircle(circle)
-                    } else {
-                        Color.clear.frame(width: StatusCircle.size, height: StatusCircle.size)
+            // The row's head takes the click; inside the drawer a click does nothing (text, buttons).
+            head
+                .contentShape(Rectangle())
+                .onTapGesture { click() }
+            if open {
+                VideoDrawer(video: video, columns: columns)
+                    .padding(.leading, columns.textInset)
+                    .padding(.trailing, 18)
+                    .padding(.top, 12)
+                    .padding(.bottom, 14)
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(SV.detailLine).frame(height: 1).padding(.leading, columns.textInset)
                     }
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(1).truncationMode(.middle)
-                        if video.state == .ready, video.srtExists {
-                            StatusChip(model.t("app.process.row.srt_exists"))
-                                .help(model.t("app.process.row.srt_exists_help", ["name": renamedSRT]))
-                        }
-                    }
-                    // Without the size column (a narrow list) the resolution follows the folder (`.fline`, design note 59).
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(video.folder).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
-                        if widths.size == nil, let size = video.size {
-                            Text("· \(size)").svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).fixedSize()
-                        }
-                    }
-                    statusLine
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .opacity(dim ? 0.55 : 1)
-                Group {
-                    number(video.duration.map(Localizer.clock)).frame(width: widths.duration, alignment: .trailing)
-                    number(video.fps.map(fpsText)).frame(width: widths.fps, alignment: .trailing)
-                    if let size = widths.size {
-                        number(video.size).frame(width: size, alignment: .trailing)
-                    }
-                }
-                .opacity(dim ? 0.55 : 1)
-                RowActions(video: video)
-                    .frame(width: widths.actions, alignment: .trailing)
-            }
-            .padding(.vertical, 8)
-            .frame(minHeight: 52)
-            if running || video.state == .failed {
-                if running {
-                    // A light line between the row's head and its steps, from the text to the right edge (design note 65).
-                    Rectangle().fill(SV.detailLine).frame(height: 1)
-                        .padding(.leading, textInset)
-                        .padding(.trailing, -16)
-                        .padding(.top, 2)
-                        .padding(.bottom, 8)
-                }
-                StepsPanel(video: video)
-                    .padding(.leading, textInset)
-                    .padding(.top, running ? 0 : 4)
-                    .padding(.bottom, 12)
-            } else if video.state.isFinished, expanded {
-                FinishedDetail(video: video)
-                    .padding(.leading, textInset)
-                    .padding(.top, 4)
-                    .padding(.bottom, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .padding(.leading, 13)
-        .padding(.trailing, 16)
-        // The selection a step softer than the sidebar's (design note 58, `.fr.selr`).
-        .background(selected ? SV.selSoft : running ? SV.soft : hover ? SV.hoverVeil : .clear)
+        .clipped()
+        .background(background)
         .overlay(alignment: .leading) { Rectangle().fill(edge).frame(width: 3) }
+        .overlay { if focused { FocusRing().stroke(SV.focus, lineWidth: 1).allowsHitTesting(false) } }
         .contentShape(Rectangle())
         .onHover { hover = $0 }
-        .gesture(TapGesture(count: 2).onEnded { toggleExpanded() })
-        .simultaneousGesture(TapGesture().onEnded { select() })
-        .contextMenu { RowMenu(video: video, selected: selected) }
-        .help(video.size.map { "\($0) · \(video.path)" } ?? video.path)
+        .contextMenu { RowMenuButtons(video: video) }
+        .help(video.path)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(focused ? .isSelected : [])
     }
 
-    /// The third line: the outcome of the row (E1–E5).
-    @ViewBuilder private var statusLine: some View {
-        if unreadable {
-            Text(model.t("app.process.row.unreadable")).svFont(11.5).foregroundStyle(SV.redText)
-                .help(video.problem ?? "")
-        } else if missing, !video.state.isFinished {
-            Text(model.t("app.process.row.not_found")).svFont(11.5).foregroundStyle(SV.yellowText)
-                .help(model.t("app.process.row.file_missing_help"))
+    private var head: some View {
+        HStack(alignment: .center, spacing: columns.gap) {
+            RowLead(video: video)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text(video.name).svFont(12.5, .medium).foregroundStyle(SV.text).lineLimit(2).truncationMode(.middle)
+                    chips
+                }
+                Text(video.folder).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1).truncationMode(.middle)
+                RowStatusLine(video: video, outOfBatch: outOfBatch)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(dim)
+            Group {
+                number(video.duration.map(Localizer.clock)).frame(width: columns.duration, alignment: .trailing)
+                if let fps = columns.fps {
+                    number(video.fps.map(model.previewFPSText)).frame(width: fps, alignment: .trailing)
+                }
+                if let size = columns.size {
+                    number(video.size).frame(width: size, alignment: .trailing)
+                }
+            }
+            .opacity(dim)
+            RowAction(video: video)
+                .frame(width: columns.actions, alignment: .trailing)
+            RowMoreButton(video: video)
+                .frame(width: ListColumns.more)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 18, height: 18)
+                .foregroundStyle(SV.text3)
+                .rotationEffect(.degrees(open ? 90 : 0))
+                .frame(width: ListColumns.chevron)
+                .accessibilityHidden(true)
+        }
+        .padding(.leading, ListColumns.leading)
+        .padding(.trailing, ListColumns.trailing)
+        .padding(.vertical, 8)
+        .frame(minHeight: 52)
+    }
+
+    @ViewBuilder private var chips: some View {
+        if video.willRedo {
+            StatusChip(model.t("app.process.row.redo_chip"), tone: .accent)
+                .help(model.t("app.process.row.redo_chip_help"))
+        } else if video.state == .ready, video.srtExists {
+            // A warning, not an error: the new SRT gets the date in its name (C3-03).
+            StatusChip(model.t("app.process.row.srt_exists"), tone: .yellow)
+                .help(model.t("app.process.row.srt_exists_help"))
+        }
+    }
+
+    /// Numbers in mono, "—" where the probe has nothing (unreadable), "…" until it answers.
+    private func number(_ text: String?) -> some View {
+        Text(text ?? (video.probed ? "—" : "…")).svFont(SVFont.numbers).foregroundStyle(SV.textCode).lineLimit(1)
+    }
+
+    /// A click anywhere outside the buttons opens or closes the drawer, and the focus comes
+    /// here. The second click of a double click does nothing more: a double click opens too.
+    private func click() {
+        model.focusedRow = video.id
+        guard (NSApp.currentEvent?.clickCount ?? 1) < 2 else { return }
+        withAnimation(.easeOut(duration: 0.2)) { model.toggleDrawer(video.id) }
+    }
+}
+
+extension SV {
+    /// An open row, a touch lighter than the list (`.fr.open`).
+    static let openVeil = Color(dark: "rgba(255,255,255,.025)", light: "rgba(0,0,0,.015)")
+}
+
+/// The focus ring of a row (C3-02): a thin line on the top, right and bottom sides;
+/// the left one is the row's bar.
+struct FocusRing: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let r = rect.insetBy(dx: 0.5, dy: 0.5)
+        p.move(to: CGPoint(x: rect.minX + 3, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+        p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+        p.addLine(to: CGPoint(x: rect.minX + 3, y: r.maxY))
+        return p
+    }
+}
+
+// MARK: - The left column
+
+/// The 22 pt column on the left (C3-02, C3-04): the checkbox of a video to do; the outcome
+/// of a finished one, which turns into an empty box under the pointer (a click checks it:
+/// "will be redone"); the batch's circles while it runs, which no click changes.
+struct RowLead: View {
+    @Environment(AppModel.self) private var model
+    var video: VideoItem
+    @State private var hover = false
+
+    private var batchRunning: Bool { model.batch.running }
+
+    var body: some View {
+        ZStack {
+            content
+                .transition(.opacity)
+        }
+        .frame(width: ListColumns.lead, height: ListColumns.lead)
+        .animation(.easeInOut(duration: 0.15), value: batchRunning)
+        .animation(.easeInOut(duration: 0.15), value: video.state)
+    }
+
+    @ViewBuilder private var content: some View {
+        switch video.checkKind {
+        case .excluded:
+            if let circle = video.circle { StatusCircle(circle) } else { Color.clear }
+        case .todo:
+            SVCheckbox(isOn: video.isChecked, help: model.t("app.process.row.check_help")) { model.toggleCheck(video.id) }
+                .disabled(batchRunning)
+                .id("box")
+        case .finished:
+            if video.isChecked {
+                SVCheckbox(isOn: true, help: model.t("app.process.row.check_help")) { model.toggleCheck(video.id) }
+                    .disabled(batchRunning)
+                    .id("box")
+            } else if batchRunning {
+                video.circle.map { StatusCircle($0) }
+            } else {
+                // The outcome; under the pointer the empty box that brings it back to the batch.
+                Button { model.toggleCheck(video.id) } label: {
+                    ZStack {
+                        if hover {
+                            CheckboxMark(state: .off, hover: true)
+                        } else if let circle = video.circle {
+                            StatusCircle(circle)
+                        }
+                    }
+                    .frame(width: ListColumns.lead, height: ListColumns.lead)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hover = $0 }
+                .help(model.t("app.process.row.redo_help"))
+                .accessibilityLabel(model.t("app.process.row.redo_help"))
+            }
+        }
+    }
+}
+
+// MARK: - The line of state
+
+/// The third line of a row (C3-02–C3-05, E3, E5, E7, E9).
+struct RowStatusLine: View {
+    @Environment(AppModel.self) private var model
+    var video: VideoItem
+    var outOfBatch: Bool
+
+    var body: some View {
+        if video.state == .unreadable {
+            line(model.t("app.process.row.unreadable"), SV.redText).help(video.problem ?? "")
+        } else if !video.exists, !video.state.isFinished {
+            line(model.t("app.process.row.not_found"), SV.yellowText).help(model.t("app.process.row.file_missing_help"))
         } else {
             switch video.state {
             case .waiting:
-                Text(waitingText).svFont(11.5).foregroundStyle(SV.text2)
+                line(waitingText, SV.text2)
             case .running:
-                // Only the time: the place in the batch is in the sidebar's card and the bottom bar (design note 66).
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(model.t("app.process.row.elapsed", ["t": Localizer.clock(elapsed(at: context.date))]))
-                        .svFont(11.5).foregroundStyle(SV.text2)
+                    line(runningText(at: context.date), SV.text2)
                 }
-            case .done:
-                Text(doneText).svFont(11.5).foregroundStyle(SV.text2).lineLimit(2)
-            case .noSubs:
-                Text(model.t("app.process.row.no_subs")).svFont(11.5).foregroundStyle(SV.yellowText).lineLimit(2)
-            case .failed:
-                Text(failedText).svFont(11.5).foregroundStyle(SV.redText).lineLimit(2)
-                    .help(video.errorDetail ?? "")
-            case .stopped:
-                Text(model.t("app.process.row.stopped", ["step": stepOnly, "band": bandOnly])).svFont(11.5).foregroundStyle(SV.text2)
             case .ready:
-                // Back to ready after Stop All (E5); a row that never was in a batch says nothing (E1).
-                if model.run.readyAgain.contains(video.id) {
-                    Text(model.t("app.process.row.ready")).svFont(11.5).foregroundStyle(SV.text2)
-                }
+                line(readyText, SV.text2)
+            case .done:
+                line(outOfBatchPrefix(doneText), SV.text2)
+            case .noSubs:
+                line(outOfBatchPrefix(model.t("app.process.row.no_subs")), SV.yellowText)
+            case .failed:
+                line(outOfBatchPrefix(model.rowFailedText(video)), SV.redText).help(video.errorDetail ?? "")
+            case .stopped:
+                line(outOfBatchPrefix(model.rowStoppedText(video)), SV.text2)
             case .unreadable:
                 EmptyView()
             }
         }
     }
 
-    private func elapsed(at date: Date) -> Double {
-        model.run.fileStarted.map { date.timeIntervalSince($0) } ?? 0
+    private func line(_ text: String, _ color: Color) -> some View {
+        Text(text).svFont(11.5).foregroundStyle(color).lineLimit(2)
+    }
+
+    private func outOfBatchPrefix(_ text: String) -> String {
+        outOfBatch ? model.join([model.t("app.process.row.not_in_batch"), text]) : text
+    }
+
+    /// "Da elaborare · circa 01:16", "Non spuntato: resta fuori dal lotto", "Da elaborare · nel prossimo lotto".
+    private var readyText: String {
+        let todo = model.t("app.process.row.todo")
+        if model.batch.running {
+            return video.isChecked ? model.join([todo, model.t("app.process.row.next_batch")]) : model.t("app.process.row.not_in_batch")
+        }
+        guard video.isChecked else { return model.t("app.process.row.unchecked") }
+        if model.run.readyAgain.contains(video.id) { return model.join([todo, model.t("app.process.row.not_started")]) }
+        guard let estimate = model.estimate(video) else { return todo }
+        return model.join([todo, model.t("app.process.row.about", ["t": Localizer.clock(estimate)])])
     }
 
     private var waitingText: String {
         if let estimate = model.waitingEstimate(video) {
-            return model.t("app.process.row.waiting_est", ["t": model.durationText(estimate)])
+            return model.t("app.process.row.waiting_est", ["t": Localizer.clock(estimate)])
         }
         return model.t("app.process.row.waiting")
     }
 
-    /// "312 righe · 9 scartate (nel report) · 588 confini raffinati · elaborato in 01:31:00".
+    /// "trascorso 00:27 · finisce verso le 08:44" (C3-04).
+    private func runningText(at date: Date) -> String {
+        let elapsed = Localizer.clock(model.run.fileStarted.map { date.timeIntervalSince($0) } ?? 0)
+        if let ends = model.runningFileEnds(at: date) {
+            return model.t("app.process.row.ends", ["t": elapsed, "time": AppModel.clockTime(ends)])
+        }
+        return model.t("app.process.row.elapsed", ["t": elapsed])
+    }
+
+    /// "12 righe · 5 confini raffinati · elaborato in 01:04 · 3 buchi"; out of a running batch,
+    /// when rather than how long ("14 righe · elaborato ieri alle 22:10", C3-04).
     private var doneText: String {
         var parts = [model.tn("app.process.row.lines", video.segments ?? 0)]
+        if outOfBatch {
+            if let finished = video.finished {
+                parts.append(model.t("app.process.row.finished_when", ["when": model.whenText(finished)]))
+            }
+            return model.join(parts)
+        }
         if let dropped = video.dropped, dropped > 0 { parts.append(model.tn("app.process.row.dropped", dropped)) }
         if let refined = video.refined, refined > 0 { parts.append(model.tn("app.process.row.refined", refined)) }
         if let elapsed = video.elapsed { parts.append(model.t("app.process.finished.took_file", ["t": Localizer.clock(elapsed)])) }
+        if let gaps = video.gaps, !gaps.isEmpty { parts.append(model.tn("app.process.row.gaps", gaps.count)) }
         return model.join(parts)
     }
+}
 
-    private var stepOnly: String {
-        video.atStep.flatMap { $0.split(separator: ":").first }.map { model.stepName(String($0)) } ?? "—"
+extension AppModel {
+    /// "l'estrazione dei fotogrammi", "la lettura OCR": a step inside a sentence.
+    func stepPhrase(_ id: String?) -> String {
+        guard let key = id?.split(separator: ":").first.map(String.init) else { return "—" }
+        return localizer.has("app.process.step_in.\(key)") ? t("app.process.step_in.\(key)") : stepName(key)
     }
 
-    private var bandOnly: String {
-        guard let at = video.atStep, let band = at.split(separator: ":").dropFirst().first else { return "" }
-        return model.bandName(String(band), lower: true)
+    func bandPhrase(_ id: String?) -> String {
+        guard let id, let band = id.split(separator: ":").dropFirst().first else { return "" }
+        return bandName(String(band), lower: true)
     }
 
-    /// "Fallito durante OCR ×3 · dialoghi: Vision request failed (-1)": the step, then the
-    /// sentence of a known code or the engine's short text (`AppModel.failureText`).
-    private var failedText: String {
-        let error = model.failureText(video)
-        // Before any step (the file went away, the probe failed): no step to name.
-        guard video.atStep != nil else { return model.t("app.process.row.failed_plain", ["error": error]) }
-        let text = model.t("app.process.row.failed", ["step": stepOnly, "band": bandOnly, "error": error])
+    /// "Non riuscito durante la lettura OCR · dialoghi: Vision non ha risposto" (C3-05): the step,
+    /// then the sentence of a known code or the engine's short text (`failureText`).
+    func rowFailedText(_ video: VideoItem) -> String {
+        let error = failureText(video)
+        guard video.atStep != nil else { return t("app.process.row.failed_plain", ["error": error]) }
+        let text = t("app.process.row.failed", ["step": stepPhrase(video.atStep), "band": bandPhrase(video.atStep), "error": error])
         // A sentence of the catalogue ends with its own full stop; a bare text does not get one.
         return text.hasSuffix(": ") ? String(text.dropLast(2)) : text
     }
 
-    /// Numbers in mono, "—" where the probe has nothing (unreadable, not yet probed).
-    private func number(_ text: String?) -> some View {
-        Text(text ?? (video.probed ? "—" : "…")).svFont(SVFont.numbers).foregroundStyle(SV.textCode).lineLimit(1)
+    /// "Fermato durante la lettura OCR · dialoghi, dopo 41:12. Nessun SRT a metà" (E5).
+    func rowStoppedText(_ video: VideoItem) -> String {
+        let values: [String: Any] = ["step": stepPhrase(video.atStep), "band": bandPhrase(video.atStep)]
+        let spent = video.times?.values.reduce(0, +) ?? 0
+        guard spent >= 1 else { return t("app.process.row.stopped", values) }
+        return t("app.process.row.stopped_after", values.merging(["t": Localizer.clock(spent)]) { a, _ in a })
     }
 
-    /// "23,976" or "24": the language's separators, no trailing zeros.
-    private func fpsText(_ fps: Double) -> String {
-        let rounded = (fps * 1000).rounded() / 1000
-        return model.localizer.number(rounded, decimals: rounded == rounded.rounded() ? 0 : 3)
-    }
-
-    /// The name a new SRT would get when one is there already (`<stem>_<yyyyMMdd_HHmmss>.srt`).
-    private var renamedSRT: String {
+    /// "oggi alle 22:10", "ieri alle 22:10", "il 12/11 alle 22:10".
+    func whenText(_ date: Date) -> String {
+        let time = Self.clockTime(date)
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return t("app.process.row.when_today", ["time": time]) }
+        if calendar.isDateInYesterday(date) { return t("app.process.row.when_yesterday", ["time": time]) }
         let f = DateFormatter()
-        f.dateFormat = "yyyyMMdd_HHmmss"
-        return video.url.deletingPathExtension().lastPathComponent + "_" + f.string(from: Date()) + ".srt"
-    }
-
-    private func toggleExpanded() {
-        guard video.state.isFinished, video.state != .failed else { return }
-        if expanded { model.run.expanded.remove(video.id) } else { model.run.expanded.insert(video.id) }
-    }
-
-    private func select() {
-        let flags = NSApp.currentEvent?.modifierFlags ?? []
-        if flags.contains(.command) {
-            if selected { model.selection.remove(video.id) } else { model.selection.insert(video.id) }
-        } else if flags.contains(.shift), let anchor = model.selection.first,
-                  let a = model.videos.firstIndex(where: { $0.id == anchor }),
-                  let b = model.videos.firstIndex(where: { $0.id == video.id }) {
-            model.selection = Set(model.videos[min(a, b)...max(a, b)].map(\.id))
-        } else {
-            model.selection = [video.id]
-        }
+        f.locale = Locale(identifier: language)
+        f.setLocalizedDateFormatFromTemplate("dM")
+        return t("app.process.row.when_date", ["date": f.string(from: date), "time": time])
     }
 }
 
-/// The context menu of a row: Finder, Preview, the outputs of a finished row, Process Again, Remove.
-struct RowMenu: View {
-    @Environment(AppModel.self) private var model
-    var video: VideoItem
-    var selected: Bool
+// MARK: - The action, ⋯ and the context menu
 
-    var body: some View {
-        let missing = !video.exists
-        Button(model.t("app.menu.show_in_finder")) { model.showInFinder([video.id]) }.disabled(missing)
-        Button(model.t("app.process.row.open_in_preview")) { model.openInPreview(video.id) }
-            .disabled(missing || video.state == .unreadable)
-        if video.state.isFinished {
-            Divider()
-            if video.state != .failed, video.state != .stopped {
-                Button(model.t("app.process.row.review")) { model.review(video) }
-                    .disabled(video.outputReport == nil)
-                Button(model.t("app.process.row.open_srt")) { model.openSRT(video) }
-                    .disabled(!FileManager.default.fileExists(atPath: video.outputSRT.path))
-            }
-            Button(model.t("app.process.row.open_log")) { model.openLog(video) }.disabled(!video.logExists)
-            Button(model.t("app.process.row.process_again")) { model.processAgain([video.id]) }
-        }
-        Divider()
-        Button(model.t("app.menu.remove")) { model.removeWithUndo(selected ? model.selection : [video.id]) }
-            .disabled(video.state.inBatch)
-    }
-}
-
-/// The actions column (`.acts` of the C2 boards): Preview on a row ready for the batch,
-/// Stop on the running one, Review and ⋯ on a finished one, Open Log and ⋯ on a failed
-/// one, Process Again on a stopped one; nothing while a row waits in the batch.
-struct RowActions: View {
+/// One action per row, as a primary button (C3-02, C3-05): Preview for a video to do (and for
+/// one without subtitles, whose bands are to be checked, E3), Review for a done one, Retry for
+/// a failed or stopped one; Stop stays the stop button of the running row.
+struct RowAction: View {
     @Environment(AppModel.self) private var model
     var video: VideoItem
 
     var body: some View {
-        HStack(spacing: 6) {
-            switch video.state {
-            case .ready:
-                Button { model.openInPreview(video.id) } label: { Label(model.t("app.process.row.preview"), systemImage: "viewfinder") }
-                    .svButton(.secondary, .small)
-                    .disabled(!model.canPreview(video))
-                    .help(model.t("app.process.row.preview_help"))
-            case .running:
-                Button { model.stopCurrentFile() } label: { Label(model.t("app.common.stop"), systemImage: "stop.fill") }
-                    .svButton(.secondary, .small)
-                    .help(model.t("app.process.row.stop_help"))
-            case .done, .noSubs:
-                Button { model.review(video) } label: { Label(model.t("app.process.row.review"), systemImage: "doc.text.magnifyingglass") }
-                    .svButton(.secondary, .small)
-                    .disabled(video.outputReport == nil)
-                    .help(model.t(video.outputReport == nil ? "app.process.row.review_none" : "app.process.row.review_help"))
-                more
-            case .failed:
-                Button(model.t("app.process.row.open_log")) { model.openLog(video) }.svButton(.secondary, .small)
-                    .disabled(!video.logExists)
-                more
-            case .stopped:
-                Button(model.t("app.process.row.process_again")) { model.processAgain([video.id]) }.svButton(.secondary, .small)
-            default:
-                EmptyView()
-            }
+        switch video.state {
+        case .ready, .noSubs:
+            Button { model.openInPreview(video.id) } label: { Label(model.t("app.process.row.preview"), systemImage: "viewfinder") }
+                .svButton(.primary, .small)
+                .disabled(!model.canPreview(video))
+                .help(model.t("app.process.row.preview_help"))
+        case .running:
+            Button { model.stopCurrentFile() } label: { Label(model.t("app.common.stop"), systemImage: "stop.fill") }
+                .svButton(.secondary, .small)
+                .help(model.t("app.process.row.stop_help"))
+        case .done:
+            Button { model.review(video) } label: { Label(model.t("app.process.row.review"), systemImage: "doc.text.magnifyingglass") }
+                .svButton(.primary, .small)
+                .disabled(video.outputReport == nil)
+                .help(model.t(video.outputReport == nil ? "app.process.row.review_none" : "app.process.row.review_help"))
+        case .failed, .stopped:
+            let now = VideoChecks.retry(batchRunning: model.batch.running,
+                                        othersChecked: model.checkedVideos.filter { $0.id != video.id }.count) == .startNow
+            Button { model.retry(video.id) } label: { Label(model.t("app.process.row.retry"), systemImage: "arrow.clockwise") }
+                .svButton(.primary, .small)
+                .disabled(!video.exists || video.willRedo || (now && !model.canRun))
+                .help(model.t(now ? "app.process.row.retry_help" : "app.process.row.retry_queue_help"))
+        case .waiting, .unreadable:
+            // The column keeps its width: the numbers stay in line with the other rows.
+            Color.clear.frame(height: 1)
         }
     }
+}
 
-    private var more: some View {
-        PopupMenu({ moreItems }) {
+extension AppModel {
+    /// The items of a row's ⋯ and context menus, in the same order (C3-05): Preview ⌘Y · Review ⌘R ·
+    /// — · Process Again · — · Show in Finder · Open Log · — · Remove from List ⌫. What does not
+    /// apply is there, off.
+    func rowMenu(_ video: VideoItem) -> [SVMenuItem] {
+        let id = video.id
+        return [
+            .item(t("app.process.row.preview"), enabled: canPreview(video), key: "y") { [self] in openInPreview(id) },
+            .item(t("app.process.row.review"), enabled: video.outputReport != nil, key: "r") { [self] in
+                if let v = videos.first(where: { $0.id == id }) { review(v) }
+            },
+            .separator,
+            .item(t("app.process.row.process_again"), checked: video.willRedo,
+                  enabled: video.checkKind == .finished && !video.willRedo && !batch.running) { [self] in processAgain([id]) },
+            .separator,
+            .item(t("app.common.show_in_finder"), enabled: video.exists) { [self] in showInFinder([id]) },
+            .item(t("app.process.row.open_log"), enabled: video.logExists) { [self] in
+                if let v = videos.first(where: { $0.id == id }) { openLog(v) }
+            },
+            .separator,
+            .item(t("app.process.row.remove"), enabled: !video.state.inBatch, key: "\u{8}", modifiers: []) { [self] in removeWithUndo([id]) },
+        ]
+    }
+}
+
+/// ⋯, always there (C3-02, C3-05).
+struct RowMoreButton: View {
+    @Environment(AppModel.self) private var model
+    var video: VideoItem
+
+    var body: some View {
+        PopupMenu({ model.rowMenu(video) }, openRequest: model.rowMenuRequest?.id == video.id ? model.rowMenuRequest?.count ?? 0 : 0) {
             Image(systemName: "ellipsis").svFont(13, .semibold).foregroundStyle(SV.text2)
                 .frame(width: 22, height: 22).contentShape(Rectangle())
         }
         .help(model.t("app.process.row.more"))
         .accessibilityLabel(model.t("app.process.row.more"))
     }
-
-    private var moreItems: [SVMenuItem] {
-        var items: [SVMenuItem] = [.item(model.t("app.common.show_in_finder")) { model.showInFinder([video.id]) }]
-        if video.state != .failed {
-            items.append(.item(model.t("app.process.row.open_srt"), enabled: FileManager.default.fileExists(atPath: video.outputSRT.path)) { model.openSRT(video) })
-            items.append(.item(model.t("app.process.row.open_log"), enabled: video.logExists) { model.openLog(video) })
-        }
-        items.append(.item(model.t("app.process.row.open_in_preview"), enabled: model.canPreview(video)) { model.openInPreview(video.id) })
-        items += [.separator,
-                  .item(model.t("app.process.row.process_again")) { model.processAgain([video.id]) },
-                  .item(model.t("app.process.row.remove")) { model.removeWithUndo([video.id]) }]
-        return items
-    }
 }
 
-// MARK: - Steps (E2, E4, DS3)
-
-/// The steps of the file in progress, or of the one that failed, by band.
-struct StepsPanel: View {
+/// The context menu: the ⋯ menu's items as buttons, with their shortcuts shown.
+struct RowMenuButtons: View {
     @Environment(AppModel.self) private var model
     var video: VideoItem
 
-    private var steps: [StepRun] {
-        if video.state == .running { return model.run.steps }
-        // A failed row keeps its plan and times; the aborted step and the rest are drawn from `atStep`.
-        return failedSteps
-    }
-
-    private var failedSteps: [StepRun] {
-        guard let plan = video.plan else { return [] }
-        var seen = false
-        return plan.map { id in
-            let parts = id.split(separator: ":").map(String.init)
-            var s = StepRun(key: parts.first ?? id, band: parts.count > 1 ? parts[1] : "bottom")
-            if id == video.atStep { s.state = .aborted; seen = true }
-            else if seen { s.state = .notRun }
-            else { s.state = .done; s.ratio = 1 }
-            if let t = video.times?[id] { s.duration = t; s.elapsed = t }
-            return s
-        }
-    }
-
-    /// The column of the numbers, shared by every step of both bands (design note 64): as wide as
-    /// the longest text expected, wider for all of them together when one text needs more.
-    @State private var numbersWidth: CGFloat = 0
-
-    /// The longest text a running step is expected to show: "17.040 / 17.040 · ETA 23:40 · 127 fps".
-    private var widestExpected: String {
-        let l = model.localizer, n = l.number(17_040)
-        return model.t("app.steps.running", ["done": n, "total": n, "eta": Localizer.clock(23 * 60 + 40),
-                                             "rate": l.number(127), "unit_s": model.t("app.steps.unit.fps")])
-    }
-
     var body: some View {
-        let bands = Array(NSOrderedSet(array: steps.map(\.band))) as? [String] ?? []
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(bands, id: \.self) { band in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 2).fill(band == "top" ? signsBlue : SV.green).frame(width: 9, height: 9)
-                        Text(model.bandName(band).uppercased()).svFont(10.5, .semibold).foregroundStyle(SV.text3).tracking(0.3)
-                    }
-                    ForEach(steps.filter { $0.band == band }) { step in
-                        StepLine(step: step, failedRow: video.state == .failed, numbersWidth: numbersWidth)
-                    }
-                }
-            }
-            if video.state == .failed, let detail = video.errorDetail {
-                // The technical detail and where the whole story is (board E4).
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(detail).svFont(11.5, mono: true).foregroundStyle(SV.redText).textSelection(.enabled)
-                    if video.logPath != nil || video.logExists {
-                        LogLine(video: video)
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .svBox(RoundedRectangle(cornerRadius: SV.Radius.field), fill: SV.bg, line: SV.line,
-                       padding: EdgeInsets(vertical: 10, horizontal: 12))
-                .padding(.top, 4)
-            }
-        }
-        .padding(.trailing, 2)
-        // The expected widest text takes part in the measure without being shown.
-        .background(alignment: .topLeading) {
-            Text(widestExpected).svFont(SVFont.smallNumbers).lineLimit(1).fixedSize().hidden()
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { expectedWidth = $0 }
-        }
-        .onPreferenceChange(NumbersWidthKey.self) { measured = $0 }
-        .onChange(of: measured, initial: true) { numbersWidth = max(expectedWidth, measured) }
-        .onChange(of: expectedWidth) { numbersWidth = max(expectedWidth, measured) }
-    }
-
-    @State private var expectedWidth: CGFloat = 0
-    @State private var measured: CGFloat = 0
-}
-
-/// The widest text of the numbers column among the steps shown.
-struct NumbersWidthKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
-
-/// "log: ~/Downloads/name.log" in the box of a failed row: a click opens the log (as Open Log does).
-struct LogLine: View {
-    @Environment(AppModel.self) private var model
-    var video: VideoItem
-    @State private var hover = false
-
-    var body: some View {
-        let exists = video.logExists
-        Button { model.openLog(video) } label: {
-            Text("log: \(Text(verbatim: video.logDisplayPath).underline(hover && exists))")
-                .svFont(11.5, mono: true).foregroundStyle(SV.redText)
-                .multilineTextAlignment(.leading)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!exists)
-        .onHover { hover = $0 }
-        .svPointingHand(exists)
-        .help(model.t("app.process.row.open_log"))
-        .accessibilityLabel(model.t("app.process.row.open_log"))
-    }
-}
-
-/// One step: icon, label, bar and the numbers on the right (design note 28).
-struct StepLine: View {
-    @Environment(AppModel.self) private var model
-    var step: StepRun
-    var failedRow: Bool
-    /// The shared width of the numbers column (`StepsPanel`): all bars come out the same length.
-    var numbersWidth: CGFloat = 180
-
-    private var labelColor: Color {
-        switch step.state {
-        case .aborted: SV.redText
-        case .waiting, .notRun: SV.text3
-        default: SV.text
-        }
-    }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            icon.frame(width: 14, height: 14)
-            Text(model.stepName(step.key)).svFont(12).foregroundStyle(labelColor).frame(width: 118, alignment: .leading).lineLimit(1)
-            bar.frame(maxWidth: .infinity)
-            Text(right).svFont(SVFont.smallNumbers).foregroundStyle(rightColor).lineLimit(1)
-                .fixedSize()
-                .background { GeometryReader { Color.clear.preference(key: NumbersWidthKey.self, value: $0.size.width) } }
-                .frame(width: max(numbersWidth, 1), alignment: .trailing)
-        }
-        .help(help)
-    }
-
-    @ViewBuilder private var icon: some View {
-        switch step.state {
-        case .done: Image(systemName: "checkmark").svFont(11, .bold).foregroundStyle(SV.greenText)
-        case .running: Spinner(size: 12)
-        case .aborted: Image(systemName: "xmark").svFont(11, .bold).foregroundStyle(SV.redText)
-        case .waiting, .notRun: Circle().strokeBorder(SV.glassLine).frame(width: 10, height: 10)
-        }
-    }
-
-    private var bar: some View {
-        let fraction: Double
-        let fill: Color
-        switch step.state {
-        case .done: fraction = 1; fill = SV.green
-        case .running: fraction = step.ratio; fill = SV.primary
-        case .aborted: fraction = max(step.ratio, 0.08); fill = SV.red
-        case .waiting, .notRun: fraction = 0; fill = SV.track
-        }
-        return SVBar(fraction, height: 4, fill: fill, track: SV.trackSoft)
-    }
-
-    private var unitName: String { model.t(step.unit == "segments" ? "app.steps.unit.lines" : "app.steps.unit.frames") }
-    private var rateUnit: String { model.t(step.unit == "segments" || step.key == "refine" ? "app.steps.unit.lines_s" : "app.steps.unit.fps") }
-
-    private var right: String {
-        let l = model.localizer
-        switch step.state {
-        case .done:
-            let d = step.duration ?? step.elapsed
-            // Under a second: "in less than 1 s", not "in 00:00" (design note 64).
-            if d < 1 {
-                return step.count > 0
-                    ? model.t("app.steps.done_quick", ["total": l.number(Double(step.count)), "unit": unitName])
-                    : model.t("app.steps.under_second")
-            }
-            let t = Localizer.clock(d)
-            if step.count > 0, let rate = averageRate {
-                return model.t("app.steps.done", ["total": l.number(Double(step.count)), "unit": unitName, "t": t,
-                                                  "rate": l.number(rate, decimals: rate < 10 ? 1 : 0), "unit_s": rateUnit])
-            }
-            if step.count > 0 {
-                return model.t("app.steps.done_short", ["total": l.number(Double(step.count)), "unit": unitName, "t": t])
-            }
-            return t
-        case .running:
-            let count = "\(l.number(Double(step.count))) / \(l.number(Double(step.total)))"
-            if let eta = step.eta, let rate = step.rate {
-                return model.t("app.steps.running", ["done": l.number(Double(step.count)), "total": l.number(Double(step.total)),
-                                                     "eta": Localizer.clock(eta), "rate": l.number(rate, decimals: rate < 10 ? 1 : 0),
-                                                     "unit_s": rateUnit])
-            }
-            return count
-        case .waiting:
-            if failedRow { return model.t("app.steps.not_run") }
-            // An estimate under a second says nothing ("about 0 s"): "waiting" alone (design note 67).
-            if let e = step.estimate, e >= 1 { return model.t("app.steps.waiting_est", ["t": model.durationText(e)]) }
-            return model.t("app.steps.waiting")
-        case .aborted: return model.t("app.steps.aborted")
-        case .notRun: return model.t("app.steps.not_run")
-        }
-    }
-
-    private var averageRate: Double? {
-        let d = step.duration ?? step.elapsed
-        // Under a second ("330 frames in 0:00") a rate says nothing: it shows from one second on (note 9).
-        guard d > 1, step.count > 0 else { return nil }
-        return Double(step.count) / d
-    }
-
-    private var rightColor: Color {
-        switch step.state {
-        case .aborted: SV.redText
-        case .waiting, .notRun: SV.text3
-        default: SV.textCode
-        }
-    }
-
-    /// The long sentence of the step (design note 18).
-    private var help: String {
-        step.key == "ocr" ? model.t("app.steps.help.ocr", ["n": model.ocrParams.multiVariant ? 3 : 1]) : model.t("app.steps.help.\(step.key)")
-    }
-}
-
-// MARK: - Finished row opened (E3)
-
-/// Times per step (both bands on one line) and the three files with their links.
-struct FinishedDetail: View {
-    @Environment(AppModel.self) private var model
-    var video: VideoItem
-
-    private var keys: [String] {
-        let plan = video.plan ?? video.times.map { Array($0.keys).sorted() } ?? []
-        var out: [String] = []
-        for id in plan {
-            let key = String(id.split(separator: ":").first ?? Substring(id))
-            if !out.contains(key) { out.append(key) }
-        }
-        return out
-    }
-
-    private var bands: [String] {
-        let plan = video.plan ?? video.times.map { Array($0.keys).sorted() } ?? []
-        var out: [String] = []
-        for id in plan {
-            let parts = id.split(separator: ":")
-            if parts.count > 1, !out.contains(String(parts[1])) { out.append(String(parts[1])) }
-        }
-        return out
-    }
-
-    /// Two columns of the same width, as on board E3: FILES starts at the middle of the row.
-    var body: some View {
-        HStack(alignment: .top, spacing: 18) {
-            if let times = video.times, !times.isEmpty {
-                VStack(alignment: .leading, spacing: 5) {
-                    // "TEMPI · DIALOGHI · CARTELLI": the bands in the order of the values (board C2-R1).
-                    label(([model.t("app.process.row.times")] + bands.map { model.bandName($0) }).joined(separator: model.t("app.common.list_separator")))
-                    Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
-                        ForEach(keys, id: \.self) { key in
-                            GridRow {
-                                Text(model.stepName(key)).svFont(11.5).foregroundStyle(SV.text2).lineLimit(1).fixedSize()
-                                Text(bands.compactMap { times["\(key):\($0)"].map(stepTime) }.joined(separator: model.t("app.common.list_separator")))
-                                    .svFont(SVFont.smallNumbers).foregroundStyle(SV.textCode)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            VStack(alignment: .leading, spacing: 5) {
-                label(model.t("app.process.row.files"))
-                // The kinds take the width of the longest ("Review report", boards E3 and RV1), the names the rest:
-                // a name is cut in the middle only when it really does not fit.
-                Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
-                    if video.state != .stopped {
-                        file(model.t("app.process.row.srt"), video.outputSRT, exists: FileManager.default.fileExists(atPath: video.outputSRT.path))
-                        if let report = video.reportPath.map({ URL(fileURLWithPath: $0) }) ?? (video.reportExists ? video.reportURL : nil) {
-                            file(model.t("app.process.row.report"), report, exists: video.outputReport != nil)
-                        }
-                    }
-                    file(model.t("app.process.row.log"), video.outputLog, exists: video.logExists)
-                }
-                HStack(spacing: 14) {
-                    UnderlineLink(model.t("app.common.show_in_finder")) { model.showInFinder([video.id]) }
-                    if video.state == .done {
-                        UnderlineLink(model.t("app.process.row.open_srt")) { model.openSRT(video) }
-                    }
-                    if video.logExists {
-                        UnderlineLink(model.t("app.process.row.open_log")) { model.openLog(video) }
-                    }
-                }
-                .padding(.top, 4)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private func label(_ text: String) -> some View {
-        Text(text.uppercased()).svFont(10.5, .semibold).foregroundStyle(SV.text3).tracking(0.3).padding(.bottom, 2)
-    }
-
-    /// "00:04", or "meno di 1 s" for a step under a second (as the steps say it, design note 64).
-    private func stepTime(_ seconds: Double) -> String {
-        seconds < 1 ? model.t("app.process.row.under_second") : Localizer.clock(seconds)
-    }
-
-    private func file(_ kind: String, _ url: URL, exists: Bool) -> some View {
-        GridRow {
-            Text(kind).svFont(11.5).foregroundStyle(SV.text2).lineLimit(1).fixedSize()
-            Text(url.lastPathComponent).svFont(SVFont.smallNumbers).foregroundStyle(exists ? SV.textCode : SV.text3)
-                .strikethrough(!exists, color: SV.text3).lineLimit(1).truncationMode(.middle)
-                .help(url.lastPathComponent)
-        }
+        let id = video.id
+        Button(model.t("app.process.row.preview")) { model.openInPreview(id) }
+            .keyboardShortcut("y", modifiers: .command)
+            .disabled(!model.canPreview(video))
+        Button(model.t("app.process.row.review")) { model.review(video) }
+            .keyboardShortcut("r", modifiers: .command)
+            .disabled(video.outputReport == nil)
+        Divider()
+        Button(model.t("app.process.row.process_again")) { model.processAgain([id]) }
+            .disabled(video.checkKind != .finished || video.willRedo || model.batch.running)
+        Divider()
+        Button(model.t("app.common.show_in_finder")) { model.showInFinder([id]) }.disabled(!video.exists)
+        Button(model.t("app.process.row.open_log")) { model.openLog(video) }.disabled(!video.logExists)
+        Divider()
+        Button(model.t("app.process.row.remove")) { model.removeWithUndo([id]) }
+            .keyboardShortcut(.delete, modifiers: [])
+            .disabled(video.state.inBatch)
     }
 }

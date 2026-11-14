@@ -119,10 +119,11 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
                               as: ListsStatus.self)
         #expect(lists.ignore.count == 12 && lists.corrections.path == "/s/corrections.txt")
         let probe = try reply(#"""
-            {"videos":[{"path":"/v/a.mkv","duration":1440.5,"fps":23.976,"width":1920,"height":1080},
+            {"videos":[{"path":"/v/a.mkv","duration":1440.5,"fps":23.976,"width":1920,"height":1080,"video_codec":"hevc","audio_codec":"aac"},
                        {"path":"/v/b.mkv","error":"probe_failed","message":"no video stream or duration"}]}
             """#, as: VideosProbeReply.self)
         #expect(probe.videos[0].fps == 23.976 && probe.videos[1].error == "probe_failed" && probe.videos[1].duration == nil)
+        #expect(probe.videos[0].videoCodec == "hevc" && probe.videos[0].audioCodec == "aac" && probe.videos[1].videoCodec == nil)
         #expect(try reply(#"{"out_path":"/v/a-fixed-20261113.srt","count":118}"#, as: SrtFixReply.self).count == 118)
         #expect(try reply(#"{"ok":false,"reason":"no_batch"}"#, as: StopReply.self) == StopReply(ok: false, reason: "no_batch"))
         #expect(try event("ready", #"{"version":"2.0.0","protocol":1,"pid":42}"#)

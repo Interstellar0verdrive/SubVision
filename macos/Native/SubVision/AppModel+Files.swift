@@ -2,6 +2,8 @@
 // The list of videos of Process (F4.4): drops and Open Videos… with
 // subfolders, `videos.probe`, removal with undo, the skipped items, and the
 // list kept between launches in `<state>/records/videos.json` (design note 8).
+// Since C3 there is no selection: each row has a checkbox, "process it"
+// (`VideoChecks`), and the keyboard moves a focus ring over the rows.
 
 import AppKit
 import SVShell
@@ -87,6 +89,13 @@ struct VideoItem: Identifiable, Codable, Equatable {
     var gapWarn: Double?
     /// When the outcome arrived.
     var finished: Date?
+    /// The row's checkbox (C3-02): nil until the person changes it, then what they chose. A video
+    /// to do comes in checked, a finished one is not (checked by hand it "will be redone").
+    var checked: Bool?
+    /// ffprobe's codec names of the first video and audio streams, and the file's size (the to-do drawer).
+    var videoCodec: String?
+    var audioCodec: String?
+    var bytes: Int64?
 
     init(path: String) {
         id = UUID()
@@ -112,6 +121,22 @@ struct VideoItem: Identifiable, Codable, Equatable {
         guard let width, let height, width > 0, height > 0 else { return nil }
         return "\(width)×\(height)"
     }
+
+    /// The row's checkbox as `VideoChecks` reads it: to do, finished, or never a box
+    /// (unreadable, the file gone, in the batch that runs).
+    var checkKind: CheckKind {
+        guard state != .unreadable, exists else { return .excluded }
+        switch state {
+        case .ready: return .todo
+        case .done, .noSubs, .failed, .stopped: return .finished
+        case .waiting, .running, .unreadable: return .excluded
+        }
+    }
+
+    var isChecked: Bool { checked ?? (state == .ready) }
+    var checkRow: CheckRow<UUID> { CheckRow(id: id, kind: checkKind, checked: isChecked) }
+    /// A finished row checked by hand: "verrà rifatto" (C3-02).
+    var willRedo: Bool { state.isFinished && isChecked && checkKind == .finished }
 
     /// The SRT the last batch wrote (or `<stem>.srt`), its report and its log.
     var outputSRT: URL { srtPath.map { URL(fileURLWithPath: $0) } ?? srtURL }
@@ -194,10 +219,39 @@ extension AppModel {
         }
     }
 
-    var readyVideos: [VideoItem] { videos.filter { $0.state == .ready && $0.exists } }
+    /// The rows the next batch takes: the checked ones that have a box (`VideoChecks`).
+    var checkedVideos: [VideoItem] { videos.filter { $0.checkRow.toProcess } }
 
-    /// "3 video · 48 min in tutto".
-    var totalDuration: Double { readyVideos.compactMap(\.duration).reduce(0, +) }
+    /// About how long the checked videos take with the parameters of now (the bottom bar);
+    /// nil while a duration is not known yet.
+    var checkedEstimate: Double? {
+        let estimates = checkedVideos.map(estimate)
+        guard !estimates.isEmpty, estimates.allSatisfy({ $0 != nil }) else { return nil }
+        return estimates.compactMap { $0 }.reduce(0, +)
+    }
+
+    // MARK: - Estimates (C3-02)
+
+    static let estimateRateKey = "estimate.rate"
+
+    /// The work the parameters of now ask for (`WorkEstimate.factor`).
+    var estimateFactor: Double { Self.factor(ocrParams) }
+
+    static func factor(_ p: OcrParams) -> Double {
+        WorkEstimate.factor(fps: p.fps, multiVariant: p.multiVariant, signs: p.topBand, refine: p.refineTiming)
+    }
+
+    /// About how long a video takes with the parameters of now; nil before its duration is known.
+    func estimate(_ video: VideoItem) -> Double? {
+        guard let duration = video.duration, duration > 0 else { return nil }
+        return WorkEstimate.seconds(duration: duration, factor: estimateFactor, rate: estimateRate)
+    }
+
+    /// A file done teaches the rate (its seconds over its duration and its batch's work).
+    func learnRate(elapsed: Double, duration: Double?, factor: Double?) {
+        guard let duration, let factor, let observed = WorkEstimate.observedRate(elapsed: elapsed, duration: duration, factor: factor) else { return }
+        estimateRate = WorkEstimate.learn(previous: estimateRate, observed: observed)
+    }
 
     /// "2 h 14 min", "48 min", "55 s".
     func durationText(_ seconds: Double) -> String {
@@ -277,17 +331,23 @@ extension AppModel {
             for info in infos {
                 guard let i = videos.firstIndex(where: { $0.path == info.path }) else { continue }
                 videos[i].probed = true
+                // A probe again (the codecs of a row probed before C3) leaves an outcome as it is.
+                let open = videos[i].state == .ready || videos[i].state == .unreadable
                 if info.error != nil {
-                    videos[i].state = .unreadable
+                    if open { videos[i].state = .unreadable }
                     videos[i].problem = info.message ?? info.error
                 } else {
                     videos[i].duration = info.duration
                     videos[i].fps = info.fps
                     videos[i].width = info.width
                     videos[i].height = info.height
-                    videos[i].state = .ready
+                    videos[i].videoCodec = info.videoCodec
+                    videos[i].audioCodec = info.audioCodec
+                    if open { videos[i].state = .ready }
                     videos[i].problem = nil
                 }
+                let size = (try? FileManager.default.attributesOfItem(atPath: videos[i].path)[.size]) as? NSNumber
+                videos[i].bytes = size?.int64Value
             }
             saveVideos()
         } catch {
@@ -295,9 +355,13 @@ extension AppModel {
         }
     }
 
-    /// After the engine is up: the rows not probed yet.
+    /// After the engine is up: the rows not probed yet, and the ones probed before the
+    /// codecs were read (once per launch).
     func refreshVideos() async {
-        let pending = videos.filter { !$0.probed && $0.exists }.map(\.id)
+        let pending = videos.filter {
+            $0.exists && !$0.state.inBatch && (!$0.probed || ($0.state != .unreadable && $0.videoCodec == nil && !codecProbed.contains($0.id)))
+        }.map(\.id)
+        codecProbed.formUnion(pending)
         if !pending.isEmpty { await probe(pending) }
     }
 
@@ -307,8 +371,13 @@ extension AppModel {
     func removeWithUndo(_ ids: Set<UUID>) {
         let removed = videos.enumerated().filter { ids.contains($0.element.id) }
         guard !removed.isEmpty else { return }
+        // The focus goes to the row after the last one removed (or before, at the end).
+        if let focus = focusedRow, ids.contains(focus) {
+            let after = videos.drop { $0.id != focus }.dropFirst().first { !ids.contains($0.id) }
+            let before = videos.prefix { $0.id != focus }.last { !ids.contains($0.id) }
+            focusedRow = (after ?? before)?.id
+        }
         videos.removeAll { ids.contains($0.id) }
-        selection.subtract(ids)
         // The note on skipped items talks about this list: an empty list drops it (design note 45).
         if videos.isEmpty { skippedItems = [] }
         saveVideos()
@@ -324,19 +393,82 @@ extension AppModel {
         undo?.setActionName(t("app.menu.undo_remove"))
     }
 
-    func removeSelection() { removeWithUndo(selection) }
-
-    /// Rows that can be removed now (not the ones a batch is working on).
-    var canRemoveSelection: Bool {
-        !selection.isEmpty && !videos.contains { selection.contains($0.id) && $0.state.inBatch }
-    }
-
-    /// Process Again (the row, the context menu): a finished row goes back to ready (design note 9).
+    /// Process Again (the ⋯ and context menus): the finished row is checked, "will be redone",
+    /// and keeps its outcome until the batch takes it; the new SRT gets the date in its name (C3-02).
     func processAgain(_ ids: Set<UUID>) {
-        for i in videos.indices where ids.contains(videos[i].id) && videos[i].state.isFinished {
-            videos[i].resetOutcome()
+        for i in videos.indices where ids.contains(videos[i].id) && videos[i].checkKind == .finished {
+            videos[i].checked = true
         }
         saveVideos()
+    }
+
+    // MARK: - Checkboxes (C3-02)
+
+    var checkRows: [CheckRow<UUID>] { videos.map(\.checkRow) }
+
+    /// A row's box clicked: a to-do row on and off; a finished one to "will be redone" and back.
+    func toggleCheck(_ id: UUID) {
+        guard !batch.running, let i = videos.firstIndex(where: { $0.id == id }), videos[i].checkKind != .excluded else { return }
+        let value = !videos[i].isChecked
+        // Back to its default: a row that never was changed reads as before.
+        videos[i].checked = value == (videos[i].state == .ready) ? nil : value
+        saveVideos()
+    }
+
+    /// The list header's box (C3-02): some → all, all → none, only on the rows that have a box.
+    func toggleHeader() {
+        guard !batch.running else { return }
+        let change = VideoChecks.headerToggle(checkRows)
+        guard !change.isEmpty else { return }
+        for i in videos.indices {
+            guard let value = change[videos[i].id] else { continue }
+            videos[i].checked = value == (videos[i].state == .ready) ? nil : value
+        }
+        saveVideos()
+    }
+
+    var headerCheck: CheckState { VideoChecks.headerState(checkRows) }
+
+    /// Retry on a failed or stopped row (C3-05, E5): at once when nothing else waits,
+    /// else checked, with the others, for the next batch.
+    func retry(_ id: UUID) {
+        guard let video = videos.first(where: { $0.id == id }), video.checkKind == .finished else { return }
+        let others = checkedVideos.filter { $0.id != id }.count
+        switch VideoChecks.retry(batchRunning: batch.running, othersChecked: others) {
+        case .startNow:
+            startBatch(only: [id])
+        case .check:
+            processAgain([id])
+        }
+    }
+
+    // MARK: - Focus (C3-02: the keyboard's ring, no selection)
+
+    var focusedVideo: VideoItem? { focusedRow.flatMap { id in videos.first { $0.id == id } } }
+
+    /// ↑ ↓: the ring to the row above or below (the first or the last one when none has it).
+    func moveFocus(by step: Int) {
+        guard !videos.isEmpty else { return }
+        guard let id = focusedRow, let i = videos.firstIndex(where: { $0.id == id }) else {
+            focusedRow = (step > 0 ? videos.first : videos.last)?.id
+            return
+        }
+        focusedRow = videos[min(max(i + step, 0), videos.count - 1)].id
+    }
+
+    /// A row's drawer: open or closed (a click on the row, Space, → and ←).
+    func setDrawer(_ id: UUID, open: Bool) {
+        if open { run.expanded.insert(id) } else { run.expanded.remove(id) }
+    }
+
+    func toggleDrawer(_ id: UUID) { setDrawer(id, open: !run.expanded.contains(id)) }
+
+    /// The focused row can be removed (⌫, File › Remove from List): not while the batch works on it.
+    var canRemoveFocused: Bool { focusedVideo.map { !$0.state.inBatch } ?? false }
+
+    func removeFocused() {
+        guard canRemoveFocused, let id = focusedRow else { return }
+        removeWithUndo([id])
     }
 
     /// Remove Finished (the bottom bar): every done, failed or stopped row goes.
@@ -346,15 +478,20 @@ extension AppModel {
 
     var finishedVideos: [VideoItem] { videos.filter { $0.state.isFinished } }
 
-    func selectAll() { selection = Set(videos.map(\.id)) }
+    /// Every row that has a box, checked (the header's "all").
+    func checkAll() {
+        guard !batch.running else { return }
+        for i in videos.indices where videos[i].checkKind == .todo { videos[i].checked = nil }
+        saveVideos()
+    }
 
-    /// Edit › Select All (⌘A): the rows of the Video page when the main window is in front and
-    /// no text is being edited; anywhere else the first responder's own Select All.
+    /// Edit › Select All (⌘A): on the Video page, with the main window in front and no text
+    /// being edited, every to-do row checked; anywhere else the first responder's own Select All.
     func selectAllInContext() {
         let window = NSApp.keyWindow
         let main = window?.identifier?.rawValue.hasPrefix(config.mainWindowID) == true
         if main, tab == .process, !preview.shown, !videos.isEmpty, !(window?.firstResponder is NSText) {
-            selectAll()
+            checkAll()
         } else {
             NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: nil, from: nil)
         }

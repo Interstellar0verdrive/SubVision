@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
-// Video, the home (design boards E0–E7, C2-V1–V5, N1): the header, the
-// notes, the list of videos (rows in `ProcessRows.swift`), the drop area
-// under it that fills the rest of the page (design note 60), the bottom bar
-// in its states (ready, a selection, finished; during a batch it gives way to
-// the window's batch bar, C3-04) and the parameters panel fixed on the right
-// (C3-03: it retracts only in a narrow window).
+// Video, the home (design boards E0–E10, C3-02–C3-05, N1, N2): the header,
+// the notes, the list of videos with its header checkbox (rows and drawers
+// in `ProcessRows.swift` and `ProcessDrawers.swift`), the drop strip under
+// it, the bottom bar that says what Process will do (during a batch it gives
+// way to the window's batch bar, C3-04) and the parameters panel fixed on the
+// right (C3-03: it retracts only in a narrow window). No selection: the
+// keyboard moves a focus ring over the rows (↑ ↓, Space → ← open and close,
+// ⌫ removes, Esc lets go).
 
 import AppKit
 import SVShell
@@ -16,10 +18,7 @@ struct ProcessView: View {
     @Environment(\.svChrome) private var chrome
     @Environment(\.svWindowWidth) private var windowWidth
     @State private var dropTargeted = false
-    /// The height the list's scroll view shows, and the list's own: the drop area takes the rest.
-    @State private var viewport: CGFloat = 0
-    @State private var listHeight: CGFloat = 0
-    @State private var escMonitor: Any?
+    @State private var keyMonitor: Any?
 
     var body: some View {
         @Bindable var model = model
@@ -33,9 +32,8 @@ struct ProcessView: View {
     private var page: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
-                // No Open Videos… here (design note 60: the drop area under the list adds), no
-                // panel button: the panel is fixed beside a wide page, and a narrow window has
-                // its button in the top bar (board N1).
+                // No panel button here: the panel is fixed beside a wide page, and a narrow
+                // window has its button in the top bar (board N1).
                 PageTop(title: model.t("app.process.title"), intro: narrow ? nil : model.t("app.process.intro")) { EmptyView() }
                 .padding(.bottom, 18)
                 if model.videos.isEmpty {
@@ -53,45 +51,60 @@ struct ProcessView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background { Color.clear.contentShape(Rectangle()).onTapGesture { model.selection = [] } }
-        .onAppear { installEscape() }
-        .onDisappear { removeEscape() }
+        .background { Color.clear.contentShape(Rectangle()).onTapGesture { model.focusedRow = nil } }
+        .onAppear { installKeys() }
+        .onDisappear { removeKeys() }
         .fileDrop(isTargeted: $dropTargeted) { model.add($0) }
     }
 
-    // MARK: - Selection
+    // MARK: - Keys
 
-    /// Esc deselects the rows (design note 58), unless a text field, a sheet or the
-    /// inspector laid over a narrow window has a better use for it. ⌫ and ⌦ remove the
-    /// rows selected (File › Remove from List): the menu item's ⌫ is U+0008, and the Delete
-    /// key types U+007F, which that key equivalent does not match (manual tests, 14/11).
-    private func installEscape() {
-        guard escMonitor == nil else { return }
+    /// The list's keys (C3-02), when the main window is in front with nothing over it and no
+    /// text is being edited: ↑ ↓ move the focus, Space opens or closes the focused row's drawer,
+    /// → opens it, ← closes it, ⌫ ⌦ remove the row (⌘Z puts it back), Esc lets the focus go.
+    /// ⌫ is here as well as in the File menu: the menu item's ⌫ is U+0008 and the Delete key
+    /// types U+007F, which that key equivalent does not match (manual tests, 14/11).
+    private func installKeys() {
+        guard keyMonitor == nil else { return }
         let chrome = chrome
-        escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [model] event in
-            guard [53, 51, 117].contains(event.keyCode), event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
-                  model.tab == .process, !model.selection.isEmpty,
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [model] event in
+            let code = event.keyCode
+            guard [126, 125, 49, 124, 123, 51, 117, 53].contains(code),
+                  event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
+                  model.tab == .process, !model.videos.isEmpty,
                   let window = event.window, window.isMainWindow, window.attachedSheet == nil,
                   !(window.firstResponder is NSText) else { return event }
-            if event.keyCode == 53 {
-                guard !(model.inspectorOpen && chrome.inspectorOverlays(windowWidth: window.frame.width)) else { return event }
-                model.selection = []
-            } else {
-                guard model.canRemoveSelection else { return event }
-                model.removeSelection()
+            // The parameters laid over a narrow window keep their own keys.
+            if model.inspectorOpen && chrome.inspectorOverlays(windowWidth: window.frame.width) { return event }
+            switch code {
+            case 126: model.moveFocus(by: -1)
+            case 125: model.moveFocus(by: 1)
+            case 53:
+                guard model.focusedRow != nil else { return event }
+                model.focusedRow = nil
+            default:
+                guard let id = model.focusedRow else { return event }
+                switch code {
+                case 49: withAnimation(.easeOut(duration: 0.2)) { model.toggleDrawer(id) }
+                case 124: withAnimation(.easeOut(duration: 0.2)) { model.setDrawer(id, open: true) }
+                case 123: withAnimation(.easeOut(duration: 0.2)) { model.setDrawer(id, open: false) }
+                default:
+                    guard model.canRemoveFocused else { return event }
+                    model.removeFocused()
+                }
             }
             return nil
         }
     }
 
-    private func removeEscape() {
-        if let escMonitor { NSEvent.removeMonitor(escMonitor) }
-        escMonitor = nil
+    private func removeKeys() {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
     }
 
     // MARK: - List
 
-    /// A narrow window (the parameters retracted): the title alone (board N1).
+    /// A narrow window (the parameters retracted): the title alone, Duration the only number (N1).
     private var narrow: Bool { chrome.inspectorOverlays(windowWidth: windowWidth) }
 
     private var list: some View {
@@ -101,7 +114,7 @@ struct ProcessView: View {
                     Button(model.t("app.common.retry")) { model.retry() }.buttonStyle(SVTintedButtonStyle(.red))
                     Button(model.t("app.common.show_log")) { model.showLog() }.buttonStyle(SVTintedButtonStyle(.red))
                 }
-                .padding(.bottom, 14)
+                .padding(.bottom, 12)
             }
             if !model.skippedItems.isEmpty {
                 NoteView(.yellow, title: model.tn("app.process.note.skipped", model.skippedItems.count),
@@ -112,31 +125,40 @@ struct ProcessView: View {
                     .buttonStyle(.plain)
                     .help(model.t("app.common.dismiss"))
                 }
-                .padding(.bottom, 14)
+                .padding(.bottom, 12)
             }
-            // The list and the drop area scroll together: the area takes what the list leaves of
-            // the page, at least 140 pt; with a long list it waits at the end (boards C2-V1, V4).
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    VideoList()
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
-                    VideoDropArea(targeted: dropTargeted)
-                        .frame(height: max(140, viewport - listHeight - 12 - 16))
-                        .padding(.top, 12)
+            if let stopped = model.run.stoppedAt, !model.batch.running {
+                // E5: a neutral note, what became of the rows.
+                NoteView(.neutral, title: model.t("app.process.note.stopped_title", ["time": AppModel.clockTime(stopped)]),
+                         text: stoppedText, inlineTitle: true) { EmptyView() }
+                    .padding(.bottom, 12)
+            }
+            ScrollViewReader { scroller in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        VideoList(narrow: narrow)
+                        VideoDropStrip(targeted: dropTargeted, narrow: narrow)
+                            .padding(.top, 12)
+                    }
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .padding(.bottom, 16)
-                .frame(maxWidth: .infinity, minHeight: viewport, alignment: .topLeading)
-                // A click on the empty space deselects (design note 58); the rows take their own clicks first.
-                .contentShape(Rectangle())
-                .onTapGesture { model.selection = [] }
+                .scrollClipDisabled()
+                .onChange(of: model.focusedRow) { _, id in
+                    guard let id else { return }
+                    withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo(id) }
+                }
             }
-            .scrollClipDisabled()
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewport = $0 }
             if let note = diskNote {
                 NoteView(.yellow, text: note)
                     .padding(.bottom, 14)
             }
         }
+    }
+
+    private var stoppedText: String {
+        let notStarted = model.videos.filter { model.run.readyAgain.contains($0.id) && $0.state == .ready }.count
+        return notStarted == 0 ? model.t("app.process.note.stopped_none") : model.tn("app.process.note.stopped_text", notStarted)
     }
 
     /// Design note 16: under 10 GB free on the internal disk, a yellow line over the bar.
@@ -156,162 +178,126 @@ struct ProcessView: View {
 
     // MARK: - Bottom bar
 
-    /// Ready: the count and the outputs line, Start. Finished: the outcomes,
-    /// Remove Finished, Start for the rows that are ready (E1, E3, E5). Not during
-    /// a batch: the window's batch bar is there then (C3-04).
+    /// What Process will do (C3-02, C3-03, C3-05, E3, E5): "2 da elaborare · circa 3 min" and
+    /// "Elabora 2 video"; with nothing checked the outcomes and Remove Finished, the button off
+    /// as "Nessun video da elaborare". Not during a batch: the window's batch bar is there (C3-04).
     private var bottomBar: some View {
         HStack(alignment: .center, spacing: 14) {
-            let ready = model.readyVideos
-            let finished = model.finishedVideos
-            if !model.selection.isEmpty {
-                selectionBar
-            } else {
-                if !finished.isEmpty {
-                    Text(outcomeText(finished, ready: ready.count)).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
+            switch model.bottomSummary {
+            case .toProcess(let count, let seconds):
+                Text(model.join([model.tn("app.process.bar.to_process", count)]
+                                + (seconds.map { [model.t("app.process.row.about", ["t": model.durationText($0)])] } ?? [])))
+                    .svFont(12.5, .semibold).foregroundStyle(SV.text).fixedSize()
+                if !narrow {
+                    let retry = model.videos.contains { $0.state == .stopped && !$0.willRedo }
+                    Text(model.t(retry ? "app.process.bar.retry_note" : "app.process.bar.outputs"))
+                        .svFont(12).foregroundStyle(SV.text2).lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    Text(model.tn("app.process.bar.ready", ready.count, ["t": Localizer.clock(model.totalDuration)]))
-                        .svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
-                    if !narrow {
-                        OutputsNote(text: model.t("app.process.bar.outputs"))
-                            .layoutPriority(1)
-                    }
+                    Spacer(minLength: 8)
                 }
+            case .outcomes:
+                Text(model.outcomeText).svFont(12.5, .semibold).foregroundStyle(SV.text).lineLimit(1)
                 Spacer(minLength: 8)
-                if !finished.isEmpty {
-                    Button(model.t("app.process.bar.clear_done")) { model.clearFinished() }.svButton(.secondary, .regular)
-                }
-                Button { model.startBatch() } label: { Label(model.t("app.process.bar.start"), systemImage: "play.fill") }
-                    .svButton(.primary, .regular)
-                    .disabled(!model.canStart)
-                    .help(model.t("app.process.bar.start_help"))
+                Button(model.t("app.process.bar.clear_done")) { model.clearFinished() }.svButton(.secondary, .regular)
+            case .nothingChecked:
+                Text(model.t("app.process.bar.none_checked")).svFont(12.5, .semibold).foregroundStyle(SV.text).fixedSize()
+                Spacer(minLength: 8)
             }
+            let count = model.checkedVideos.count
+            Button { model.startBatch() } label: {
+                Label(VideoChecks.startButton(checked: count) == .nothing ? model.t("app.process.bar.nothing")
+                      : model.tn("app.process.bar.process", count), systemImage: "play.fill")
+            }
+            .svButton(.primary, .regular)
+            .disabled(!model.canStart)
+            .help(model.t(count > 0 ? "app.process.bar.process_help" : "app.process.bar.nothing_help"))
         }
         .padding(.horizontal, 28)
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(SV.bg)
         .overlay(alignment: .top) { Rectangle().fill(SV.line).frame(height: 1) }
     }
+}
 
-    /// A selection (design note 58, board C2-V2): what to do with it, in place of the count;
-    /// how to leave it on the right, before Start.
-    @ViewBuilder private var selectionBar: some View {
-        Text(model.tn("app.process.bar.selected", model.selection.count)).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
-        Button { model.showInFinder(model.selection) } label: {
-            Label(model.t("app.common.show_in_finder"), systemImage: "macwindow")
-        }
-        .svButton(.secondary, .small)
-        .help(model.t("app.process.bar.show_in_finder_help"))
-        Button { model.removeSelection() } label: { Label(model.t("app.process.bar.remove"), systemImage: "minus") }
-            .svButton(.secondary, .small)
-            .disabled(!model.canRemoveSelection)
-            .help(model.t("app.process.bar.remove_help"))
-        Spacer(minLength: 8)
-        if !narrow {
-            Text(model.t("app.process.bar.deselect_hint")).svSmall(SV.text3).lineLimit(1)
-        }
-        Button { model.startBatch() } label: { Label(model.t("app.process.bar.start"), systemImage: "play.fill") }
-            .svButton(.primary, .regular)
-            .disabled(!model.canStart)
-            .help(model.t("app.process.bar.start_help"))
+extension AppModel {
+    /// The left of the bottom bar (`VideoChecks.summary`).
+    var bottomSummary: VideoChecks.Summary {
+        let finished = finishedVideos
+        return VideoChecks.summary(checked: checkedVideos.count, seconds: checkedEstimate,
+                                   done: finished.filter { $0.state == .done }.count,
+                                   noSubs: finished.filter { $0.state == .noSubs }.count,
+                                   failed: finished.filter { $0.state == .failed }.count,
+                                   stopped: finished.filter { $0.state == .stopped }.count)
     }
 
-    /// "Lotto fermato · 1 fatto · 1 senza sottotitoli · 1 fallito · 1 pronto".
-    private func outcomeText(_ finished: [VideoItem], ready: Int) -> String {
+    /// "1 fatto · 1 senza sottotitoli · 1 non riuscito · 1 fermato" (E3).
+    var outcomeText: String {
+        guard case let .outcomes(done, noSubs, failed, stopped) = bottomSummary else { return "" }
         var parts: [String] = []
-        let stopped = finished.filter { $0.state == .stopped }.count
-        let done = finished.filter { $0.state == .done }.count
-        let noSubs = finished.filter { $0.state == .noSubs }.count
-        let failed = finished.filter { $0.state == .failed }.count
-        if model.run.summary?.stopped ?? 0 > 0 || (stopped > 0 && model.run.stoppedByUser) { parts.append(model.t("app.process.bar.stopped")) }
-        if done > 0 { parts.append(model.tn("app.process.bar.done", done)) }
-        if noSubs > 0 { parts.append(model.tn("app.process.bar.no_subs", noSubs)) }
-        if failed > 0 { parts.append(model.tn("app.process.bar.failed", failed)) }
-        if stopped > 0 { parts.append(model.tn("app.process.bar.stopped_count", stopped)) }
-        if ready > 0 { parts.append(model.tn("app.process.bar.ready_count", ready)) }
-        return model.join(parts)
-    }
-}
-
-/// "SRT, report and log next to each video. If the SRT is already there…": all the room between
-/// the count and Start; when it must wrap, each sentence on its own line, never half of the
-/// second one on the first (design note 61).
-struct OutputsNote: View {
-    var text: String
-
-    private var sentences: [String] {
-        guard let r = text.range(of: ". ") else { return [text] }
-        return [String(text[..<r.lowerBound]) + ".", String(text[r.upperBound...])]
+        if done > 0 { parts.append(tn("app.process.bar.done", done)) }
+        if noSubs > 0 { parts.append(tn("app.process.bar.no_subs", noSubs)) }
+        if failed > 0 { parts.append(tn("app.process.bar.failed", failed)) }
+        if stopped > 0 { parts.append(tn("app.process.bar.stopped_count", stopped)) }
+        return join(parts)
     }
 
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            Text(text).svSmall().lineLimit(1).fixedSize()
-            VStack(alignment: .leading, spacing: 1) {
-                ForEach(sentences, id: \.self) { sentence in
-                    Text(sentence).svSmall().fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    /// The bottom bar's button as it reads ("Elabora 2 video", "Nessun video da elaborare").
+    var startButtonTitle: String {
+        switch VideoChecks.startButton(checked: checkedVideos.count) {
+        case .process(let n): tn("app.process.bar.process", n)
+        case .nothing: t("app.process.bar.nothing")
         }
     }
 }
 
-/// Under the list, the drop area of E0 (design note 60): drop videos or folders, or
-/// Choose Videos… (⌘O), which adds them at the end. During a batch it stays: what
-/// is added goes to the next batch (board C2-V3).
-struct VideoDropArea: View {
+/// Under the list, the drop strip (`.drop3`, C3-02): drop videos or folders, or Choose Videos…
+/// (⌘O), which adds them at the end. During a batch it says they go to the next batch (C3-04).
+struct VideoDropStrip: View {
     @Environment(AppModel.self) private var model
     var targeted: Bool
+    var narrow: Bool
 
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "film").svFont(34, .light).foregroundStyle(targeted ? SV.primaryText : SV.text3)
-                .frame(height: 40)
-            Text(model.t("app.process.list.drop_more")).svFont(14, .semibold).foregroundStyle(targeted ? SV.primaryText : SV.text)
-            HStack(spacing: 8) {
-                Text(model.t("app.process.empty.or_open")).svFont(13).foregroundStyle(SV.text2)
-                Button { model.openVideos() } label: { Label(model.t("app.process.list.choose"), systemImage: "folder") }
-                    .svButton(.secondary, .regular)
-                    .help(model.t("app.process.list.choose_help"))
-            }
-            if model.batch.running {
-                Text(model.t("app.process.list.next_batch")).svFont(11).foregroundStyle(SV.text3)
-            } else {
-                Text(model.t("app.process.list.formats")).svFont(11, mono: true).foregroundStyle(SV.text3)
-            }
+        HStack(spacing: 10) {
+            Image(systemName: "film").svFont(13).foregroundStyle(targeted ? SV.primaryText : SV.text2)
+            Text(model.t("app.process.list.drop_strip")).svFont(12.5).foregroundStyle(targeted ? SV.primaryText : SV.text2)
+                .fixedSize(horizontal: false, vertical: true)
+            Button { model.openVideos() } label: { Label(model.t("app.process.list.choose"), systemImage: "folder") }
+                .svButton(.secondary, .small)
+                .help(model.t("app.process.list.choose_help"))
+                .fixedSize()
+            Text(model.t(model.batch.running ? "app.process.list.next_batch" : "app.process.list.formats_short"))
+                .svFont(11, mono: true).foregroundStyle(SV.text3)
+                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                .opacity(narrow && !model.batch.running ? 0 : 1)
+                .frame(maxWidth: narrow && !model.batch.running ? 0 : nil)
         }
-        .multilineTextAlignment(.center)
-        .padding(20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .svDropFrame(targeted: targeted)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, minHeight: 46)
+        .svDropFrame(targeted: targeted, cornerRadius: 10)
     }
 }
 
-/// The list of videos: a header row and one row per video in a surface box.
+/// The list of videos: a header row with its checkbox and one row per video in a surface box.
 struct VideoList: View {
     @Environment(AppModel.self) private var model
-    /// The list's own width: the size column needs room (design note 59 and the C2 boards).
+    var narrow: Bool
+    /// The list's own width: under it the numbers give way to Duration alone (N1).
     @State private var width: CGFloat = 0
 
-    /// From this width of the list on, the size column shows; under it the size goes next to the folder.
-    static let sizeColumnFrom: CGFloat = 760
-
-    /// No row has a state yet (a new list): no circle column, the names start at the left (design note 63).
-    private var showsStatus: Bool { model.videos.contains { $0.circle != nil } }
-
-    /// Column widths of the boards (`.c-nost`, `.c-st`, `.c-stdim`): duration, fps, size, actions.
-    var widths: VideoRow.Widths {
-        if width >= Self.sizeColumnFrom { return .init(duration: 74, fps: 62, size: 96, actions: 150) }
-        return .init(duration: 66, fps: 62, size: nil, actions: showsStatus ? 136 : 116)
-    }
+    private var columns: ListColumns { ListColumns(narrow: narrow || (width > 0 && width < 640)) }
 
     var body: some View {
+        let columns = columns
         VStack(spacing: 0) {
-            header
+            header(columns)
             ForEach(model.videos) { video in
                 Rectangle().fill(SV.line).frame(height: 1)
-                VideoRow(video: video, widths: widths, showsStatus: showsStatus)
+                VideoRow(video: video, columns: columns)
+                    .id(video.id)
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
@@ -320,20 +306,30 @@ struct VideoList: View {
         .clipShape(RoundedRectangle(cornerRadius: SV.Radius.card))
     }
 
-    private var header: some View {
-        HStack(spacing: 14) {
-            if showsStatus { Color.clear.frame(width: StatusCircle.size) }
+    private func header(_ c: ListColumns) -> some View {
+        HStack(spacing: c.gap) {
+            headerBox.frame(width: ListColumns.lead)
             label(model.t("app.process.list.name")).frame(maxWidth: .infinity, alignment: .leading)
-            label(model.t("app.process.list.duration")).frame(width: widths.duration, alignment: .trailing)
-            label(model.t("app.process.list.fps")).frame(width: widths.fps, alignment: .trailing)
-            if let size = widths.size {
-                label(model.t("app.process.list.size")).frame(width: size, alignment: .trailing)
-            }
-            Color.clear.frame(width: widths.actions)
+            label(model.t("app.process.list.duration")).frame(width: c.duration, alignment: .trailing)
+            if let fps = c.fps { label(model.t("app.process.list.fps")).frame(width: fps, alignment: .trailing) }
+            if let size = c.size { label(model.t("app.process.list.size")).frame(width: size, alignment: .trailing) }
+            Color.clear.frame(width: c.actions + ListColumns.more + ListColumns.chevron + 2 * c.gap)
         }
-        .padding(.leading, 13 + 3)
-        .padding(.trailing, 16)
+        .padding(.leading, ListColumns.leading)
+        .padding(.trailing, ListColumns.trailing)
         .frame(height: 30)
+    }
+
+    /// The header's box (C3-02): over the rows that have a box only; "−" when some are checked.
+    @ViewBuilder private var headerBox: some View {
+        let rows = model.checkRows
+        // During a batch the boxes are the batch's (C3-04): none in the header.
+        if VideoChecks.headerEnabled(rows), !model.batch.running {
+            let state = VideoChecks.headerState(rows)
+            HeaderCheckbox(state, help: model.t(state == .on ? "app.process.list.uncheck_all" : "app.process.list.check_all")) {
+                model.toggleHeader()
+            }
+        }
     }
 
     private func label(_ text: String) -> some View {
