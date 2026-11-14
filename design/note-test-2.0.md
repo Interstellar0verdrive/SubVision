@@ -95,10 +95,10 @@ Viste negli snapshot di `design/snapshot/f6/` e negli scenari QA.
 41. **ST1 · Aspetto non segue un cambio di tema fatto altrove** (menu, comando). — **piccola** · [fatto 13/11 · `0ad366a`]
 42. **O1–O8 · ombra degli avvisi tagliata** dal bordo del pannello (rettangolo grigio in chiaro). — **piccola** · [fatto 13/11 · `0ad366a`: margine di 84 pt]
 43. **N1 · la finestra non scendeva sotto 720×672**: la tavola stretta è 760×640 (finestra intera). — **piccola** · [fatto 13/11 · `a026056`: minimo 720×640, scenario QA 07]
-44. **O9 · due «Seleziona tutto»** nel menu Modifica (quello di sistema spento con ⌘A, quello dell'app senza scorciatoia, `Commands.swift:57`). — **piccola** · [da fare in F7]
-45. **E1 · la nota «2 elementi saltati» resta** anche dopo aver tolto tutti i video; sparisce solo con la ×. — **piccola** · [da fare in F7]
-46. **N1 · a 760 pt le statistiche delle tappe si troncano** con «…» nella riga in corso. — **piccola** · [da fare in F7]
-47. **O3 · «Esci e ferma» rosso pieno** (la tavola lo ha primario); **O10** · la prima riga del menu del Dock non è attenuata. — **piccola** · [da fare in F7]
+44. **O9 · due «Seleziona tutto»** nel menu Modifica (quello di sistema spento con ⌘A, quello dell'app senza scorciatoia, `Commands.swift:57`). — **piccola** · [fatto 14/11 · `4bcb768`: il gruppo di sistema di Modifica sostituito da Taglia, Copia, Incolla e un solo «Seleziona tutto» (testo in modifica, altrimenti le righe di Video)]
+45. **E1 · la nota «2 elementi saltati» resta** anche dopo aver tolto tutti i video; sparisce solo con la ×. — **piccola** · [fatto 14/11 · `4bcb768`: la nota va via quando l’elenco si svuota]
+46. **N1 · a 760 pt le statistiche delle tappe si troncano** con «…» nella riga in corso. — **piccola** · [fatto 14/11 · `8cf38a8`: già risolta dalla colonna dei numeri della voce 64 (`23b5ea1`); verificata a 760 pt dallo scenario 15 (`N1-running`)]
+47. **O3 · «Esci e ferma» rosso pieno** (la tavola lo ha primario); **O10** · la prima riga del menu del Dock non è attenuata. — **piccola** · [fatto 14/11 · `4bcb768`: «Esci e ferma» primario; la riga del file in corso è testo attenuato (`DockMenuEntry.label`)]
 
 ---
 
