@@ -4,7 +4,7 @@
 // `DebugQA.watchCommands`). One command per line; the reply goes to `<file>.out`.
 //
 //   tab process|review|fix · add <path>[,<path>…] · remove-all · select-all
-//   sidebar · inspector [open|close] · lang en|it · theme system|light|dark
+//   inspector [open|close] · lang en|it · theme system|light|dark
 //   size <w>x<h> · windowid · capture <path> · settings · quit
 //   key <combo> [main|front|<window>]   a key press posted to the app's event queue, e.g. key cmd+return, key esc
 //   mouse click|double|right <x>,<y> [main|front|<window>] [pick <title>]   real mouse events sent to a window
@@ -38,6 +38,8 @@
 //   C2 · Video, Review and the panel: inspector-tab read|bands|lines · params-reset (undoable) ·
 //   select <idx>[,<idx>…] (rows of Video; empty deselects) · bottom-bar · remove-selection ·
 //   review-state · review-select <idx> (opens the row of Review) · review <idx> (its report window's title)
+//   C3 · the frame: batch-bar (the window's batch bar: hidden, or its line, segments and percentage) ·
+//   summary-sheet (the end-of-batch sheet: its title, the page under it and each row's outcome)
 //   F6 · the QA scenarios (macos/Native/QA):
 //   status                         engine status, Vision, tools phase and rows, window, language, tab
 //   wait-ready <s>                 until the engine is ready and the tools window is gone (first launch: downloads)
@@ -47,7 +49,7 @@
 //   window-size                    the main window's size (the whole window, as `size` sets it), "760x640"
 //   row-text <idx>                 what the row of video idx says after its step (a failed row: the error text)
 //   batch-progress                 the batch's weights (durations), fraction, rate and ends around, as the
-//                                  sidebar card, the Dock and O3 show them
+//                                  batch bar, the Dock and O3 show them
 //   alert-other · alert-other-press <n>   the non-modal alert that is not O1/O2 (O7, an error): title and buttons; press n
 //   lang-menu                      waits for the inspector's language menu to open, reads its items and closes it
 //   The F6 design snapshots: engine-status, vision, disk-free, batch-fake, capture-all, capture-window,
@@ -84,8 +86,6 @@ enum DebugQA {
             model.removeWithUndo(Set(model.videos.map(\.id)))
         case "select-all":
             model.selectAll()
-        case "sidebar":
-            model.toggleSidebar()
         case "inspector":
             switch argument {
             case "open": model.inspectorOpen = true
@@ -263,6 +263,17 @@ enum DebugQA {
             model.clearFinished()
         case "summary-seen":
             model.markSummarySeen()
+        case "batch-bar":
+            // C3-01: the window's batch bar, as it reads: its line, the segments and the percentage.
+            guard model.batch.running else { return "hidden" }
+            let text = model.batchBarText
+            let pct = model.t("app.process.batchbar.percent", ["n": Int(((model.batch.fraction ?? 0) * 100).rounded())])
+            return "shown · \(text.head)\(text.tail) · segments \(model.batchWeights.count) · \(pct)"
+        case "summary-sheet":
+            // C3-12: the end-of-batch sheet, over the page in front: its title and one outcome per row.
+            guard model.run.showSummary else { return "no sheet · tab \(model.tab.rawValue)" }
+            let rows = model.summaryVideos.map { "\($0.name)=\($0.state.rawValue)" }.joined(separator: " ")
+            return "sheet · \(model.summaryTitle) · tab \(model.tab.rawValue) · \(rows)"
         case "summary":
             model.run.showSummary = model.run.summary != nil
             return model.run.summary.map { _ in "shown · \(summaryLine(model))" } ?? "no summary"
@@ -451,7 +462,7 @@ enum DebugQA {
                 + " gaps \(v.gaps.map { String($0.count) } ?? "-") lang \(v.ocrLang ?? "-") fps \(v.ocrFPS.map { String(Int($0)) } ?? "-")"
                 + " report \(v.outputReport != nil ? "yes" : "no") reviewed \(model.hasReviewedSRT(v) ? "yes" : "no")"
         }
-        return (["review \(rows.count)"] + rows).joined(separator: " · ") + " · sidebar \(model.reviewSubtitle)"
+        return (["review \(rows.count)"] + rows).joined(separator: " · ")
     }
 
     private static func statusLine(_ model: AppModel) -> String {

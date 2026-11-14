@@ -7,15 +7,8 @@ import Foundation
 import SVLocalization
 
 public struct ShellTexts: Sendable, Equatable {
-    // Sidebar and top bar
+    // Top bar
     public var settings = "Settings"
-    public var showSidebar = "Show Sidebar"
-    /// `{version}` is filled in.
-    public var version = "Version {version}"
-    /// `{version}` and `{python}`: the sidebar footer's tooltip.
-    public var engineVersion = "Engine {version} · Python {python}"
-    public var checkUpdates = "Check for Updates…"
-    public var github = "GitHub"
 
     // Engine status
     public var engineStarting = "Starting the engine…"
@@ -91,11 +84,6 @@ public struct ShellTexts: Sendable, Equatable {
     /// The app's catalogue test checks that every key is there.
     nonisolated(unsafe) public static let catalogue: [(WritableKeyPath<ShellTexts, String>, String)] = [
         (\.settings, "app.sidebar.settings"),
-        (\.showSidebar, "app.sidebar.show_sidebar"),
-        (\.version, "app.sidebar.version"),
-        (\.engineVersion, "app.sidebar.engine_version"),
-        (\.checkUpdates, "app.sidebar.check_updates"),
-        (\.github, "app.sidebar.github_short"),
         (\.engineStarting, "app.tools.engine.starting"),
         (\.engineFirst, "app.tools.engine.first"),
         (\.engineFailed, "app.tools.engine.failed"),

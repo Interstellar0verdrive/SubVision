@@ -28,13 +28,42 @@ import Testing
 
 @Test func chromeDefaults() {
     let chrome = SVChrome.default
-    #expect(chrome.sidebarWidth == 236 && chrome.collapseBelow == 1240)
-    #expect(chrome.window == CGSize(width: 1360, height: 840))
+    #expect(chrome.topBarHeight == 52 && chrome.batchBarHeight == 44)
+    #expect(chrome.window == CGSize(width: 1360, height: 860))
     #expect(chrome.minWindow == CGSize(width: 720, height: 640))
-    #expect(chrome.inspectorWidth == 340 && chrome.inspectorOverlayBelow == 1000)
-    #expect(chrome.inspectorOverlays(windowWidth: 999) && !chrome.inspectorOverlays(windowWidth: 1000))
-    let narrow = SVChrome(sidebarWidth: 200, collapseBelow: 1000)
-    #expect(narrow.sidebarWidth == 200 && narrow.page.top == 28)
+    #expect(chrome.inspectorWidth == 340 && chrome.inspectorOverlayBelow == 1100)
+    #expect(chrome.inspectorOverlays(windowWidth: 1099) && !chrome.inspectorOverlays(windowWidth: 1100))
+    let narrow = SVChrome(inspectorOverlayBelow: 1000)
+    #expect(narrow.inspectorOverlayBelow == 1000 && narrow.page.top == 28)
+}
+
+/// C3-03: the window opens at least at the boards' size, or almost the whole screen.
+@Test func generousWindow() {
+    let chrome = SVChrome.default
+    let big = CGSize(width: 1800, height: 1100)
+    #expect(chrome.generousSize(current: CGSize(width: 800, height: 600), area: big) == CGSize(width: 1360, height: 860))
+    #expect(chrome.generousSize(current: CGSize(width: 1500, height: 900), area: big) == CGSize(width: 1500, height: 900))
+    // A small screen: almost all of it, never more.
+    let small = CGSize(width: 1280, height: 775)
+    #expect(chrome.generousSize(current: CGSize(width: 900, height: 700), area: small) == CGSize(width: 1229, height: 744))
+    #expect(chrome.generousSize(current: CGSize(width: 1400, height: 900), area: small) == CGSize(width: 1280, height: 775))
+}
+
+/// C3-02: the header's box over the rows that have one.
+@Test func headerCheckState() {
+    #expect(CheckState.of(checked: 0, total: 3) == .off)
+    #expect(CheckState.of(checked: 2, total: 3) == .mixed)
+    #expect(CheckState.of(checked: 3, total: 3) == .on)
+    #expect(CheckState.of(checked: 0, total: 0) == .off)
+}
+
+/// C3-01: one segment per file, as wide as its duration.
+@Test func segmentCuts() {
+    let cuts = SegmentedProgressBar.cuts([55, 55, 63])
+    #expect(cuts.count == 2)
+    #expect(abs(cuts[0] - 55.0 / 173) < 1e-9 && abs(cuts[1] - 110.0 / 173) < 1e-9)
+    #expect(SegmentedProgressBar.cuts([42]).isEmpty)
+    #expect(SegmentedProgressBar.cuts([]).isEmpty)
 }
 
 @Test func alertIconFallsBackToSymbol() {

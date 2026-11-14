@@ -20,11 +20,15 @@ struct AppCommands: Commands {
         CommandGroup(replacing: .appInfo) {
             Button { model.showAbout() } label: { Label(model.t("app.menu.about"), systemImage: "info.circle") }
         }
+        // Version and GitHub left the sidebar for the app menu (C3-01, board O9).
         CommandGroup(after: .appInfo) {
             Button { model.checkForUpdates() } label: {
                 Label(model.t("app.menu.check_updates"), systemImage: "arrow.down.circle")
             }
             .disabled(model.checkingUpdates)
+            Button { model.openRepository() } label: {
+                Label(model.t("app.menu.github"), systemImage: "arrow.up.right.square")
+            }
         }
         CommandGroup(replacing: .newItem) {
             Button(model.t("app.menu.open_videos")) { model.openVideos() }
@@ -72,14 +76,14 @@ struct AppCommands: Commands {
             pageItem(.process, "app.sidebar.tab.process", "1")
             pageItem(.review, "app.sidebar.tab.review", "2")
             pageItem(.fix, "app.sidebar.tab.fix", "3")
-            Divider()
-            Button(model.t(model.sidebarShown ? "app.menu.hide_sidebar" : "app.menu.show_sidebar")) { model.toggleSidebar() }
-                .keyboardShortcut("s", modifiers: [.control, .command])
-                .disabled(model.sidebarNarrow)
-            // The panel is fixed beside a wide page (design note 50): only a narrow window shows and hides it.
-            Button(model.t(model.inspectorOpen ? "app.menu.hide_inspector" : "app.menu.show_inspector")) { model.toggleInspector() }
-                .keyboardShortcut("i", modifiers: [.command, .option])
-                .disabled(model.tab != .process || !model.inspectorOverlays)
+            // The panel never closes beside a wide page (C3-03): the item, and ⌥⌘I, are there
+            // only while a narrow window lays it over the page (N1, N2).
+            if model.inspectorOverlays {
+                Divider()
+                Button(model.t(model.inspectorOpen ? "app.menu.hide_inspector" : "app.menu.show_inspector")) { model.toggleInspector() }
+                    .keyboardShortcut("i", modifiers: [.command, .option])
+                    .disabled(model.tab != .process)
+            }
             Divider()
         }
         CommandMenu(model.t("app.menu.process")) {

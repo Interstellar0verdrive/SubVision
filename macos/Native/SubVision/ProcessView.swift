@@ -2,9 +2,9 @@
 // Video, the home (design boards E0–E7, C2-V1–V5, N1): the header, the
 // notes, the list of videos (rows in `ProcessRows.swift`), the drop area
 // under it that fills the rest of the page (design note 60), the bottom bar
-// in its four states (ready, a selection, batch running, finished), the
-// parameters panel fixed on the right and the end-of-batch sheet
-// (`FinishedSheet.swift`).
+// in its states (ready, a selection, finished; during a batch it gives way to
+// the window's batch bar, C3-04) and the parameters panel fixed on the right
+// (C3-03: it retracts only in a narrow window).
 
 import AppKit
 import SVShell
@@ -47,7 +47,8 @@ struct ProcessView: View {
             }
             .padding(.horizontal, 28)
             .padding(.top, top)
-            if !model.videos.isEmpty {
+            // During the batch the window's batch bar takes its place (C3-04).
+            if !model.videos.isEmpty, !model.batch.running {
                 bottomBar
             }
         }
@@ -56,9 +57,6 @@ struct ProcessView: View {
         .onAppear { installEscape() }
         .onDisappear { removeEscape() }
         .fileDrop(isTargeted: $dropTargeted) { model.add($0) }
-        .sheet(isPresented: Binding(get: { model.run.showSummary }, set: { if !$0 { model.markSummarySeen() } })) {
-            FinishedSheet()
-        }
     }
 
     // MARK: - Selection
@@ -93,8 +91,8 @@ struct ProcessView: View {
 
     // MARK: - List
 
-    /// A narrow window (the top bar instead of the sidebar): the title alone (board N1).
-    private var narrow: Bool { windowWidth < chrome.collapseBelow }
+    /// A narrow window (the parameters retracted): the title alone (board N1).
+    private var narrow: Bool { chrome.inspectorOverlays(windowWidth: windowWidth) }
 
     private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -158,24 +156,15 @@ struct ProcessView: View {
 
     // MARK: - Bottom bar
 
-    /// Ready: the count and the outputs line, Start. Running: "File 2 of 3 · ends
-    /// around 14:20", the rows added meanwhile, Stop All. Finished: the outcomes,
-    /// Remove Finished, Start for the rows that are ready (E1, E2, E3, E5).
+    /// Ready: the count and the outputs line, Start. Finished: the outcomes,
+    /// Remove Finished, Start for the rows that are ready (E1, E3, E5). Not during
+    /// a batch: the window's batch bar is there then (C3-04).
     private var bottomBar: some View {
         HStack(alignment: .center, spacing: 14) {
             let ready = model.readyVideos
             let finished = model.finishedVideos
-            if !model.batch.running, !model.selection.isEmpty {
+            if !model.selection.isEmpty {
                 selectionBar
-            } else if model.batch.running {
-                Text(runningText).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
-                if !ready.isEmpty {
-                    StatusChip(model.tn("app.process.bar.next_batch", ready.count))
-                }
-                Spacer(minLength: 8)
-                Button { model.stopAll() } label: { Label(model.t("app.common.stop_all"), systemImage: "stop.fill") }
-                    .svButton(.destructive, .regular)
-                    .help(model.t("app.process.bar.stop_all_help"))
             } else {
                 if !finished.isEmpty {
                     Text(outcomeText(finished, ready: ready.count)).svFont(13, .semibold).foregroundStyle(SV.text).fixedSize()
@@ -225,14 +214,6 @@ struct ProcessView: View {
             .svButton(.primary, .regular)
             .disabled(!model.canStart)
             .help(model.t("app.process.bar.start_help"))
-    }
-
-    /// "File 2 di 3 · fine verso le 14:20" (or without the end, before any estimate).
-    private var runningText: String {
-        if let ends = model.batch.endsAround {
-            return model.t("app.process.bar.running", ["i": model.batch.index, "n": model.batch.total, "time": ends])
-        }
-        return model.t("app.process.row.file_of", ["i": model.batch.index, "n": model.batch.total])
     }
 
     /// "Lotto fermato · 1 fatto · 1 senza sottotitoli · 1 fallito · 1 pronto".

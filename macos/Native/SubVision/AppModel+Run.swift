@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // The batch (F5.1, design boards E2–E6, O1, O2, O10): `batch.start`, the
 // rows' steps and outcomes from the `batch.*` events, Stop and Stop All with
-// their confirmations, `BatchActivity` for the sidebar and the Dock, the
+// their confirmations, `BatchActivity` for the batch bar and the Dock, the
 // end-of-batch summary (kept until seen) and the notifications. Some of the
 // shape (stop confirmations after the click, the summary seen or not) is
 // adapted from the AppModel+Run of the native macOS app of AnimeUp (by the
@@ -237,7 +237,7 @@ extension AppModel {
         afterClick { [self] in askStop(.file(idx: idx, name: video.name)) }
     }
 
-    /// Stop All (⌘., the sidebar card, the bottom bar, the Dock; O2).
+    /// Stop All (⌘., the batch bar, the Dock; O2).
     func stopAll() {
         guard batch.running else { return }
         afterClick { [self] in askStop(.all) }
@@ -467,7 +467,7 @@ extension AppModel {
         batch = BatchActivity()
         saveVideos()
         updateDock()
-        if worthASheet { tab = .process }
+        // The sheet comes up over the page in front: no jump to Video (C3-12).
         if let error = d.error {
             Alerts.error(self, title: t("app.notify.batch_done"), text: engineErrorText(error.split(separator: " ").first.map(String.init) ?? "unknown", detail: error))
         }
@@ -527,7 +527,7 @@ extension AppModel {
         return rate * weights[i]
     }
 
-    /// `BatchActivity` (sidebar, Dock, O3): the fraction and "Ends around", both by duration:
+    /// `BatchActivity` (batch bar, Dock, O3): the fraction and "Ends around", both by duration:
     /// a file twice as long weighs twice as much (`BatchProgress`).
     private func refreshActivity() {
         guard batch.running, batch.total > 0 else { return }

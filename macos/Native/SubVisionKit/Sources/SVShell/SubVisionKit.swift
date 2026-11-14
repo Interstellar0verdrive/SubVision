@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // SVShell: the app frame. The app keeps its model, its pages and its texts;
-// the shell gives it the window chrome, the sidebar and top bar, the engine
+// the shell gives it the window chrome, the top bar, the engine
 // status, the first-launch tools window, the log, the Dock, notifications,
 // the update check and the debug helpers.
 

@@ -23,14 +23,14 @@ Una riga per voce; tra parentesi il consumatore principale.
 
 ### SVDesign
 
-- Token: `SV.*` (superfici, testi, accento, stati, `Radius`), `Color(dark:light:)`, `NSColor(css:)`, `SV.hoverVeil`.
+- Token: `SV.*` (superfici, testi, accento, stati, `modified`/`modifiedTint`/`defaultTick` dei valori diversi dal predefinito, `Radius`), `Color(dark:light:)`, `NSColor(css:)`, `SV.hoverVeil`.
 - Tipografia: `SVTextStyle`, `SVFont.*`, `SVType.normalLineHeight`, `.svFont`, `.svControlFont`, `.svPageTitle`, `.svBody`, `.svSmall`, `.svLabel`, `Text.svRun`, `BalancedText`, `BalancedParagraph`.
 - Pulsanti: `SVButtonRole`, `SVButtonSize`, `SVButtonStyle`, `SVTintedButtonStyle`, `.svButton`.
 - Superfici: `.svBox`, `EdgeInsets.grown/init(vertical:horizontal:)`, `.svHover`, `.svPointingHand`, `OuterShadow`.
 - Menu: `SVMenuItem`, `PopupMenu` (menu della lingua OCR, D13).
-- Componenti: `SVTone`, `StatusChip`, `StatusDot`, `NoteView`, `Card`, `CardTitle`, `ValueStrip`, `NumberedSteps` (stato vuoto E0), `DropZone`, `SVBar`, `ActivityCard`, `Spinner`, `UnderlineLink`, `StatusLink`, `PathField`, `SidebarTab`, `TopBarSegment(s)`, `SVMiniSegments`.
-- Impostazioni: `SettingsGroup`, `SettingsRow` (con "Predefinito"), `CapsuleSegments` (Sistema/Chiaro/Scuro), `SnapSlider` (fps), `SVSlider`.
-- Cornice: `SVChrome` (misure delle tavole, `inspectorOverlays(windowWidth:)`), `\.svChrome`, `\.svPageTop`, `\.svWindowWidth`, `TrafficLightsSlot`/`TrafficLightsAnchor`, `SidebarPanel`, `ChromeIconButton`, `PageHeader`.
+- Componenti: `SVTone`, `StatusChip`, `StatusDot`, `NoteView`, `Card`, `CardTitle`, `ValueStrip`, `NumberedSteps` (stato vuoto E0), `DropZone`, `SVBar`, `Spinner`, `UnderlineLink`, `StatusLink`, `PathField`, `TopBarSegment(s)` (capsule), `SVMiniSegments`; giro C3: `TitleBand` e `BackCircleButton` (fascia del titolo, ⌘[), `CheckState`, `SVCheckbox`, `HeaderCheckbox`, `CheckboxMark`, `SegmentedProgressBar` (`cuts`).
+- Impostazioni: `SettingsGroup`, `SettingsRow` (con "Predefinito"), `CapsuleSegments` (Sistema/Chiaro/Scuro), `SnapSlider` (fps), `SVSlider` (entrambi con `defaultValue`/`defaultHelp`: tacca grigia del predefinito, clic = predefinito).
+- Cornice: `SVChrome` (misure delle tavole: barra in alto 52, barra del lotto 44, finestra 1360 × 860, pannello sovrapposto sotto 1100 pt, `inspectorOverlays(windowWidth:)`, `generousSize(current:area:)`), `\.svChrome`, `\.svPageTop`, `\.svWindowWidth`, `TrafficLightsSlot`/`TrafficLightsAnchor`, `ChromeIconButton` (`.iconbtn`, `on`), `PageHeader`.
 - Avvisi: `SVAlert` (`runModal`, `button`, `checkbox`/`checked`, `iconSource` statico), `SVAlertButton`, `SVAlertCard`, `AlertIconSource` (`default`, `bundle`, `symbols`), `AlertIconName.*` (le 11 icone di §8 dell'inventario).
 - `SVDesignGallery` (test e tavola DS).
 
@@ -41,14 +41,14 @@ Una riga per voce; tra parentesi il consumatore principale.
 ### SVShell
 
 - `AppShellConfig` (nome, bundle id, URL, `windowSize` = `chrome.window`, finestra strumenti 600 pt, `environmentPrefix` `SUBVISION_`, `logSubsystem`, `tools`, `toolsMethods`, `dockColors`, `appVersion`, `environment(_:)`).
-- Scene e delegato: `ShellWindow`, `ShellAppDelegate` (`quitBlocker` per O3, `dockMenu`, `reopenMainWindow`, `willTerminate`, `willFinishLaunching`), `DockMenuEntry`, `ShellTheme` (`apply`, `applySaved(defaults:key:)`, `scheme`), `showAboutPanel(repositoryURL:credits:)`, `afterClick`.
-- Cornice: `MainSplit` (barra laterale, barra in alto sotto 1240 pt, `svWindowWidth` alle pagine), `ShellTab`, `ShellFooter` (`pythonVersion`), `ShellSidebar`, `ShellTopBar`, `TopBarChip`, `FooterLink`, `PlaceholderPage`, `WindowChrome`, `WindowSizer` (`main`, `toTools`, `toMain`).
-- `InspectorSplit` (inspector di Elabora e Anteprima: accanto da 1000 pt in su, sovrapposto sotto).
+- Scene e delegato: `ShellWindow`, `ShellAppDelegate` (`quitBlocker` per O3, `dockMenu`, `reopenMainWindow`, `willTerminate`, `willFinishLaunching`), `DockMenuEntry`, `ShellTheme` (`apply`, `applySaved(defaults:key:)`, `scheme`), `showAboutPanel(repositoryURL:credits:mark:)`, `afterClick`.
+- Cornice (giro C3, navigazione N-A): `MainSplit` (barra in alto con le pagine a ogni larghezza, barra in basso dell'app mentre `showsBottomBar`, `svWindowWidth` alle pagine), `ShellTab`, `ShellTopBar`, `TopBarChip`, `PlaceholderPage`, `WindowChrome` (`generous`), `WindowSizer` (`main`, `toTools`, `toMain`, `openGenerously`).
+- `InspectorSplit` (inspector di Video e Anteprima: accanto da 1100 pt in su, sempre aperto; sovrapposto sotto).
 - Motore: `EngineStatus`, `EngineStatusView` (T5).
 - Strumenti: `ToolRow` (`detail`, `kind` download/runtime/task), `ToolsMethods`, `ToolsSetupState` (`prepareIfFirstLaunch`, `runtimeReady`, `decide(_:runTasks:)`, `refresh`, `apply`, `progress`, `retry`, `warmupLanguages`, `runningTask`, `totals`, `failure`, `onFinished`), `ToolsSetupView`.
 - Testi: `ShellTexts` (`english`, `init(_ localizer:)`, `catalogue`, `fill`).
 - Servizi: `AppLog` (`shared`, `info/error/debug`), `openLogInConsole`, `DockProgress` (`update(fraction:badge:colors:)`, `update(_ config:…)`, `clear`), `DockColors`, `notify(title:body:identifier:userInfo:)`, `ShellNotifications` (`install`, `onClick`, `presentWhileActive`), `UpdateCheck` (`check`, `normalise`, `isNewer`), `UpdateResult`, `checkForUpdates(config:texts:session:busy:)`, `VideoScan`, `.videoDrop(extensions:recursive:isTargeted:onEmpty:action:)`.
-- Debug: `DebugSnapshot` (`base`, `schemes`, `path`, `render`, `renderComposite`, `capture`, `capture(_:schemes:_:)` async), `DebugQA` (`watchCommands`, `watchIfAsked`, `wait`).
+- Debug: `DebugSnapshot` (`base`, `schemes`, `path`, `render`, `capture`, `capture(_:schemes:_:)` async), `DebugQA` (`watchCommands`, `watchIfAsked`, `wait`).
 - `SubVisionKit.version`, `SubVisionKit.modules`; `SVShell` riesporta `SVDesign`, `SVEngine`, `SVLocalization` (all'app basta `import SVShell`).
 
 ## 2. Modifiche
@@ -73,7 +73,7 @@ Legenda: **applicata** (in questo commit, test aggiornati) · **rinviata** (a ch
 16. **`SVChrome` con le misure delle tavole** — **applicata**. Aggiunti `window` 1360 × 840 (prima solo in `AppShellConfig`, ora `AppShellConfig.windowSize` lo prende da lì se non dato), `inspectorWidth` 300, `inspectorOverlayBelow` 1000, `inspectorOverlays(windowWidth:)`; restano `collapseBelow` 1240, `minWindow` 720 × 640, barra laterale 236/8. Il commento non dice più "misure di AnimeUp".
 17. **`InspectorSplit` e `\.svWindowWidth`** — **applicata**. L'inspector serve a Elabora (5.1) e ad Anteprima (5.2), in worktree diversi: il contenitore comune sta nel pacchetto. Accanto alla pagina da 1000 pt in su, sovrapposto da destra con ombra sotto, chiuso con Esc o clic fuori; la larghezza della finestra arriva da `MainSplit`. L'aspetto dell'inspector (fondo, intestazione, gruppi) è dell'app. Da verificare in F5 nella finestra vera: che Esc arrivi (serve il fuoco nell'inspector) e l'ombra contro la tavola N2.
 18. **`ShellTheme.applySaved`** — **applicata**. Leggeva `<stato>/records/settings.json`, che in SubVision non esiste (in AnimeUp le impostazioni le teneva il motore); ora legge `UserDefaults` (chiave `theme`, la stessa dell'`@AppStorage` di Impostazioni › Generali). Tolto `savedSetting(_:in:)`.
-19. **`showAboutPanel(repositoryURL:credits:)`** — **applicata**. Riga `app.menu.about_credits` sopra il link (menu SubVision › Informazioni).
+19. **`showAboutPanel(repositoryURL:credits:mark:)`** — **applicata**. Riga `app.menu.about_credits` sopra il link (menu SubVision › Informazioni).
 20. **`.videoDrop(onEmpty:)`** — **applicata**. Senza video trovati l'azione non partiva e l'app non poteva mostrare O8a ("Nessun video in «Serie»"): `onEmpty` riceve gli elementi trascinati. Per Sub fix: `.videoDrop(extensions: ["srt"], recursive: false)`.
 21. **`Localizer.locale`, `number(_:decimals:)`, `clock(_:)`** — **applicata**. Le righe in corso mostrano "1.840 / 17.000 fotogrammi · trascorso 4:12 · 7,3 fps" (separatori della lingua); il motore manda numeri nudi. Test EN/IT.
 22. **`AppLog.shared`** — **applicata**. Sottosistema predefinito `io.github.interstellar0verdrive.subvision` (il bundle id), non più un nome inventato; l'app lo sostituisce comunque all'avvio.

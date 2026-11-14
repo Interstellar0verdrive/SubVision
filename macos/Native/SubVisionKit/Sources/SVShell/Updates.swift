@@ -60,7 +60,7 @@ public enum UpdateCheck {
     }
 }
 
-/// The app menu's Check for Updates… and the sidebar footer: asks GitHub now and
+/// The app menu's Check for Updates…: asks GitHub now and
 /// always answers, in the app's own alert.
 @MainActor
 public func checkForUpdates(config: AppShellConfig, texts: ShellTexts = .english, session: URLSession = .shared,

@@ -129,21 +129,41 @@ public struct ShellWindow<Content: View>: Scene {
     }
 }
 
-/// The standard About panel: a line about the app (`app.menu.about_credits`),
-/// then a link to the project, under the version.
+/// The standard About panel (SubVision › About SubVision, design round C3): under
+/// the version, a line about the app (`app.menu.about_credits`), then the
+/// project's GitHub mark and its link.
 @MainActor
-public func showAboutPanel(repositoryURL: URL, credits line: String? = nil) {
+public func showAboutPanel(repositoryURL: URL, credits line: String? = nil, mark: NSImage? = nil) {
     let small = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
     let text = repositoryURL.absoluteString.replacingOccurrences(of: "https://", with: "")
     let credits = NSMutableAttributedString()
     if let line, !line.isEmpty {
         credits.append(NSAttributedString(string: line + "\n", attributes: [.font: small, .foregroundColor: NSColor.labelColor]))
     }
+    if let mark {
+        let attachment = NSTextAttachment()
+        attachment.image = tinted(mark, size: NSSize(width: 12, height: 12))
+        attachment.bounds = NSRect(x: 0, y: -2, width: 12, height: 12)
+        credits.append(NSAttributedString(attachment: attachment))
+        credits.append(NSAttributedString(string: " ", attributes: [.font: small]))
+    }
     credits.append(NSAttributedString(string: text, attributes: [.link: repositoryURL, .font: small]))
     let centred = NSMutableParagraphStyle(); centred.alignment = .center
     credits.addAttribute(.paragraphStyle, value: centred, range: NSRange(location: 0, length: credits.length))
     NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
     NSApp.activate()
+}
+
+/// A template image drawn in the label colour of the appearance it is drawn in
+/// (a text attachment does not tint a template image by itself).
+@MainActor
+private func tinted(_ image: NSImage, size: NSSize) -> NSImage {
+    NSImage(size: size, flipped: false) { rect in
+        image.draw(in: rect)
+        NSColor.labelColor.set()
+        rect.fill(using: .sourceAtop)
+        return true
+    }
 }
 
 /// Alerts opened by a button wait for the click to finish: a modal loop started

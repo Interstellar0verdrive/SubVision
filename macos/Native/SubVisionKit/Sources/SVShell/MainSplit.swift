@@ -1,147 +1,105 @@
 // SPDX-License-Identifier: MIT
-// Copied and adapted from the native macOS app of AnimeUp (AnimeUp/MainView.swift,
-// TopBar.swift and SidebarView.swift), by the same author: the tabs, the page
-// and the sidebar's extra content come from the app; the measures from `SVChrome`.
+// Copied and adapted from the native macOS app of AnimeUp (AnimeUp/MainView.swift
+// and TopBar.swift), by the same author: the tabs, the page and the bars come
+// from the app; the measures from `SVChrome`. Design round C3 took the sidebar
+// away (navigation N-A): the top bar is there at every width.
 
 import AppKit
 import SVDesign
 import SwiftUI
 
-/// One page of the app, as the sidebar and the top bar show it.
+/// One page of the app, as a segment of the top bar shows it.
 public struct ShellTab: Identifiable, Hashable, Sendable {
     public var id: String
     public var symbol: String
     public var title: String
-    public var subtitle: String
-    /// Work going on in that page: a spinner.
+    /// Work going on in that page: a spinner in place of the icon (C3-01).
     public var busy: Bool
-    /// A check on the sidebar tab (something finished there).
-    public var done: Bool
-    /// A small number on the top bar segment (files waiting).
+    /// A small number on the segment.
     public var count: Int?
     /// A thin line before this tab: it starts the group of the tools (Sub fix after the pages).
     public var separatorBefore: Bool
 
-    public init(id: String, symbol: String, title: String, subtitle: String = "",
-                busy: Bool = false, done: Bool = false, count: Int? = nil, separatorBefore: Bool = false) {
+    public init(id: String, symbol: String, title: String, busy: Bool = false, count: Int? = nil,
+                separatorBefore: Bool = false) {
         self.id = id
-        self.separatorBefore = separatorBefore
         self.symbol = symbol
         self.title = title
-        self.subtitle = subtitle
         self.busy = busy
-        self.done = done
         self.count = count
+        self.separatorBefore = separatorBefore
     }
 }
 
-/// The sidebar's footer: version, Check for Updates, the project on GitHub.
-public struct ShellFooter {
-    public var appVersion: String
-    /// `hello.version` and `hello.python`, for the tooltip.
-    public var engineVersion: String?
-    public var pythonVersion: String?
-    public var checkingUpdates: Bool
-    public var repositoryURL: URL
-    /// The mark next to "GitHub" (a template image of the app's catalog); nil shows `</>`.
-    public var repositoryMark: Image?
-    public var checkUpdates: @MainActor () -> Void
-
-    public init(appVersion: String, engineVersion: String? = nil, pythonVersion: String? = nil, checkingUpdates: Bool = false,
-                repositoryURL: URL, repositoryMark: Image? = nil, checkUpdates: @escaping @MainActor () -> Void) {
-        self.appVersion = appVersion
-        self.engineVersion = engineVersion
-        self.pythonVersion = pythonVersion
-        self.checkingUpdates = checkingUpdates
-        self.repositoryURL = repositoryURL
-        self.repositoryMark = repositoryMark
-        self.checkUpdates = checkUpdates
-    }
-}
-
-/// The frame: the sidebar panel and the page on `bg`. Below
-/// `SVChrome.collapseBelow` the sidebar folds away and the top bar takes its
-/// place; in a wide window it can also be hidden from View (`sidebarChoice`).
-public struct MainSplit<SidebarExtra: View, TopBarTrailing: View, Page: View>: View {
+/// The frame (navigation N-A, design round C3): the top bar with the pages as
+/// segments at every width, the page under it, and at the bottom of the window
+/// the app's `bottomBar` while `showsBottomBar` (the batch bar: it slides up in
+/// 0.2 s and down again when it goes).
+public struct MainSplit<TopBarTrailing: View, Page: View, BottomBar: View>: View {
     var tabs: [ShellTab]
     @Binding var selection: String
-    /// The sidebar as the person set it from View, in a wide window; nil keeps it shown.
-    @Binding var sidebarChoice: Bool?
     var texts: ShellTexts
-    var footer: ShellFooter
     var openSettings: () -> Void
     var onClose: () -> Void
     var sizeOverride: String?
-    /// Told whether the window is narrow (no sidebar possible) and whether the sidebar shows.
-    var layoutChanged: (_ narrow: Bool, _ sidebarShown: Bool) -> Void
-    @ViewBuilder var sidebarExtra: () -> SidebarExtra
+    var showsBottomBar: Bool
     @ViewBuilder var topBarTrailing: () -> TopBarTrailing
     @ViewBuilder var page: () -> Page
+    @ViewBuilder var bottomBar: () -> BottomBar
     @Environment(\.svChrome) private var chrome
     @State private var lightsAnchor: CGRect?
 
-    public init(tabs: [ShellTab], selection: Binding<String>, sidebarChoice: Binding<Bool?>,
-                texts: ShellTexts = .english, footer: ShellFooter, sizeOverride: String? = nil,
+    public init(tabs: [ShellTab], selection: Binding<String>, texts: ShellTexts = .english, sizeOverride: String? = nil,
                 openSettings: @escaping () -> Void, onClose: @escaping () -> Void = {},
-                layoutChanged: @escaping (_ narrow: Bool, _ sidebarShown: Bool) -> Void = { _, _ in },
-                @ViewBuilder sidebarExtra: @escaping () -> SidebarExtra,
+                showsBottomBar: Bool = false,
                 @ViewBuilder topBarTrailing: @escaping () -> TopBarTrailing,
-                @ViewBuilder page: @escaping () -> Page) {
+                @ViewBuilder page: @escaping () -> Page,
+                @ViewBuilder bottomBar: @escaping () -> BottomBar) {
         self.tabs = tabs
         self._selection = selection
-        self._sidebarChoice = sidebarChoice
         self.texts = texts
-        self.footer = footer
         self.sizeOverride = sizeOverride
         self.openSettings = openSettings
         self.onClose = onClose
-        self.layoutChanged = layoutChanged
-        self.sidebarExtra = sidebarExtra
+        self.showsBottomBar = showsBottomBar
         self.topBarTrailing = topBarTrailing
         self.page = page
+        self.bottomBar = bottomBar
     }
 
     public var body: some View {
         GeometryReader { g in
-            let narrow = g.size.width < chrome.collapseBelow
-            let inline = !narrow && (sidebarChoice ?? true)
-            HStack(spacing: 0) {
-                if inline {
-                    ShellSidebar(tabs: tabs, selection: $selection, texts: texts, footer: footer,
-                                 openSettings: openSettings, extra: sidebarExtra)
-                        .padding([.leading, .top, .bottom], chrome.sidebarInset)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                }
-                VStack(spacing: 0) {
-                    if !inline {
-                        ShellTopBar(tabs: tabs, selection: $selection, texts: texts, canShowSidebar: !narrow,
-                                    showSidebar: { sidebarChoice = true }, openSettings: openSettings, trailing: topBarTrailing)
-                    }
-                    pageBody
-                        .environment(\.svPageTop, inline ? chrome.page.top : 17)
-                        .environment(\.svWindowWidth, g.size.width)
-                        .overlay(alignment: .top) {
+            VStack(spacing: 0) {
+                ShellTopBar(tabs: tabs, selection: $selection, texts: texts, openSettings: openSettings, trailing: topBarTrailing)
+                pageBody
+                    .environment(\.svPageTop, 17)
+                    .environment(\.svWindowWidth, g.size.width)
+                    .overlay(alignment: .top) {
                         // What scrolls under the top bar fades into it. At rest the page's
                         // own top padding is under the fade, so nothing shows.
-                        if !inline {
-                            LinearGradient(colors: [SV.bg, SV.bg.opacity(0)], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 18)
-                                .allowsHitTesting(false)
-                        }
+                        LinearGradient(colors: [SV.bg, SV.bg.opacity(0)], startPoint: .top, endPoint: .bottom)
+                            .frame(height: 18)
+                            .allowsHitTesting(false)
                     }
+                if showsBottomBar {
+                    bottomBar()
+                        .frame(height: chrome.batchBarHeight)
+                        .frame(maxWidth: .infinity)
+                        .environment(\.svWindowWidth, g.size.width)
+                        .transition(.move(edge: .bottom))
                 }
             }
-            .onChange(of: narrow, initial: true) { _, now in layoutChanged(now, inline) }
-            .onChange(of: inline, initial: true) { _, now in layoutChanged(narrow, now) }
+            .clipped()
         }
         // The minimum is the whole window's (the narrow board is 760x640, top bar included), but
         // SwiftUI adds the hidden title bar's height to the content's minimum: take it off here.
         .frame(minWidth: chrome.minWindow.width, minHeight: chrome.minWindow.height - Self.titleBarHeight)
         .background(SV.bg)
         .ignoresSafeArea()
-        .background(WindowChrome(anchor: lightsAnchor, minSize: chrome.minWindow, sizeOverride: sizeOverride, onClose: onClose))
+        .background(WindowChrome(anchor: lightsAnchor, minSize: chrome.minWindow, generous: chrome,
+                                 sizeOverride: sizeOverride, onClose: onClose))
         .onPreferenceChange(TrafficLightsAnchor.self) { lightsAnchor = $0 }
-        .animation(.easeOut(duration: 0.2), value: sidebarChoice)
+        .animation(.easeOut(duration: 0.2), value: showsBottomBar)
     }
 
     /// The height of a standard title bar, which the window adds to the content's minimum.
@@ -155,166 +113,50 @@ public struct MainSplit<SidebarExtra: View, TopBarTrailing: View, Page: View>: V
             // The page never sets the window's height: a wrapped text measured at
             // a narrow width would otherwise make the frame taller than the window.
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-            // Pages reach up under the title bar; with the sidebar folded, the top bar
-            // sits there instead, and a scrolled page must not slide under it.
+            // A scrolled page must not slide under the top bar.
             .clipped()
     }
 }
 
-/// The glass sidebar: traffic lights and the Settings gear on the top row,
-/// the tabs, the app's extra content (status lines, an activity card) and the footer.
-public struct ShellSidebar<Extra: View>: View {
-    var tabs: [ShellTab]
-    @Binding var selection: String
-    var texts: ShellTexts
-    var footer: ShellFooter
-    var openSettings: () -> Void
-    @ViewBuilder var extra: () -> Extra
-    @Environment(\.svChrome) private var chrome
-
-    public init(tabs: [ShellTab], selection: Binding<String>, texts: ShellTexts = .english, footer: ShellFooter,
-                openSettings: @escaping () -> Void, @ViewBuilder extra: @escaping () -> Extra) {
-        self.tabs = tabs
-        self._selection = selection
-        self.texts = texts
-        self.footer = footer
-        self.openSettings = openSettings
-        self.extra = extra
-    }
-
-    public var body: some View {
-        SidebarPanel {
-            HStack(spacing: 8) {
-                TrafficLightsSlot()
-                Spacer(minLength: 0)
-                ChromeIconButton("gearshape", help: texts.settings, action: openSettings)
-            }
-            .frame(height: chrome.topRowHeight)
-            .padding(.horizontal, chrome.topRowPadding)
-            VStack(spacing: 2) {
-                ForEach(tabs) { tab in
-                    if tab.separatorBefore {
-                        // `.side .sepline` of the boards: 1 pt of glass line, 10 pt in from the edges.
-                        Rectangle().fill(SV.glassLine).frame(height: 1).padding(.horizontal, 10).padding(.vertical, 2)
-                    }
-                    SidebarTab(symbol: tab.symbol, title: tab.title, subtitle: tab.subtitle, selected: tab.id == selection,
-                               trailing: tab.busy ? .busy : tab.done ? .done : .none) {
-                        selection = tab.id
-                    }
-                }
-            }
-            extra()
-            Spacer(minLength: 12)
-            ShellFooterView(footer: footer, texts: texts)
-        }
+extension MainSplit where BottomBar == EmptyView {
+    public init(tabs: [ShellTab], selection: Binding<String>, texts: ShellTexts = .english, sizeOverride: String? = nil,
+                openSettings: @escaping () -> Void, onClose: @escaping () -> Void = {},
+                @ViewBuilder topBarTrailing: @escaping () -> TopBarTrailing,
+                @ViewBuilder page: @escaping () -> Page) {
+        self.init(tabs: tabs, selection: selection, texts: texts, sizeOverride: sizeOverride, openSettings: openSettings,
+                  onClose: onClose, showsBottomBar: false, topBarTrailing: topBarTrailing, page: page) { EmptyView() }
     }
 }
 
-/// The sidebar footer: version (the engine's in the tooltip), Check for Updates, GitHub.
-struct ShellFooterView: View {
-    var footer: ShellFooter
-    var texts: ShellTexts
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Text(ShellTexts.fill(texts.version, ["version": footer.appVersion]))
-                .svFont(SVFont.smallNumbers).foregroundStyle(SV.text3)
-                .help(ShellTexts.fill(texts.engineVersion, ["version": footer.engineVersion ?? "…", "python": footer.pythonVersion ?? "…"]))
-            FooterLink(help: texts.checkUpdates, action: footer.checkUpdates) {
-                if footer.checkingUpdates {
-                    Spinner(size: 10)
-                } else {
-                    Image(systemName: "arrow.clockwise").svFont(10, .medium)
-                }
-            }
-            .disabled(footer.checkingUpdates)
-            .accessibilityLabel(texts.checkUpdates)
-            Spacer(minLength: 0)
-            FooterLink(help: footer.repositoryURL.absoluteString.replacingOccurrences(of: "https://", with: ""),
-                       action: { NSWorkspace.shared.open(footer.repositoryURL) }) {
-                HStack(spacing: 4) {
-                    if let mark = footer.repositoryMark {
-                        mark.resizable().renderingMode(.template).frame(width: 13, height: 13)
-                    } else {
-                        Image(systemName: "chevron.left.forwardslash.chevron.right").svFont(10, .medium)
-                    }
-                    Text(texts.github).svFont(11)
-                }
-            }
-        }
-        .padding(.horizontal, 6)
-        .padding(.top, 2)
-    }
-}
-
-/// The sidebar footer's small links: tertiary text, brighter under the pointer,
-/// which becomes the pointing hand.
-public struct FooterLink<Label: View>: View {
-    var help: String
-    var action: @MainActor () -> Void
-    @ViewBuilder var label: Label
-    @State private var hover = false
-
-    public init(help: String, action: @escaping @MainActor () -> Void, @ViewBuilder label: () -> Label) {
-        self.help = help
-        self.action = action
-        self.label = label()
-    }
-
-    public var body: some View {
-        Button(action: action) {
-            label
-                .foregroundStyle(hover ? SV.text : SV.text3)
-                .padding(3)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(-3)
-        .onHover { hover = $0 }
-        .svPointingHand()
-        .help(help)
-    }
-}
-
-/// With the sidebar folded (a narrow window, or hidden from View), a 52 pt row
-/// takes its place. Traffic lights on the left, the pages as a segmented
-/// control in the middle, on the right the app's `trailing` and the Settings gear.
+/// The window's 52 pt top bar (`.topbar`, boards C3-01, DS4). Traffic lights on
+/// the left, the pages as a segmented control in the middle (⌘1 ⌘2 ⌘3 are the
+/// app's menu items), on the right the app's `trailing` and the Settings gear.
 public struct ShellTopBar<Trailing: View>: View {
     var tabs: [ShellTab]
     @Binding var selection: String
     var texts: ShellTexts
-    /// The window is wide enough for the sidebar: offer the button that brings it back.
-    var canShowSidebar: Bool
-    var showSidebar: () -> Void
     var openSettings: () -> Void
     @ViewBuilder var trailing: () -> Trailing
+    @Environment(\.svChrome) private var chrome
 
-    public init(tabs: [ShellTab], selection: Binding<String>, texts: ShellTexts = .english, canShowSidebar: Bool,
-                showSidebar: @escaping () -> Void, openSettings: @escaping () -> Void,
-                @ViewBuilder trailing: @escaping () -> Trailing) {
+    public init(tabs: [ShellTab], selection: Binding<String>, texts: ShellTexts = .english,
+                openSettings: @escaping () -> Void, @ViewBuilder trailing: @escaping () -> Trailing) {
         self.tabs = tabs
         self._selection = selection
         self.texts = texts
-        self.canShowSidebar = canShowSidebar
-        self.showSidebar = showSidebar
         self.openSettings = openSettings
         self.trailing = trailing
     }
 
     public var body: some View {
         HStack(spacing: 8) {
-            HStack(spacing: 16) {
-                TrafficLightsSlot()
-                if canShowSidebar {
-                    ChromeIconButton("sidebar.left", help: texts.showSidebar, action: showSidebar)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            TrafficLightsSlot()
+                .frame(maxWidth: .infinity, alignment: .leading)
             TopBarSegments {
                 ForEach(tabs) { tab in
                     if tab.separatorBefore {
                         // `.tsegs .vsep`: a hairline between the pages and the tools.
-                        Rectangle().fill(SV.glassLine).frame(width: 1, height: 18).padding(.horizontal, 3)
+                        Rectangle().fill(SV.glassLine).frame(width: 1, height: 16).padding(.horizontal, 3)
                     }
                     TopBarSegment(symbol: tab.symbol, title: tab.title, selected: tab.id == selection,
                                   busy: tab.busy, count: tab.count) { selection = tab.id }
@@ -330,7 +172,8 @@ public struct ShellTopBar<Trailing: View>: View {
         // The lights' left edge and the gear's right edge on the page's 28 pt margins.
         .padding(.leading, 25)
         .padding(.trailing, 28)
-        .frame(height: 52)
+        .frame(height: chrome.topBarHeight)
+        .background(SV.bg)
         // Where the bar ends and the page that scrolls under it begins.
         .overlay(alignment: .bottom) { Rectangle().fill(SV.line).frame(height: 1) }
     }

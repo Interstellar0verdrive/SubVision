@@ -57,23 +57,6 @@ public enum DebugSnapshot {
         }
     }
 
-    /// Sidebar and page side by side at the window size, on `bg`.
-    @discardableResult
-    public static func renderComposite<S: View, P: View>(sidebar: S, page: P, size: CGSize, chrome: SVChrome = .default,
-                                                         schemes: [ColorScheme], _ path: String) -> [String] {
-        let view = HStack(spacing: 0) {
-            sidebar
-                .frame(width: chrome.sidebarWidth)
-                .frame(maxHeight: .infinity)
-                .padding([.leading, .vertical], chrome.sidebarInset)
-            page.frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .frame(width: size.width, height: size.height, alignment: .top)
-        .background(SV.bg)
-        .environment(\.svChrome, chrome)
-        return render(view, width: size.width, height: size.height, schemes: schemes, path)
-    }
-
     /// The main window as it is on screen (no Screen Recording permission needed).
     @discardableResult
     public static func capture(_ config: AppShellConfig, _ path: String) -> Bool {

@@ -9,21 +9,25 @@ import SwiftUI
 
 /// Gives the main window the design's frame: no title bar of its own, the
 /// content under it, and the real traffic lights moved into the
-/// `TrafficLightsSlot` the page reports (the sidebar's top row, or the top
-/// bar when the sidebar is folded).
+/// `TrafficLightsSlot` the page reports (the top bar). With `generous`, each
+/// time the window opens it grows to `SVChrome.generousSize` (C3-03: at least
+/// the boards' size, or almost the whole screen), even if it was saved smaller.
 public struct WindowChrome: NSViewRepresentable {
     /// The slot in window coordinates, top-left origin.
     public var anchor: CGRect?
     public var minSize: CGSize
+    /// The measures the window opens at least at (`SVChrome.generousSize`); nil leaves the saved size.
+    public var generous: SVChrome?
     /// `<PREFIX>WINDOW=1000x680`: open at that size, to check the layout at other sizes.
     public var sizeOverride: String?
     /// Called when the window closes (the red button or ⌘W): the app keeps running.
     public var onClose: () -> Void
 
-    public init(anchor: CGRect?, minSize: CGSize = SVChrome.default.minWindow, sizeOverride: String? = nil,
-                onClose: @escaping () -> Void = {}) {
+    public init(anchor: CGRect?, minSize: CGSize = SVChrome.default.minWindow, generous: SVChrome? = nil,
+                sizeOverride: String? = nil, onClose: @escaping () -> Void = {}) {
         self.anchor = anchor
         self.minSize = minSize
+        self.generous = generous
         self.sizeOverride = sizeOverride
         self.onClose = onClose
     }
@@ -31,6 +35,7 @@ public struct WindowChrome: NSViewRepresentable {
     public func makeNSView(context: Context) -> ChromeView {
         let view = ChromeView()
         view.minSize = minSize
+        view.generous = generous
         view.sizeOverride = sizeOverride
         return view
     }
@@ -45,6 +50,7 @@ public struct WindowChrome: NSViewRepresentable {
     public final class ChromeView: NSView {
         var anchor: CGRect?
         var minSize = SVChrome.default.minWindow
+        var generous: SVChrome?
         var sizeOverride: String?
         var onClose: () -> Void = {}
         private var observers: [NSObjectProtocol] = []
@@ -59,6 +65,13 @@ public struct WindowChrome: NSViewRepresentable {
             window.styleMask.insert(.fullSizeContentView)
             window.isMovableByWindowBackground = false
             window.minSize = minSize
+            if let generous, sizeOverride == nil {
+                // After the window's saved frame has been restored, which would otherwise win.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak window] in
+                    guard let window else { return }
+                    WindowSizer.openGenerously(window, generous)
+                }
+            }
             if let spec = sizeOverride,
                case let parts = spec.split(separator: "x").compactMap({ Double($0) }), parts.count == 2 {
                 // After the window's saved frame has been restored.
@@ -138,6 +151,20 @@ public enum WindowSizer {
 
     public static func toMain(_ config: AppShellConfig) {
         place(config, config.windowSize, min: config.chrome.minWindow, save: true)
+    }
+
+    /// C3-03: the window as it opens is at least `chrome.window`, or almost the whole
+    /// screen when that is smaller, even if it was saved smaller; a larger one stays.
+    /// Grown, it is centred on its screen; it never ends up outside the visible area.
+    public static func openGenerously(_ window: NSWindow, _ chrome: SVChrome) {
+        guard !window.styleMask.contains(.fullScreen), let screen = window.screen ?? NSScreen.main else { return }
+        let area = screen.visibleFrame
+        let size = chrome.generousSize(current: window.frame.size, area: area.size)
+        guard abs(size.width - window.frame.width) > 0.5 || abs(size.height - window.frame.height) > 0.5 else { return }
+        var frame = NSRect(origin: .zero, size: size)
+        frame.origin = NSPoint(x: (area.midX - size.width / 2).rounded(), y: (area.midY - size.height / 2).rounded())
+        window.setFrame(frame, display: true, animate: false)
+        if !window.frameAutosaveName.isEmpty { window.saveFrame(usingName: window.frameAutosaveName) }
     }
 
     /// On the next turn of the run loop: by then the window is on a screen and

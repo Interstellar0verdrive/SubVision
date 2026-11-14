@@ -39,7 +39,7 @@ public struct SVDesignGallery: View {
             }
             HStack(alignment: .top, spacing: 24) {
                 alerts
-                sidebar
+                navigation
             }
         }
         .padding(28)
@@ -148,12 +148,15 @@ public struct SVDesignGallery: View {
             SVBar(0.35, height: 6, fill: SV.green)
             HStack(spacing: 10) { Spinner(); Spinner(size: 10); Text("Spinner").svSmall() }
             SnapSlider(values: [2, 4, 6, 8, 12], selection: $fps) { "\($0) fps" }
-            SVSlider(value: $level, in: 0...1).frame(width: 250)
-            ActivityCard(kind: "Processing", line: Text("episode-01.mp4 · ocr 1 240 / 3 600"), fraction: 0.34,
-                         footnote: "Ends around 14:20") {
-                Button("Stop All") {}.svButton(.secondary, .small, fullWidth: true)
+            SVSlider(value: $level, in: 0...1, defaultValue: 0.3, defaultHelp: "Default: 0.30").frame(width: 250)
+            HStack(spacing: 10) {
+                SegmentedProgressBar(weights: [55, 55, 63], fraction: 0.47).frame(width: 280)
+                Text("47 %").svFont(SVFont.smallNumbers).foregroundStyle(SV.text2)
             }
-            .frame(width: 236)
+            HStack(spacing: 8) {
+                Circle().fill(SV.modified).frame(width: 6, height: 6)
+                Text("1 value differs from the default").svFont(11.5).foregroundStyle(SV.modified)
+            }
         }
     }
 
@@ -219,27 +222,32 @@ public struct SVDesignGallery: View {
         .padding(.vertical, 40).padding(.horizontal, 24)
     }
 
-    private var sidebar: some View {
-        SidebarPanel {
-            HStack {
+    /// The top bar's segments, the title band, the checkboxes (C3, DS4).
+    private var navigation: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
                 TrafficLightsSlot()
-                Spacer()
+                TopBarSegments {
+                    TopBarSegment(symbol: "captions.bubble", title: "Video", selected: true, busy: true) {}
+                    TopBarSegment(symbol: "doc.text.magnifyingglass", title: "Review", selected: false) {}
+                    TopBarSegment(symbol: "text.badge.checkmark", title: "Sub fix", selected: false) {}
+                }
+                ChromeIconButton("sidebar.right", help: "Parameters", on: true) {}
                 ChromeIconButton("gearshape", help: "Settings") {}
             }
-            SidebarTab(symbol: "play.rectangle", title: "Process", subtitle: "3 files queued", selected: true, trailing: .busy) {}
-            SidebarTab(symbol: "eye", title: "Preview", subtitle: "Nothing open", selected: false) {}
-            SidebarTab(symbol: "wrench.and.screwdriver", title: "Sub fix", subtitle: "Last run done", selected: false, trailing: .done) {}
-            PopupMenu({ [.item("English", checked: true) {}, .item("Italiano") {}] }) {
-                HStack { Text("Language: English").svFont(12).foregroundStyle(SV.text); Image(systemName: "chevron.up.chevron.down").svFont(9) }
-                    .padding(6)
+            TitleBand(prefix: "Review of", name: "episode-01.mkv", subtitle: "16 lines · processed today",
+                      backHelp: "Back to the list · ⌘[", back: {}) {
+                Button("Show in Finder") {}.svButton(.secondary, .small)
             }
-            Spacer()
-            ActivityCard(kind: "Processing", line: Text("episode-01.mp4 · ocr"), fraction: 0.34) {
-                Button("Pause") {}.svButton(.secondary, .small)
+            .frame(width: 560)
+            HStack(spacing: 14) {
+                HeaderCheckbox(.off, help: "None") {}
+                HeaderCheckbox(.mixed, help: "Some") {}
+                HeaderCheckbox(.on, help: "All") {}
+                SVCheckbox(isOn: true) {}.disabled(true)
             }
         }
-        .frame(height: 420)
-        .padding(8)
+        .padding(.vertical, 40)
     }
 
     private static func alert(icon: String, tone: SVTone, title: String, text: String,

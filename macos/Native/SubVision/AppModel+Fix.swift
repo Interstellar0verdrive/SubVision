@@ -103,17 +103,7 @@ extension AppModel {
     /// Off for an SRT the app read no timed block from (the red note is up already).
     var canRunFix: Bool { fixPath != nil && (fix.lines ?? 0) > 0 && status == .ready && !fix.running }
 
-    /// The sidebar's Sub fix line: the file, "Created · 618 lines", "No valid segments".
-    var fixSubtitle: String {
-        guard let path = fixPath else { return t("app.sidebar.no_srt") }
-        switch fix.outcome {
-        case .created(_, let count): return tn("app.sidebar.fix_done", count)
-        case .noValidSegments: return t("app.sidebar.fix_none")
-        default: return path.lastPathComponent
-        }
-    }
-
-    /// A check on the sidebar tab once the fixed copy is written (board F2).
+    /// The fixed copy is written (board F2).
     var fixDone: Bool {
         if case .created = fix.outcome { return true }
         return false
