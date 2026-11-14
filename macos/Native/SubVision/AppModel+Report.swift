@@ -1,88 +1,134 @@
 // SPDX-License-Identifier: MIT
-// The review report windows (F5.4, D8 a): one `ReportWindowController` per
-// report, opened from the row's button, ⌘R, the end-of-batch sheet and
-// File › Open a Report…; opening a report already open brings its window
-// to the front. The window and the bridge are in ReportWindow.swift and
-// ReportBridge.swift.
+// The review report inside the Review page (C3-06, C3-07, boards RV1, R1–R4):
+// the list of the videos processed, a click on one (or Review on Video, ⌘R,
+// the end-of-batch sheet, a file's notification, File › Open a Review…) and its
+// report comes in from the right in the same page, under a title band; back
+// (the round ‹, ⌘[) returns to the list. One report at a time, no window of its
+// own. The page and the bridge are in ReportPage.swift and ReportBridge.swift.
 
 import AppKit
 import SVShell
+import SwiftUI
 import UniformTypeIdentifiers
 
-/// The report windows open, by the report's file; `AppModel.report` holds it.
+/// The report the Review page shows, if any; `AppModel.report` holds it.
 struct ReportState {
-    var windows: [URL: ReportWindowController] = [:]
-
-    /// The reports open, front to back (the order of their windows).
-    var open: [ReportSession] {
-        NSApp.orderedWindows.compactMap { window in windows.values.first { $0.window === window }?.session }
-    }
-
-    /// The report whose window is in front of the others, if any.
-    var front: ReportWindowController? { open.first.flatMap { windows[$0.url] } }
+    /// The report open in the page, nil while the page shows the list.
+    var session: ReportSession?
 }
 
 extension VideoItem {
     /// `<stem>.review.html` next to the video, as the engine writes it.
     var reportURL: URL { url.deletingPathExtension().appendingPathExtension("review.html") }
     var reportExists: Bool { FileManager.default.fileExists(atPath: reportURL.path) }
+
+    /// The report the last batch wrote, also when it is no longer on disk (the page says
+    /// so, R3); nil when the batch wrote none.
+    var reviewReport: URL? {
+        if let reportPath { return URL(fileURLWithPath: reportPath) }
+        return reportExists ? reportURL : nil
+    }
 }
 
 extension AppModel {
-    /// Opens a report in its window, or brings that window to the front
-    /// (the row's button, ⌘R, Open a Report…, the end-of-batch sheet).
-    @discardableResult
-    func openReport(_ url: URL) -> ReportWindowController {
+    /// The time the report comes in from the right and goes back (C3-06).
+    static let reportSlide = Animation.easeOut(duration: 0.25)
+
+    /// Review is in front with a report open (not the list).
+    var reportShown: Bool { tab == .review && report.session != nil }
+
+    /// Opens `url` in the Review page: the page comes to the front and the report slides in
+    /// over the list; the same report open already stays as it is (its edits too).
+    func openReport(_ url: URL, video: VideoItem? = nil) {
         let key = url.standardizedFileURL
-        if let existing = report.windows[key] {
-            existing.window?.makeKeyAndOrderFront(nil)
-            NSApp.activate()
-            return existing
+        let owner = video ?? videos.first { $0.reviewReport?.standardizedFileURL == key }
+        if let owner { reviewSelection = owner.id }
+        let sameTab = tab == .review
+        if tab != .review { tab = .review }
+        reopenMainWindow()
+        if let open = report.session, open.url == key {
+            if open.phase == .gone || open.phase == .unreadable { open.load() }
+            return
         }
-        let session = ReportSession(url: key, model: self)
-        let last = report.open.first.flatMap { report.windows[$0.url]?.window }
-        let controller = ReportWindowController(session: session, cascadeFrom: last)
-        controller.onClose = { [weak self] in self?.report.windows[key] = nil }
-        report.windows[key] = controller
-        controller.show()
-        return controller
+        let session = ReportSession(url: key, videoID: owner?.id, model: self)
+        session.load()
+        let previous = report.session
+        if sameTab && previous == nil {
+            withAnimation(Self.reportSlide) { report.session = session }
+        } else {
+            report.session = session
+        }
+        previous?.close()
     }
 
-    /// Review (the row's button, ⌘R, the end-of-batch sheet, the Review page): the
-    /// file's review report in its window, "Review · <video>" (C2 boards).
+    /// Review (the row's button and ⋯ on Video, ⌘R, the end-of-batch sheet, the Review list):
+    /// the Review page with that video's report open.
     func review(_ video: VideoItem) {
-        guard let report = video.outputReport else { return }
-        openReport(report)
+        guard let url = video.reviewReport else { return }
+        openReport(url, video: video)
     }
 
-    /// The name a report window carries: the video of the list it belongs to, else the
+    /// Back to the list (the round ‹, View › Back ⌘[, "Back to the List" of R3): the
+    /// report slides out, the list is where it was.
+    func closeReport() {
+        guard let session = report.session else { return }
+        if tab == .review {
+            withAnimation(Self.reportSlide) { report.session = nil }
+        } else {
+            report.session = nil
+        }
+        // The web view keeps its place until the slide is over.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { session.close() }
+    }
+
+    /// "Go to Review" of the end-of-batch sheet: one video to review opens its report,
+    /// more open the list.
+    func goToReview(_ batch: [VideoItem]) {
+        let reviewable = batch.filter { ($0.state == .done || $0.state == .noSubs) && $0.reviewReport != nil }
+        if reviewable.count == 1, let only = reviewable.first {
+            review(only)
+        } else {
+            if report.session != nil { closeReport() }
+            tab = .review
+        }
+    }
+
+    /// The name a report goes by: the video of the list it belongs to, else the
     /// report's own name without `_<date>.review.html`.
     func reviewName(for report: URL) -> String {
         let key = report.standardizedFileURL.path
-        if let video = videos.first(where: { $0.outputReport?.standardizedFileURL.path == key }) { return video.name }
-        var name = report.lastPathComponent
-        for suffix in [".review.html", ".revisione.html", ".html"] where name.hasSuffix(suffix) {
-            name = String(name.dropLast(suffix.count))
-            break
-        }
-        if let m = name.firstMatch(of: /^(.+)_\d{4}-\d{2}-\d{2}$/) { name = String(m.1) }
-        return name
+        if let video = videos.first(where: { $0.reviewReport?.standardizedFileURL.path == key }) { return video.name }
+        return ReviewData.videoName(ofReport: report.lastPathComponent)
     }
 
-    /// File › Open a Report… (⌥⌘O): the open panel, then `openReport`
-    /// (also for the reports written by the 1.x).
+    /// File › Open a Review… (⌥⌘O): the open panel, then the report in the page
+    /// (also the reports written by the 1.x).
     func openReportPanel() {
         let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
+        panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.allowedContentTypes = [.html]
         panel.message = t("app.menu.open_panel_report")
         panel.prompt = t("app.common.open")
-        guard panel.runModal() == .OK else { return }
-        for url in panel.urls { openReport(url) }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        openReport(url)
     }
 
-    /// The report window's Open in Browser: the default app for HTML.
+    /// File › Save Reviewed SRT (⌘S): the report's own "Save reviewed SRT".
+    var canSaveReview: Bool { reportShown && report.session?.phase == .ready }
+
+    func saveReviewedSRT() {
+        guard canSaveReview, let bridge = report.session?.bridge else { return }
+        Task { _ = try? await bridge.call("await exportSrt();") }
+    }
+
+    /// A file's notification (design note 23): the Review page with its report open.
+    func openReviewFromNotification(_ id: UUID) {
+        guard let video = videos.first(where: { $0.id == id }) else { return }
+        reviewSelection = id
+        if video.reviewReport != nil { review(video) } else { tab = .review }
+    }
+
     func openReportInBrowser(_ url: URL) { NSWorkspace.shared.open(url) }
 
     func showReportInFinder(_ url: URL) { NSWorkspace.shared.activateFileViewerSelecting([url]) }

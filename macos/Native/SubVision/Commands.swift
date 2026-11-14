@@ -40,12 +40,17 @@ struct AppCommands: Commands {
         }
         CommandGroup(after: .newItem) {
             Divider()
-            // Review (⌘R): the finished row selected on Video, the row selected on Review.
+            // Review (⌘R): the finished row selected on Video, the row last opened on Review;
+            // the report opens in the Review page (C3-06).
             Button(model.t("app.menu.open_report")) {
                 if let video = model.reviewTarget { model.review(video) }
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(model.reviewTarget?.outputReport == nil)
+            .disabled(model.reviewTarget?.reviewReport == nil)
+            // The report bar's "Save reviewed SRT" (C3-07), while a report is in front.
+            Button(model.t("app.review.save_menu")) { model.saveReviewedSRT() }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(!model.canSaveReview)
             Button(model.t("app.menu.show_in_finder")) { model.showInFinder(model.selection) }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(model.selection.isEmpty)

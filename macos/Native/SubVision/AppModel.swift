@@ -84,7 +84,7 @@ final class AppModel {
     // Process (F4.4)
     var videos: [VideoItem] = []
     var selection: Set<UUID> = []
-    /// The row selected on the Review page (⌘R reviews it).
+    /// The row of the Review page last opened (⌘R on the list opens it again).
     var reviewSelection: UUID?
     /// Items dropped that are not videos: the yellow note over the list, until closed.
     var skippedItems: [String] = []
@@ -162,8 +162,8 @@ final class AppModel {
         tools.relabel(AppConfig.tools { [localizer] in localizer.t($0, $1) })
         defaults.set(localizer.language, forKey: DefaultsKey.language)
         followLanguage(localizer.language)
-        // The open reports follow too (design note 72).
-        for controller in report.windows.values { controller.session.bridge?.setLanguage(localizer.language) }
+        // The report open follows too (design note 72).
+        report.session?.bridge?.setLanguage(localizer.language)
     }
 
     /// macOS names its own menu items (About, Services, Hide…) in the app's
@@ -225,11 +225,8 @@ final class AppModel {
             guard let self else { return }
             reopenMainWindow()
             if let page = info["page"], let tab = Tab(rawValue: page) { self.tab = tab }
-            // A file's notification opens its row on Review.
-            if let id = info["video"].flatMap(UUID.init) {
-                self.reviewSelection = id
-                self.run.expanded.insert(id)
-            }
+            // A file's notification opens its report on Review.
+            if let id = info["video"].flatMap(UUID.init) { self.openReviewFromNotification(id) }
         }
         tools.warmupLanguages = [ocrLanguage]
         tools.prepareIfFirstLaunch(stateFolder: configuration.stateFolder)
@@ -388,7 +385,7 @@ final class AppModel {
         return videos.first { $0.id == id }
     }
 
-    /// What Review (⌘R) opens: the row selected on Review, else the finished row selected on Video.
+    /// What Review (⌘R) opens: the row last opened on Review, else the finished row selected on Video.
     var reviewTarget: VideoItem? {
         tab == .review ? selectedReview : (tab == .process ? selectedFinished : nil)
     }

@@ -45,7 +45,7 @@ struct FinishedSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button {
                     model.markSummarySeen()
-                    model.tab = .review
+                    model.goToReview(rows)
                 } label: { Label(model.t("app.process.finished.go_review"), systemImage: "doc.text.magnifyingglass") }
                     .svButton(.primary, .regular)
                     .keyboardShortcut(.defaultAction)
@@ -102,7 +102,11 @@ struct SummaryRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if video.state == .done || video.state == .noSubs {
-                Button { model.review(video) } label: {
+                Button {
+                    // C3-12: the sheet closes and the video opens in Review.
+                    model.markSummarySeen()
+                    model.review(video)
+                } label: {
                     Label(model.t("app.process.row.review"), systemImage: "doc.text.magnifyingglass")
                 }
                 .svButton(.secondary, .small)
