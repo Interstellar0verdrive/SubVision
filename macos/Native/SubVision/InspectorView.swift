@@ -676,6 +676,8 @@ struct StepField: View {
         }
         .onAppear { text = format(value) }
         .onChange(of: value) { _, now in if !focused { text = format(now) } }
+        // The decimal separator follows the app's language: "0,6" in Italian, "0.6" in English.
+        .onChange(of: model.language) { if !focused { text = format(value) } }
     }
 
     private func format(_ v: Double) -> String { model.localizer.number(v, decimals: decimals) }

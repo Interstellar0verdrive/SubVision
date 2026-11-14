@@ -40,7 +40,8 @@ struct ListColumns: Equatable {
     var narrow: Bool
 
     var gap: CGFloat { narrow ? 10 : 12 }
-    var duration: CGFloat { narrow ? 48 : 52 }
+    // «DURATION» in English needs 60 pt at the header's size (it was cut to «DURATI…»).
+    var duration: CGFloat { narrow ? 56 : 60 }
     var fps: CGFloat? { narrow ? nil : 48 }
     var size: CGFloat? { narrow ? nil : 78 }
     var actions: CGFloat { narrow ? 96 : 104 }
