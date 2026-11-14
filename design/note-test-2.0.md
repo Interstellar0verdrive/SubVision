@@ -250,3 +250,13 @@ Build Debug di `native-2.0` (`2d2fc72`), poi del ramo `c3-manual` per le correzi
 **Scenario QA nuovo:** `16-keys-and-quit` (⌫ e ⌘Z su una riga, ⌘Y, ⌘→ ⌘←, ⌘↩, ⌘., ⌥⌘. senza aprire i menu; ⌘Q con il lotto che va avanti sotto O3).
 
 **Verifiche sul ramo `c3-manual`:** build Debug pulita; `swift test` 52 verdi; test dei cataloghi 6 verdi e `tools/check_locales.py` OK (642 chiavi per lingua); `pytest` 111 verdi e 4 saltati (`test_launcher_marker_decides_the_sync` sistemato in `43c803b`: la copia del venv di sviluppo portava il marcatore); scenari QA 16 su 16 (02 con gli SRT di `demo-assets`, 10 con `_test-1.mkv` copiato nella scratchpad). Le correzioni rifatte a mano dopo la build: ⌘↩, ⌘., ⌥⌘., ⌘R, ⌘T, ⌘← ⌘→, ⌫ e ⌘Z sulle righe, O3 con le righe che vanno avanti, «il lotto finisce verso le …», menu Finestra e Modifica.
+
+## Catture dei README (agente, 14/11)
+
+Le 17 immagini di `design/immagini-readme-2.0.md` sono sul ramo locale `assets` (`screenshots/2.0/`, commit `34ba482`), non ancora pubblicate. Quello che l'agente ha notato nell'app:
+
+- **Finestra del primo avvio e lingua.** Cambiando lingua con la finestra aperta, nomi e descrizioni delle righe restavano nella lingua di partenza. — [fatto 14/11: `ToolsSetupState.relabel`, chiamato da `setLanguage`; test `ToolsRelabelTests`]
+- **Sub fix · barra in basso dopo l'esecuzione.** «La copia va accanto: …» ripeteva il nome della copia appena creata, già nella nota verde. — [fatto 14/11: la riga non c'è finché la nota «Creato» resta]
+- **Anteprima · `{\an8}` dei cartelli.** Il testo finale con `{\an8}` si vede solo nel suggerimento e nel menu contestuale del pannello Cartelli, non nel pannello (la scheda delle immagini lo chiedeva visibile). — da decidere se mostrarlo
+- **Revisione · nota dei buchi.** Conta anche l'inizio e la fine del video (00:00 → 00:03, 00:51 → 00:55). Il motore lo fa da sempre (anche in 1.0.0): un tratto senza sottotitoli all'inizio o alla fine è un buco come gli altri. — da decidere se escluderli
+- **Sub fix · nota verde in alto** (la scheda delle immagini diceva «in basso»): l'app segue la tavola F2, la scheda era imprecisa. — nessuna modifica

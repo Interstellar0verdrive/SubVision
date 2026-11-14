@@ -60,7 +60,7 @@ public final class ToolsSetupState {
     public private(set) var startedAt: Double?
     public private(set) var startBytes: Int64 = 0
 
-    @ObservationIgnored public let tools: [ToolRow]
+    @ObservationIgnored public private(set) var tools: [ToolRow]
     @ObservationIgnored public let methods: ToolsMethods
     @ObservationIgnored public let engine: EngineClient?
     @ObservationIgnored public var log: AppLog = .shared
@@ -74,6 +74,15 @@ public final class ToolsSetupState {
         self.tools = tools
         self.methods = methods
         self.engine = engine
+    }
+
+    /// The same tools in another language: names and details change, every
+    /// row keeps its state and progress (the app's language changed live).
+    public func relabel(_ tools: [ToolRow]) {
+        self.tools = tools
+        for i in rows.indices {
+            if let tool = tools.first(where: { $0.key == rows[i].tool.key }) { rows[i].tool = tool }
+        }
     }
 
     public var showsWindow: Bool {

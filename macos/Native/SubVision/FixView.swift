@@ -112,8 +112,9 @@ struct FixReadyView: View {
 
     private var bottomBar: some View {
         HStack(alignment: .center, spacing: 12) {
-            // The name the engine will give the copy (`fix.py`), next to the source.
-            if let name = model.fixCopyName {
+            // The name the engine will give the copy (`fix.py`), next to the source; not once
+            // the copy is made, where it would repeat the green note's name (README shots, 14/11).
+            if !model.fixDone, let name = model.fixCopyName {
                 Text(model.t("app.fix.copy_next", ["name": name])).svSmall()
                     .lineLimit(1).truncationMode(.middle)
             }
