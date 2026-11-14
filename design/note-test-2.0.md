@@ -322,3 +322,21 @@ Da confermare nella versione 32: C3-08 (righe a mano), C3-10 (ambra), la barra d
 - **Design system:** DS1 token `modified` (#E8C547 · #AB5E00) · DS2 «Elabora» al posto di «Avvia» · DS3 righe nuove · **DS4** «Navigazione, lista e barre» al posto della barra laterale.
 
 Prossimo passo: applicare C3 all'app (dopo l'ok dell'utente sulle tavole integrate).
+
+## Report v2 (C3) · motore (14/11)
+
+Il report di revisione ha l'aspetto delle tavole R1/R2 (C3-07, C3-08) — voce 29 [fatto 14/11 · `ff4d755`, test `1a61a71`]:
+
+- **Due impaginazioni.** Nell'app la pagina comincia dal riquadro del riepilogo (la fascia del titolo è dell'app); nel browser sopra c'è un titolo semplice «Revisione di <video>». In entrambe l'intestazione del riquadro è la **barra del report** (righe incluse, unisci duplicati, «Ripristina tutto…», «Salva SRT revisionato»), larga quanto la colonna (1180 px) e **ferma in alto** quando si scorre; dopo il salvataggio mostra «✓ Salvato: <file>» in verde (il percorso nel tooltip).
+- **Aspetto:** gettoni dei colori dell'app (ciano nello scuro, blu nel chiaro), niente emoji, «98 %», una riga di istruzioni, **legenda sottile fissa in basso** con il testo «accordo = tra le letture dei diversi fotogrammi limitrofi analizzati».
+- **Riga:** durata sotto inizio e fine («2,38 s»), tempi non validi in rosso; letture alternative con le parole diverse evidenziate, quella in uso e la casella modificata col bordo dell'accento; casella «È un cartello (va in alto)» al posto del tag (`{\an8}` solo nel file); «↺ Originale» riporta testo **e** casella, spento se non c'è niente da riportare; confidenza e accordo colorati come la riga.
+- **Righe a mano:** «+» al posto del numero, «Togli» al posto di «Originale»; da «+ Aggiungi riga» in fondo, senza fotogramma e con i tempi **vuoti** (rossi, «Salva» lo dice); da un buco sotto il buco, col fotogramma del buco e i tempi da 0,5 s dopo l'inizio per 2 s. **Riaprendo il report tornano tra le altre al loro tempo** (il fotogramma del buco resta: lo stato salva l'indice del buco, `gap`).
+- **Sezioni:** «Scartate» (numero della riga invece di ✂) e «Buchi senza sottotitoli oltre N s» (N = la soglia del lotto), con «Inizio del video.» / «Fine del video.» per i buchi ai bordi.
+- **«Ripristina tutto…»** chiede «Ripristinare tutto il report?» con il testo di R4.
+
+**Da fare nell'app (ReportBridge.swift):**
+- Messaggio nuovo `{type:"confirm", title, text, confirm, cancel, destructive:true}`: avviso dell'app con quel titolo e testo, «Ripristina tutto» distruttivo e «Annulla» predefinito (Invio = Annulla); risposta `{confirmed: true|false}`. Finché l'app non lo conosce (oggi risponde «unknown type»), il report ripiega su `confirm(titolo + riga vuota + testo)`, che l'app mostra col suo titolo generico, OK e Annulla. `report-confirm yes|no` vale solo per il ripiego: da estendere al messaggio nuovo.
+- La risposta di `export` deve continuare a portare `name` (la barra mostra quello) e `path` (tooltip).
+- ⌘S della tavola: se serve, dal menu dell'app con `exportSrt()`; il report non lo intercetta.
+
+**Da decidere:** le tavole dicono «oltre 3 s», ma la soglia predefinita dei buchi è 6 s (Parametri › File): il titolo segue la soglia usata; cambiare il predefinito è una scelta a parte.
