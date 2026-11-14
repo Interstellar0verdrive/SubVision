@@ -5,7 +5,8 @@
 // 2544×1440", the Video menu, Find 20 Frames), the frame block on the left
 // (PreviewView.swift) and the parameters panel fixed on the right, the same
 // values as the main window's. One window at a time, kept by
-// `AppModel.preview.window`; AppKit lists it in the Window menu by itself.
+// `AppModel.preview.window`. The Window menu has the app's own item for it
+// («Anteprima · <video>», board O9), so AppKit does not list it a second time.
 
 import AppKit
 import SVShell
@@ -33,6 +34,8 @@ final class PreviewWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.isReleasedWhenClosed = false
         window.identifier = NSUserInterfaceItemIdentifier("preview")
+        // Window › «Anteprima · <video>» opens it already: no second line with the same title.
+        window.isExcludedFromWindowsMenu = true
         window.minSize = Self.minSize
         window.delegate = self
         let root = PreviewWindowView(setTitle: { [weak window] in window?.title = $0 })

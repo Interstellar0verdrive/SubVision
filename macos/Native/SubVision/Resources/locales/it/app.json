@@ -189,7 +189,7 @@
   "app.inspector.title": "Parametri",
   "app.inspector.top": "Altezza dall’alto",
   "app.inspector.topw": "Larghezza al centro",
-  "app.inspector.undo_reset": "Ripristina i predefiniti",
+  "app.inspector.undo_reset": "ritorno ai predefiniti",
   "app.inspector.unit_pct": "{value} %",
   "app.inspector.unit_s": "{value} s",
   "app.inspector.width": "Larghezza al centro",

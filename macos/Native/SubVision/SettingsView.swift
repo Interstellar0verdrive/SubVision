@@ -270,6 +270,8 @@ struct ListsSettings: View {
                 }
                 .buttonStyle(.plain)
                 .help(model.t("app.settings.show_in_finder"))
+                // Without it VoiceOver reads the symbol's own name ("Sposta" in Italian).
+                .accessibilityLabel(model.t("app.settings.show_in_finder"))
             }
             .disabled(list == nil || model.status != .ready)
         }
