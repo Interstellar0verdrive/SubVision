@@ -126,6 +126,11 @@ public struct ShellWindow<Content: View>: Scene {
         .defaultSize(width: config.windowSize.width, height: config.windowSize.height)
         .windowResizability(.contentMinSize)
         .windowStyle(.hiddenTitleBar)
+        // Always there at launch: with restoration on, a window closed during a batch (⌘W keeps
+        // the app working) and the app then quit came back with no window at all, and the
+        // person had to find it in the Dock. Its size and place come from `WindowSizer`.
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.presented)
     }
 }
 
