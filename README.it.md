@@ -425,7 +425,7 @@ strumenti e gli elenchi con cui è partito.
 | ⌘Y | Apri in Anteprima il video col fuoco |
 | ⌘T, ⌘← ⌘→ | Prova OCR, fotogramma precedente e successivo (nell'Anteprima) |
 | ⌘↑ ⌘↓ | Video precedente e successivo (nell'Anteprima) |
-| ⌘[ | Torna all'elenco, dall'Anteprima o da un report |
+| ⌘[ | Torna all'elenco, dall'Anteprima o da un report (con la tastiera italiana il menu lo mostra come ⌘ò) |
 | ⌘1 ⌘2 ⌘3 | Video, Revisione, Sub fix |
 | ⌘0 | Riporta la finestra principale |
 | ⌘, | Impostazioni |
@@ -629,11 +629,6 @@ scaricano al primo avvio.
 | [uv](https://github.com/astral-sh/uv) di Astral | l'ambiente Python privato | MIT / Apache-2.0 |
 | [Python](https://www.python.org) 3.13, [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | fa girare il motore | PSF |
 | **Vision** e **LiveText** di Apple | i motori OCR veri e propri, parte di macOS | — |
-
-Parti della cornice dell'app, del suo design system e del lanciatore del
-motore vengono dall'altra mia app per Mac,
-[AnimeUp](https://github.com/Interstellar0verdrive/AnimeUp), e qui sono
-rilasciate sotto licenza MIT.
 
 ## Licenza
 

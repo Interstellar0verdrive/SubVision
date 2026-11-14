@@ -617,10 +617,6 @@ repository: they are downloaded on the first launch.
 | [Python](https://www.python.org) 3.13, [python-build-standalone](https://github.com/astral-sh/python-build-standalone) | runs the engine | PSF |
 | Apple **Vision** and **LiveText** | the OCR engines themselves, part of macOS | — |
 
-Parts of the app's shell, its design system and the engine launcher come from
-my other Mac app, [AnimeUp](https://github.com/Interstellar0verdrive/AnimeUp),
-and are released here under the MIT License.
-
 ## License
 
 [MIT](LICENSE) © 2026 Interstellar0verdrive.
