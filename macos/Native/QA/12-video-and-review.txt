@@ -4,7 +4,8 @@
 # inside the Review page (no window of its own): the title band and its details,
 # the report bar that sticks and the legend fixed at the bottom, Reset all's
 # question (R4, Return = Cancel), ⌘S, back to the list (‹, ⌘[), a file's
-# notification, the language, the report gone (R3). Captures in dark and light.
+# notification, the language, the report gone (the list's «revisione mancante»,
+# R3). Details and totals leave out what is zero. Captures in dark and light.
 ! cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" "$WORK/"
 @launch
 wait-ready 600
@@ -53,6 +54,7 @@ capture $OUT/V-done-dark.png
 ? V-done-dark.png$
 review-state
 ? ^review 2 · sintel_ita_hardsub_demo\.mp4 lines [0-9]+ dropped [0-9]+ gaps [0-9]+ lang it-IT fps 6 report yes reviewed no
+? · totals 2 video elaborati · [1-9][0-9]* righe( · [1-9][0-9]* buch[io])?$
 # RV1 · the list: Righe, Buchi, Elaborato, «Apri», ⋯ and the chevron; the totals at the bottom
 review-select 0
 ? ^ok · sintel_ita_hardsub_demo\.mp4$
@@ -75,7 +77,8 @@ report-back
 size 1360x840
 # R1 · «Apri»: the report in the page, under the title band; View › Back and ⌘S on
 review 0
-? ^Revisione di sintel_ita_hardsub_demo\.mp4 · [0-9]+ righe · [0-9]+ da ricontrollare · [0-9]+ buch[io] · elaborato oggi alle [0-9:.]+ · ready · tab review · back on · save on$
+? ^Revisione di sintel_ita_hardsub_demo\.mp4 · [1-9][0-9]* righe( · [1-9][0-9]* da ricontrollare)?( · [1-9][0-9]* buch[io])? · elaborato oggi alle [0-9:.]+ · ready · tab review · back on · save on$
+?! · 0 
 report-windows
 ? ^1 windows: 
 ?! window menu: .*(Revisione|Review) ·
@@ -149,7 +152,8 @@ report-page
 ? ^Revisione di sintel_eng_hardsub_demo\.mp4 · .* · ready · tab review · back on
 lang en
 report-page
-? ^Review of sintel_eng_hardsub_demo\.mp4 · [0-9]+ lines? · [0-9]+ to re-check · .* · processed today at
+? ^Review of sintel_eng_hardsub_demo\.mp4 · [1-9][0-9]* lines?( · [1-9][0-9]* to re-check)?( · [1-9][0-9]* gaps?)? · processed today at
+?! · 0 
 report-js document.documentElement.lang
 ? ^en$
 lang it
@@ -164,6 +168,13 @@ report-close
 ? ok
 # R3 · the report moved away: the red note, back to the list from it
 ! mv "$WORK/sintel_ita_hardsub_demo.review.html" "$WORK/moved.html"
+review-state
+? sintel_ita_hardsub_demo\.mp4 .* report missing reviewed
+capture $OUT/RV1-missing-dark.png
+? RV1-missing-dark.png$
+theme light
+capture $OUT/RV1-missing-light.png
+theme dark
 review 0
 ? ^Revisione di sintel_ita_hardsub_demo\.mp4 · elaborato oggi alle [0-9:.]+ · gone
 capture $OUT/R3-gone-dark.png

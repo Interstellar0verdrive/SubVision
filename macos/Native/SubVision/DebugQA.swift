@@ -101,6 +101,7 @@ enum DebugQA {
             case "close": model.inspectorOpen = false
             default: model.toggleInspector()
             }
+            return "inspector \(model.inspectorOpen ? "open" : "closed")"
         case "lang":
             model.setLanguage(argument)
         case "theme":
@@ -539,9 +540,11 @@ enum DebugQA {
         let rows = model.reviewVideos.map { v in
             "\(v.name) lines \(v.segments.map(String.init) ?? "-") dropped \(v.dropped.map(String.init) ?? "-")"
                 + " gaps \(v.gaps.map { String($0.count) } ?? "-") lang \(v.ocrLang ?? "-") fps \(v.ocrFPS.map { String(Int($0)) } ?? "-")"
-                + " report \(v.outputReport != nil ? "yes" : "no") reviewed \(model.hasReviewedSRT(v) ? "yes" : "no")"
+                + " report \(v.outputReport != nil ? "yes" : v.reviewReport != nil ? "missing" : "no")"
+                + " reviewed \(model.hasReviewedSRT(v) ? "yes" : "no")"
         }
-        return (["review \(rows.count)"] + rows).joined(separator: " · ")
+        let totals = rows.isEmpty ? [] : ["totals " + model.reviewTotals]
+        return (["review \(rows.count)"] + rows + totals).joined(separator: " · ")
     }
 
     private static func statusLine(_ model: AppModel) -> String {
