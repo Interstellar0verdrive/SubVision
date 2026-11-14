@@ -13,14 +13,14 @@ params fast
 inspector-set langHint it-IT
 tab process
 add $WORK/a.mp4,$WORK/b.mp4
-select 0
+focus 0
 key delete main
 states
 ? ^b.mp4=ready$
 key cmd+z main
 states
 ? ^a.mp4=ready b.mp4=ready$
-select 0
+focus 0
 key cmd+y main
 wait-frames 300
 ? ^20 frames
@@ -31,7 +31,7 @@ key cmd+left
 preview-state
 ? index 1
 preview-close
-select
+focus
 key cmd+return main
 states
 ? ^a.mp4=running b.mp4=waiting$

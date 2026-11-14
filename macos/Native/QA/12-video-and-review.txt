@@ -1,5 +1,5 @@
-# C2 (design notes 58, 60, 80; boards C2-V1–V5, C2-R1): the Video page with the
-# drop area under the list and the selection bar, a fast batch of two with the
+# C2 (design notes 58, 60, 80; boards C2-V1–V5, C2-R1), C3 (C3-02): the Video page
+# with the drop strip under the list and the checkboxes, a fast batch of two with the
 # end-of-batch sheet, the Review page (lines, dropped, gaps, language and fps of
 # each file) and the review window's title. Captures in
 # dark and light.
@@ -26,12 +26,14 @@ theme light
 capture $OUT/V1-light.png
 ? V1-light.png$
 theme dark
-select 0,1
-? ^selection 2 · 2 selezionati · remove on$
+focus 0
+? ^focus sintel_ita_hardsub_demo\.mp4 · checked 2 · finished 0 · Elabora 2 video on$
+drawer 0 open
 capture $OUT/V2-dark.png
 ? V2-dark.png$
-select
-? ^ready 2 · finished 0$
+drawer 0 close
+focus
+? ^focus - · checked 2 · finished 0 · Elabora 2 video on$
 start
 ? status ready
 wait-step 0 ocr 300
@@ -63,9 +65,11 @@ review 1
 ? ^Review · sintel_eng_hardsub_demo\.mp4$
 report-close all
 lang it
-# Process Again takes a file off Review.
+# Process Again checks the done rows ("verrà rifatto"): they keep their outcome until the next batch.
 process-again
-review-state
-? ^review 0$
+checks
+? ^header on · sintel_ita_hardsub_demo\.mp4=redo sintel_eng_hardsub_demo\.mp4=redo$
+bottom-bar
+? ^checked 2 · finished 2 · Elabora 2 video on$
 params default
 inspector-tab read

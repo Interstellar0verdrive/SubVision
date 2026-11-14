@@ -1,0 +1,163 @@
+# Design round C3, the Video list (boards C3-02–C3-05, E3, E5, E8, E10, N1,
+# N2): no selection, one checkbox per row ("process it"). New videos come in
+# checked; the header's box (all / "−" / none) acts only on the rows that
+# have a box; the bottom bar's button says what it does. The keyboard's ring
+# (↑ ↓) and the drawers (Space → ←, a click on the row). During a batch the
+# boxes become circles and do not change; a video added meanwhile comes in
+# checked for the next batch. A done row checked by hand "will be redone"
+# (⋯ › Elabora di nuovo does the same); the header's none puts it back.
+# Retry on a failed row with nothing else checked processes it at once. The
+# ⋯ menu has the context menu's items in its order. Then the boards' states,
+# fed by hand, captured in dark and light.
+! cp "$DEMO/sintel_ita_hardsub_demo.mp4" a.mp4 && cp "$DEMO/sintel_eng_hardsub_demo.mp4" b.mp4 && cp "$DEMO/sintel_ita_hardsub_demo.mp4" c.mp4 && cp "$DEMO/sintel_eng_hardsub_demo.mp4" d.mp4
+! printf '1\n00:00:01,000 --> 00:00:02,500\nCiao.\n' > c.srt
+@launch
+wait-ready 600
+? ^ready
+lang it
+size 1360x860
+params fast
+inspector-set langHint it-IT
+inspector-tab read
+theme dark
+tab process
+add $WORK/a.mp4,$WORK/b.mp4,$WORK/c.mp4
+checks
+? ^header on · a\.mp4=on b\.mp4=on c\.mp4=on$
+bottom-bar
+? ^checked 3 · finished 0 · Elabora 3 video on$
+check 1
+? ^header mixed · a\.mp4=on b\.mp4=off c\.mp4=on$
+header
+? ^header on · a\.mp4=on b\.mp4=on c\.mp4=on$
+header
+? ^header off · a\.mp4=off b\.mp4=off c\.mp4=off$
+bottom-bar
+? ^checked 0 · finished 0 · Nessun video da elaborare off$
+header
+? ^header on
+check 1
+? ^header mixed · a\.mp4=on b\.mp4=off c\.mp4=on$
+# The ring and the drawers from the keyboard
+key down main
+drawers
+? ^open -$
+key space main
+drawers
+? ^open a\.mp4$
+key down main
+key right main
+drawers
+? ^open a\.mp4 b\.mp4$
+key left main
+drawers
+? ^open a\.mp4$
+key esc main
+drawer 0 close
+# A batch of the two checked: b stays out and its box does not change; d, added meanwhile, comes in checked
+start
+? status ready
+checks
+? ^header off · a\.mp4=- b\.mp4=off c\.mp4=-$
+check 1
+? b\.mp4=off
+add $WORK/d.mp4
+checks
+? d\.mp4=on$
+wait-batch 900
+? ^batch done · done 2 failed 0 stopped 0 skipped 0
+summary-seen
+states
+? ^a\.mp4=done:12 b\.mp4=ready c\.mp4=done:12 d\.mp4=ready$
+! ls c_*.srt
+checks
+? ^header mixed · a\.mp4=- b\.mp4=off c\.mp4=- d\.mp4=on$
+bottom-bar
+? ^checked 1 · finished 2 · Elabora 1 video on$
+check 3
+bottom-bar
+? ^checked 0 · finished 2 · Nessun video da elaborare off$
+# A done row checked by hand will be redone; the header's none puts it back
+check 0
+? ^header mixed · a\.mp4=redo b\.mp4=off c\.mp4=- d\.mp4=off$
+header
+? ^header on · a\.mp4=redo b\.mp4=on c\.mp4=- d\.mp4=on$
+header
+? ^header off · a\.mp4=- b\.mp4=off c\.mp4=- d\.mp4=off$
+row-menu 2
+? ^Anteprima ⌘Y \| Rivedi ⌘R \| — \| Elabora di nuovo \| — \| Mostra nel Finder \| Apri il log \| — \| Togli dall’elenco ⌫$
+row-menu 1
+? ^Anteprima ⌘Y \| Rivedi ⌘R \(off\) \| — \| Elabora di nuovo \(off\) \|
+process-again 2
+checks
+? c\.mp4=redo d\.mp4=off$
+row-menu 2
+? \| ✓Elabora di nuovo \(off\) \|
+check 2
+? c\.mp4=- d\.mp4=off$
+# Retry on a failed row with nothing else checked: processed at once
+video-fake failed
+? ^ok · failed · header off · a\.mp4=- b\.mp4=- c\.mp4=- d\.mp4=off$
+retry 1
+? ^running true
+wait-batch 300
+? ^batch done · done 1 failed 0
+summary-seen
+states
+? ^a\.mp4=done:12 b\.mp4=done:12 c\.mp4=done:14 d\.mp4=ready$
+# The boards' states, fed by hand, in dark and light
+video-fake before
+capture $OUT/C3-02-dark.png
+? C3-02-dark.png$
+theme light
+capture $OUT/C3-02-light.png
+theme dark
+video-fake drawers
+capture $OUT/C3-03-dark.png
+? C3-03-dark.png$
+theme light
+capture $OUT/C3-03-light.png
+theme dark
+video-fake batch
+capture $OUT/C3-04-dark.png
+? C3-04-dark.png$
+theme light
+capture $OUT/C3-04-light.png
+theme dark
+size 760x640
+capture $OUT/N1-dark.png
+theme light
+capture $OUT/N1-light.png
+theme dark
+size 1360x860
+video-fake failed
+capture $OUT/C3-05-dark.png
+? C3-05-dark.png$
+theme light
+capture $OUT/C3-05-light.png
+theme dark
+row-menu-shot 2 $OUT/E8-dark.png
+? E8-dark\.png$
+theme light
+row-menu-shot 2 $OUT/E8-light.png
+theme dark
+video-fake outcomes
+capture $OUT/E3-dark.png
+theme light
+capture $OUT/E3-light.png
+theme dark
+video-fake stopped
+capture $OUT/E5-dark.png
+theme light
+capture $OUT/E5-light.png
+theme dark
+video-fake before
+size 760x640
+inspector open
+capture $OUT/N2-dark.png
+inspector close
+size 1360x860
+video-fake off
+theme system
+params default
+inspector-tab read

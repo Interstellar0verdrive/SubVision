@@ -3,7 +3,7 @@
 // through the same model methods the buttons and menus call (the shell's
 // `DebugQA.watchCommands`). One command per line; the reply goes to `<file>.out`.
 //
-//   tab process|review|fix · add <path>[,<path>…] · remove-all · select-all
+//   tab process|review|fix · add <path>[,<path>…] · remove-all · check-all
 //   inspector [open|close] · lang en|it · theme system|light|dark
 //   size <w>x<h> · windowid · capture <path> · settings · quit
 //   key <combo> [main|front|<window>]   a key press posted to the app's event queue, e.g. key cmd+return, key esc
@@ -36,10 +36,12 @@
 //                                  engine stops it only if it is still the one in progress, else "not_running";
 //                                  without it, the file in progress whatever it is. Replies with the engine's answer.
 //   C2 · Video, Review and the panel: inspector-tab read|bands|lines · params-reset (undoable) ·
-//   select <idx>[,<idx>…] (rows of Video; empty deselects) · bottom-bar · remove-selection ·
+//   focus <idx> (the keyboard's ring on a row of Video; empty lets it go) · bottom-bar · remove-focused ·
 //   review-state · review-select <idx> (opens the row of Review) · review <idx> (its report window's title)
 //   C3 · the frame: batch-bar (the window's batch bar: hidden, or its line, segments and percentage) ·
 //   summary-sheet (the end-of-batch sheet: its title, the page under it and each row's outcome)
+//   C3 · the list of Video: checks, check, header, drawer, drawers, retry, row-menu, row-menu-shot,
+//   video-fake (see DebugVideo.swift)
 //   F6 · the QA scenarios (macos/Native/QA):
 //   status                         engine status, Vision, tools phase and rows, window, language, tab
 //   wait-ready <s>                 until the engine is ready and the tools window is gone (first launch: downloads)
@@ -84,8 +86,8 @@ enum DebugQA {
             _ = await wait(60) { model.videos.allSatisfy(\.probed) }
         case "remove-all":
             model.removeWithUndo(Set(model.videos.map(\.id)))
-        case "select-all":
-            model.selectAll()
+        case "check-all":
+            model.checkAll()
         case "inspector":
             switch argument {
             case "open": model.inspectorOpen = true
@@ -188,7 +190,7 @@ enum DebugQA {
             default: return "unknown profile"
             }
         case "start":
-            guard model.canStart else { return "cannot start (\(model.readyVideos.count) ready, status \(model.status), vision \(model.hello?.vision ?? false))" }
+            guard model.canStart else { return "cannot start (\(model.checkedVideos.count) checked, status \(model.status), vision \(model.hello?.vision ?? false))" }
             model.startBatch()
             _ = await wait(10) { model.batch.running && model.runningVideo != nil }
         case "stop-file":
@@ -258,7 +260,9 @@ enum DebugQA {
             guard let idx = Int(argument), model.videos.indices.contains(idx) else { return "bad index" }
             model.run.expanded.insert(model.videos[idx].id)
         case "process-again":
-            model.processAgain(Set(model.videos.map(\.id)))
+            // The rows given ("0,1"), or every finished one: checked, "will be redone" (C3-02).
+            let picked = argument.split(separator: ",").compactMap { Int($0) }.filter { model.videos.indices.contains($0) }
+            model.processAgain(Set(picked.isEmpty ? model.videos.map(\.id) : picked.map { model.videos[$0].id }))
         case "clear-done":
             model.clearFinished()
         case "summary-seen":
@@ -293,17 +297,16 @@ enum DebugQA {
             // "Ripristina" of the panel and View › Restore All Defaults (undoable).
             model.resetAllParameters()
             return model.ocrParams == OcrParams() ? "ok · defaults" : "not reset"
-        case "select":
-            // Rows of Video by index ("0,2"), as clicks would; empty deselects.
-            let ids = argument.split(separator: ",").compactMap { Int($0) }.filter { model.videos.indices.contains($0) }.map { model.videos[$0].id }
-            model.selection = Set(ids)
-            return bottomBar(model)
+        case "focus":
+            // The keyboard's ring on a row of Video (C3-02), as a click or ↑ ↓ put it; empty lets it go.
+            if let idx = Int(argument), model.videos.indices.contains(idx) { model.focusedRow = model.videos[idx].id } else { model.focusedRow = nil }
+            return "focus \(model.focusedVideo?.name ?? "-") · " + bottomBar(model)
         case "bottom-bar":
             return bottomBar(model)
-        case "remove-selection":
-            guard model.canRemoveSelection else { return "cannot remove" }
-            model.removeSelection()
-            return "ok · \(model.videos.count) left"
+        case "remove-focused":
+            guard model.canRemoveFocused else { return "cannot remove" }
+            model.removeFocused()
+            return "ok · \(model.videos.count) left · focus \(model.focusedVideo?.name ?? "-")"
         case "review-state":
             return reviewState(model)
         case "review-select":
@@ -439,20 +442,18 @@ enum DebugQA {
             targets.forEach { $0.close() }
         default:
             // The F6 design snapshots (DebugCapture.swift).
-            return await DebugCapture.run(command, argument, model) ?? "unknown"
+            if let reply = await DebugCapture.run(command, argument, model) { return reply }
+            return await DebugVideo.run(command, argument, model) ?? "unknown"
         }
         return "ok · tab \(model.tab.rawValue) · \(model.videos.count) videos · status \(model.status)"
     }
 
     /// "status ready · vision true · tools notNeeded · rows - · window 1360x840 · lang it · tab process".
-    /// The bottom bar of Video as it reads: "selection 2 · remove on" (design note 58),
-    /// "running …", or "ready N".
-    private static func bottomBar(_ model: AppModel) -> String {
-        if !model.batch.running, !model.selection.isEmpty {
-            return "selection \(model.selection.count) · \(model.tn("app.process.bar.selected", model.selection.count)) · remove \(model.canRemoveSelection ? "on" : "off")"
-        }
+    /// The bottom bar of Video as it reads (C3-02): "checked 2 · finished 0 · Elabora 2 video on",
+    /// or "running …" while the batch bar is there.
+    static func bottomBar(_ model: AppModel) -> String {
         if model.batch.running { return "running \(model.batch.index) of \(model.batch.total)" }
-        return "ready \(model.readyVideos.count) · finished \(model.finishedVideos.count)"
+        return "checked \(model.checkedVideos.count) · finished \(model.finishedVideos.count) · \(model.startButtonTitle) \(model.canStart ? "on" : "off")"
     }
 
     /// The Review page: "review 2 · a.mp4 lines 12 dropped 0 gaps 1 lang it-IT fps 6 reviewed no · …".

@@ -20,12 +20,14 @@ tab process
 capture $OUT/C2-V1-P1-dark.png
 theme light
 capture $OUT/C2-V1-P1-light.png
-select 0,1
-? ^selection 2
+focus 0
+? ^focus sintel_ita_hardsub_demo\.mp4
+drawer 0 open
 capture $OUT/C2-V2-light.png
 theme dark
 capture $OUT/C2-V2-dark.png
-select
+drawer 0 close
+focus
 inspector-tab bands
 capture $OUT/C2-P2-dark.png
 theme light
