@@ -133,6 +133,7 @@ def test_find_frames_and_test_frame(demo_ita: Path, params: OcrParams, tmp_path:
         assert f["bands"] in (["bottom"], [])        # no signs band in the fast profile
         assert f["has_text"] == bool(f["bands"])
         assert "band" not in f                         # the 1.x single field is gone
+    assert [f["zone"] for f in frames] == list(range(20))
     ts = [f["ts"] for f in frames]
     assert ts == sorted(ts) and 0 < ts[0] < ts[-1] < 60
     # whole frames: the demo clip is landscape, the band would be much flatter
@@ -144,6 +145,9 @@ def test_find_frames_and_test_frame(demo_ita: Path, params: OcrParams, tmp_path:
     assert all(d["found"] <= d["done"] and d["total"] == 20 for _, d in events)
     assert events[-1][1]["found"] == len(with_text)
     assert all(d["found_top"] == 0 for _, d in events)
+    # every event carries its zone and that zone's frame (the app shows them as they come)
+    assert sorted(d["zone"] for _, d in events) == list(range(20))
+    assert {d["zone"]: d["frame"]["path"] for _, d in events} == {f["zone"]: f["path"] for f in frames}
 
     # OCR test on a frame with text: raw and final text, time, no top band
     res = preview.test_frame(with_text[0]["path"], params, lists=([], []))
@@ -185,7 +189,8 @@ def test_find_frames_signs_band_on_the_demo(demo_ita: Path, tmp_path: Path,
     assert len(frames) == 20
     assert all(f["bands"] in (["bottom"], []) for f in frames), [f["bands"] for f in frames]
     assert [i for i, f in enumerate(frames) if not f["has_text"]] == [4, 15]
-    assert events[-1] == {"done": 20, "total": 20, "found": 18, "found_top": 0}
+    last = {k: v for k, v in events[-1].items() if k not in ("zone", "frame")}
+    assert last == {"done": 20, "total": 20, "found": 18, "found_top": 0}
 
 
 def test_zone_choice_prefers_both_bands(demo_ita: Path, tmp_path: Path, ffmpeg_bin: str,
@@ -232,7 +237,9 @@ def test_zone_choice_prefers_both_bands(demo_ita: Path, tmp_path: Path, ffmpeg_b
     step = (hi - lo) / 2
     assert z0["ts"] == pytest.approx(lo + step * 0.8, abs=0.002)
     assert z1["ts"] == pytest.approx(lo + step + step * 0.5, abs=0.002)
-    assert events[-1] == {"done": 2, "total": 2, "found": 2, "found_top": 2}
+    assert {k: v for k, v in events[-1].items() if k not in ("zone", "frame")} == \
+        {"done": 2, "total": 2, "found": 2, "found_top": 2}
+    assert events[-1]["zone"] == 1 and events[-1]["frame"] == z1
 
     # signs band off: only the dialogue band, the first confirmed one wins
     # (the third timestamp is never probed); nothing confirmed -> fallback
@@ -248,6 +255,39 @@ def test_zone_choice_prefers_both_bands(demo_ita: Path, tmp_path: Path, ffmpeg_b
     assert frames[0]["ts"] == pytest.approx(lo + step * 0.2, abs=0.002)
     assert frames[1]["ts"] == pytest.approx(lo + step + step * 0.5, abs=0.002)   # first grabbed
     assert not frames[1]["has_text"]
+
+
+def test_find_frames_resumes_the_zones_left(demo_ita: Path, tmp_path: Path, ffmpeg_bin: str,
+                                            monkeypatch) -> None:
+    """
+    C3 (board A1): a search that stopped resumes with `zones`. Only those
+    zones are searched, the frames of the others stay in the folder, `done`
+    counts from the zones not searched now; without `zones` the folder starts
+    empty. No OCR: one grab per zone (the first timestamp).
+    """
+    monkeypatch.setattr(core, "vision_available", lambda: False)
+    p = OcrParams(**FAST_PROFILE)
+    outdir = preview.preview_dir(demo_ita, tmp_path)
+    events: list[dict] = []
+    first = preview.find_frames(demo_ita, p, n=4, state=tmp_path, zones=[2, 3],
+                                emit=lambda name, data: events.append(data))
+    assert [f["zone"] for f in first] == [2, 3]
+    assert sorted(x.name for x in outdir.iterdir()) == ["002.jpg", "003.jpg"]
+    assert sorted(d["done"] for d in events) == [3, 4] and all(d["total"] == 4 for d in events)
+    assert all(d["frame"]["zone"] == d["zone"] for d in events)
+    events.clear()
+    rest = preview.find_frames(demo_ita, p, n=4, state=tmp_path, zones=[0, 1, 9, -1],
+                               emit=lambda name, data: events.append(data))
+    assert [f["zone"] for f in rest] == [0, 1]
+    assert sorted(x.name for x in outdir.iterdir()) == [f"{i:03d}.jpg" for i in range(4)]
+    assert sorted(d["done"] for d in events) == [3, 4]
+    # the same timestamps as a search of every zone (TRY_FRACTIONS): same frames
+    whole = preview.find_frames(demo_ita, p, n=4, state=tmp_path)
+    assert [f["ts"] for f in whole] == [f["ts"] for f in rest + first]
+    assert sorted(x.name for x in outdir.iterdir()) == [f"{i:03d}.jpg" for i in range(4)]
+    # nothing to search: no event, no frame, the folder as it was
+    assert preview.find_frames(demo_ita, p, n=4, state=tmp_path, zones=[]) == []
+    assert len(list(outdir.iterdir())) == 4
 
 
 # ---------------------------------------------------------------- the user's frames (C2)

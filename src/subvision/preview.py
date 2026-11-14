@@ -38,7 +38,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from PIL import Image
 
@@ -172,6 +172,7 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
                 stop: Optional[threading.Event] = None,
                 state: Optional[Path | str] = None,
                 ffmpeg: Optional[str] = None, ffprobe: Optional[str] = None,
+                zones: Optional[Iterable[int]] = None,
                 ) -> List[Dict[str, Any]]:
     """
     Samples `n` whole frames of `video`, one per zone, preferring the
@@ -180,14 +181,24 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
     zone is the first timestamp with text in both bands; otherwise the first
     with any text (dialogue preferred over signs only); otherwise the first
     frame grabbed, without text.
-    Emits `preview.progress` {done, total, found, found_top} after every
-    zone (found: frames with text in any band; found_top: frames with text
-    in the signs band) and returns the frames in order:
-    [{path, bands, has_text, width, height, ts}] where `bands` is a subset of
-    ["bottom", "top"] in this order ([] = no text) and has_text = bool(bands).
+    Emits `preview.progress` {done, total, found, found_top, zone, frame}
+    after every zone (found: frames with text in any band; found_top:
+    frames with text in the signs band; zone: the zone just searched;
+    frame: its frame, or None when no timestamp of the zone could be read)
+    and returns the frames in order:
+    [{zone, path, bands, has_text, width, height, ts}] where `bands` is a
+    subset of ["bottom", "top"] in this order ([] = no text) and has_text =
+    bool(bands). A zone whose timestamps cannot be read has no frame.
+    `zones` resumes a search (C3, board A1): only those zones (0-based, of
+    `n`) are searched, the frames of the others stay in the folder, `done`
+    starts from the zones not searched now and found/found_top count only
+    the zones searched now. Without it every zone is searched from an empty
+    folder. The zones look at the same timestamps every time
+    (TRY_FRACTIONS), so a zone searched again gives the same frame.
     Raises EngineError("invalid_duration") when ffprobe cannot read the
     video, Stopped when `stop` is set (checked while ffmpeg runs and before
-    every OCR; no ffmpeg child survives).
+    every OCR; no ffmpeg child survives). The progress events sent before
+    the stop carry the frames found so far.
     """
     video = str(video)
     paths = state_paths(state).ensure()
@@ -205,8 +216,16 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
         raise core.EngineError("invalid_duration", path=video, tool="ffprobe",
                                detail="ffprobe reported no duration")
 
+    n = max(1, int(n))
     outdir = preview_dir(video, paths.root)
-    shutil.rmtree(outdir, ignore_errors=True)
+    if zones is None:
+        todo = list(range(n))
+        shutil.rmtree(outdir, ignore_errors=True)
+    else:
+        todo = sorted({int(z) for z in zones if 0 <= int(z) < n})
+        for i in todo:
+            for old in outdir.glob(f"{i:03d}*.jpg"):
+                old.unlink(missing_ok=True)
     outdir.mkdir(parents=True, exist_ok=True)
 
     use_vision = core.vision_available()
@@ -215,7 +234,6 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
         core.warmup(langs, "fast")
         core.warmup(langs, CONFIRM_LEVEL)
     wanted = probe_bands_of(params)
-    n = max(1, int(n))
     tries = max(1, min(len(TRY_FRACTIONS), int(tries)))
     fractions = TRY_FRACTIONS[:tries] if use_vision else TRY_FRACTIONS[:1]
     lo, hi = dur * 0.02, dur * 0.98
@@ -277,23 +295,24 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
             if chosen is None and fallback is not None:
                 chosen = (fallback[0], fallback[1], [])
             if chosen is None:
-                return {"i": i, "path": None}
+                return {"zone": i, "path": None}
             fp, ts, bands = chosen
             fp.replace(final)
             with Image.open(final) as im:
                 width, height = im.size
-            return {"i": i, "path": str(final), "bands": list(bands), "has_text": bool(bands),
+            return {"zone": i, "path": str(final), "bands": list(bands), "has_text": bool(bands),
                     "width": width, "height": height, "ts": round(ts, 3)}
         finally:
             # also the half-written output of an ffmpeg terminated by the stop
             for fp in set(made) | set(outdir.glob(f"{i:03d}_*.jpg")):
                 fp.unlink(missing_ok=True)
 
-    frames: List[Optional[Dict[str, Any]]] = [None] * n
-    done = found = found_top = 0
+    frames: Dict[int, Dict[str, Any]] = {}
+    done = n - len(todo)
+    found = found_top = 0
     ex = ThreadPoolExecutor(max_workers=OCR_WORKERS)
     try:
-        futs = [ex.submit(probe_zone, i) for i in range(n)]
+        futs = {ex.submit(probe_zone, i): i for i in todo}
         for fut in as_completed(futs):
             try:
                 res = fut.result()
@@ -301,25 +320,21 @@ def find_frames(video: Path | str, params: OcrParams, n: int = 20, tries: int = 
                 raise
             except Exception:
                 res = None
-            if res and res.get("path"):
-                frames[res["i"]] = res
-                found += int(res["has_text"])
-                found_top += int("top" in res["bands"])
+            frame = res if res and res.get("path") else None
+            if frame:
+                frames[frame["zone"]] = frame
+                found += int(frame["has_text"])
+                found_top += int("top" in frame["bands"])
             done += 1
             if emit:
                 emit("preview.progress", {"done": done, "total": n, "found": found,
-                                          "found_top": found_top})
+                                          "found_top": found_top, "zone": futs[fut],
+                                          "frame": dict(frame) if frame else None})
             _check_stop(stop)
     finally:
         ex.shutdown(wait=True, cancel_futures=True)
 
-    out: List[Dict[str, Any]] = []
-    for fr in frames:
-        if fr:
-            fr = dict(fr)
-            fr.pop("i", None)
-            out.append(fr)
-    return out
+    return [frames[i] for i in sorted(frames)]
 
 
 # ---------------------------------------------------------------- OCR test
