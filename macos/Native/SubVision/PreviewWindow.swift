@@ -186,7 +186,11 @@ struct PreviewTitleRow: View {
             .padding(.leading, 8)
             Spacer(minLength: 12)
             PreviewVideoMenu()
-            findButton
+            // Board A0: before any frame the box under it has the button; the header has it
+            // from the search on (off while it runs, A1).
+            if model.previewResult != nil || model.isSearchingFrames {
+                findButton
+            }
         }
         .padding(.horizontal, 16)
         .frame(height: 52)

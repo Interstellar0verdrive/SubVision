@@ -88,14 +88,9 @@ struct PreviewContent: View {
                     FrameBlock(result: result, layout: layout, notes: { notes })
                         .previewMetric("block")
                 } else {
-                    VStack(spacing: 0) {
-                        notes
-                        PreviewPlaceholder(width: layout.frameWidth, height: layout.frameHeight)
-                            .previewMetric("frame")
-                    }
-                    .frame(width: layout.frameWidth)
-                    .previewMetric("block")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Boards A0, A1: the same block before the frames and while they are searched.
+                    EmptyFrameBlock(layout: layout, notes: { notes })
+                        .previewMetric("block")
                 }
             }
             .frame(width: g.size.width, height: g.size.height, alignment: .top)
@@ -241,6 +236,89 @@ struct FrameBlock<Notes: View>: View {
     }
 }
 
+/// Boards A0 and A1: the block before the frames exist, laid out as `FrameBlock`: the
+/// frame-shaped box (what Find does and its button, or the search's progress), the arrows
+/// off, "No frames" / "Searching", twenty empty places (the zones searched filled in
+/// grey: the frames themselves come with the end of the search), the summary with Try
+/// OCR off and the two panels.
+struct EmptyFrameBlock<Notes: View>: View {
+    @Environment(AppModel.self) private var model
+    var layout: PreviewLayout
+    @ViewBuilder var notes: () -> Notes
+
+    private var progress: (done: Int, total: Int, found: Int)? {
+        if case .running(let done, let total, let found) = model.preview.search { return (done, total, found) }
+        return nil
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            notes()
+            PreviewPlaceholder(width: layout.frameWidth, height: layout.frameHeight)
+                .overlay(alignment: .leading) { arrow("chevron.left").offset(x: -PreviewLayout.arrow) }
+                .overlay(alignment: .trailing) { arrow("chevron.right").offset(x: PreviewLayout.arrow) }
+                .previewMetric("frame")
+            Text(model.t(progress == nil ? "app.preview.caption_none" : "app.preview.caption_searching"))
+                .svFont(12, mono: true).foregroundStyle(SV.text3)
+                .frame(height: PreviewLayout.caption)
+                .padding(.top, PreviewLayout.captionTop)
+                .padding(.bottom, PreviewLayout.captionBottom)
+            slots
+                .previewMetric("thumbs")
+            HStack(spacing: 10) {
+                Text(summary).svSmall().lineLimit(1)
+                Spacer(minLength: 8)
+                Button { model.tryOCR() } label: { Label(model.t("app.preview.test"), systemImage: "magnifyingglass") }
+                    .svButton(.primary, .regular)
+                    .fixedSize()
+                    .disabled(true)
+                    .help(model.t("app.preview.test_help"))
+            }
+            .frame(height: PreviewLayout.summary)
+            .padding(.top, PreviewLayout.summaryTop)
+            .previewMetric("summary")
+            OcrTestPanels()
+                .frame(height: max(layout.panels, 0))
+                .padding(.top, PreviewLayout.panelsTop)
+        }
+        .frame(width: layout.frameWidth)
+        .padding(.top, PreviewLayout.top)
+    }
+
+    private var summary: String {
+        guard let p = progress else { return model.t("app.preview.summary_none") }
+        return model.t("app.preview.summary_searching", ["i": p.done, "n": p.total, "k": p.found])
+    }
+
+    /// Two rows of ten: the zones already searched in grey, the others dashed.
+    private var slots: some View {
+        let done = progress?.done ?? 0
+        return VStack(alignment: .leading, spacing: PreviewLayout.gap) {
+            ForEach(0..<PreviewLayout.rows, id: \.self) { row in
+                HStack(spacing: PreviewLayout.gap) {
+                    ForEach(0..<PreviewLayout.columns, id: \.self) { column in
+                        let i = row * PreviewLayout.columns + column
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(i < done ? SV.track : Color.clear)
+                            .overlay(RoundedRectangle(cornerRadius: 4)
+                                .strokeBorder(SV.line, style: StrokeStyle(lineWidth: 1, dash: i < done ? [] : [3, 2])))
+                            .frame(width: layout.thumbWidth, height: layout.thumbHeight)
+                    }
+                }
+            }
+        }
+    }
+
+    private func arrow(_ symbol: String) -> some View {
+        Image(systemName: symbol).svFont(13, .semibold).foregroundStyle(SV.text)
+            .frame(width: 30, height: 30)
+            .background(Circle().fill(SV.glass))
+            .overlay(Circle().strokeBorder(SV.glassLine))
+            .opacity(0.45)
+            .accessibilityHidden(true)
+    }
+}
+
 /// The 20 thumbnails in two rows of ten, each row exactly as wide as the frame
 /// (`.thg`, `.th2`, design note 76): the chosen one ringed in the accent, the ones
 /// without text grey at half strength, dots for the bands with text.
@@ -291,7 +369,8 @@ struct PreviewThumbnails: View {
     }
 }
 
-/// Before the frames: the frame's shape with the search's progress and Stop, or a short text.
+/// Before the frames: the frame's shape, dashed, with what Find does, its button and the three
+/// steps (A0), the search's progress and Stop (A1), or a short text (no video, the batch, an error).
 struct PreviewPlaceholder: View {
     @Environment(AppModel.self) private var model
     var width: CGFloat
@@ -301,6 +380,8 @@ struct PreviewPlaceholder: View {
         Group {
             if case .running(let done, let total, let found) = model.preview.search {
                 searching(done: done, total: total, found: found)
+            } else if model.canFindFrames, !failed {
+                intro
             } else {
                 VStack(spacing: 10) {
                     Image(systemName: "viewfinder").svFont(failed ? 22 : 40, .light)
@@ -318,8 +399,41 @@ struct PreviewPlaceholder: View {
             }
         }
         .frame(width: width, height: height)
-        .background(RoundedRectangle(cornerRadius: SV.Radius.field).fill(SV.surface))
-        .overlay(RoundedRectangle(cornerRadius: SV.Radius.field).strokeBorder(SV.line))
+        .background(RoundedRectangle(cornerRadius: SV.Radius.field).fill(SV.inset))
+        .overlay(RoundedRectangle(cornerRadius: SV.Radius.field)
+            .strokeBorder(SV.line, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+        .clipped()
+    }
+
+    /// A0: the symbol, the sentence, what the search does, the button; the three steps when there is room.
+    private var intro: some View {
+        let head = VStack(spacing: 8) {
+            Image(systemName: "viewfinder").svFont(30, .light).foregroundStyle(SV.text3)
+                .padding(.bottom, 4)
+            Text(model.t("app.preview.placeholder")).svFont(13.5, .semibold).foregroundStyle(SV.text)
+                .multilineTextAlignment(.center)
+            Text(model.t("app.preview.find_help")).svSmall().multilineTextAlignment(.center)
+                .frame(maxWidth: 520).fixedSize(horizontal: false, vertical: true)
+            Button { model.findFrames() } label: { Label(model.t("app.preview.find"), systemImage: "magnifyingglass") }
+                .svButton(.primary, .regular)
+                .fixedSize()
+                .help(model.t("app.preview.find_help"))
+                .padding(.top, 4)
+        }
+        return ViewThatFits(in: .vertical) {
+            VStack(spacing: 20) {
+                head
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(1...3, id: \.self) { n in
+                        StepCard(number: n, title: model.t("app.preview.step\(n)"), text: model.t("app.preview.step\(n)_text"))
+                    }
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 680)
+            }
+            head
+        }
+        .padding(24)
     }
 
     private var failed: Bool { if case .failed = model.preview.search { return true }; return false }
@@ -331,20 +445,20 @@ struct PreviewPlaceholder: View {
         return model.t("app.preview.placeholder")
     }
 
-    /// The search: "Cerco… zona 12 di 20 · 9 con testo", its bar and Stop, what it does.
+    /// A1, centred: the spinner, "Zona 12 di 20 · 9 con testo", its bar, what the search does, Stop.
     private func searching(done: Int, total: Int, found: Int) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Spinner(size: 14)
-                Text(model.t("app.preview.searching", ["i": done, "n": total, "k": found])).svFont(13, .semibold).foregroundStyle(SV.text)
-                Spacer(minLength: 8)
-                Button { model.stopFrames() } label: { Label(model.t("app.common.stop"), systemImage: "stop.fill") }
-                    .svButton(.secondary, .small)
-            }
+        VStack(spacing: 10) {
+            Spinner(size: 18)
+            Text(model.t("app.preview.searching", ["i": done, "n": total, "k": found])).svFont(13.5, .semibold).foregroundStyle(SV.text)
             SVBar(total > 0 ? Double(done) / Double(total) : 0)
-            Text(model.t("app.preview.find_help")).svSmall().fixedSize(horizontal: false, vertical: true)
+                .frame(width: min(320, width - 48))
+            Text(model.t("app.preview.find_help")).svSmall().multilineTextAlignment(.center)
+                .frame(maxWidth: 520).fixedSize(horizontal: false, vertical: true)
+            Button { model.stopFrames() } label: { Label(model.t("app.common.stop"), systemImage: "stop.fill") }
+                .svButton(.secondary, .small)
+                .padding(.top, 2)
         }
-        .frame(width: min(440, width - 48))
+        .padding(24)
     }
 }
 

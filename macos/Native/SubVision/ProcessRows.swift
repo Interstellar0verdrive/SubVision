@@ -618,7 +618,7 @@ struct FinishedDetail: View {
             }
             VStack(alignment: .leading, spacing: 5) {
                 label(model.t("app.process.row.files"))
-                // The kinds take the width of the longest ("Report"), the names all the rest:
+                // The kinds take the width of the longest ("Review report", boards E3 and RV1), the names the rest:
                 // a name is cut in the middle only when it really does not fit.
                 Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 5) {
                     if video.state != .stopped {

@@ -123,11 +123,14 @@ public struct NoteView<Actions: View>: View {
     /// A last line, a touch lighter (timings, a hint).
     var footnote: String?
     var centred: Bool
+    /// The title on the same line as the text, in semibold (board E7: "2 items skipped: … cover.jpg").
+    var inlineTitle: Bool
     @ViewBuilder var actions: () -> Actions
 
     public init(_ tone: SVTone, title: String? = nil, text: String, strong: String? = nil, bullets: [String] = [], footnote: String? = nil,
-                centred: Bool = false, @ViewBuilder actions: @escaping () -> Actions) {
+                centred: Bool = false, inlineTitle: Bool = false, @ViewBuilder actions: @escaping () -> Actions) {
         self.tone = tone
+        self.inlineTitle = inlineTitle
         self.title = title
         self.text = text
         self.bullets = bullets
@@ -148,10 +151,14 @@ public struct NoteView<Actions: View>: View {
                 .frame(width: 18, height: 17)
                 .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4.5 }
             VStack(alignment: .leading, spacing: 2) {
-                if let title {
-                    Text(title).fontWeight(.semibold)
+                if let title, inlineTitle {
+                    Text("\(Text(title).fontWeight(.semibold)) \(text)").lineSpacing(3)
+                } else {
+                    if let title {
+                        Text(title).fontWeight(.semibold)
+                    }
+                    Text(text).lineSpacing(3)
                 }
-                Text(text).lineSpacing(3)
                 if let strong { Text(strong).fontWeight(.semibold) }
                 if !bullets.isEmpty {
                     VStack(alignment: .leading, spacing: 2) {

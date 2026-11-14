@@ -176,7 +176,7 @@ struct FixFileCard: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(url.lastPathComponent).svFont(13, .medium).foregroundStyle(SV.text)
                     .lineLimit(1).truncationMode(.middle)
-                Text(folder).svFont(SVFont.numbers).foregroundStyle(SV.textCode)
+                Text(folder).svFont(11, mono: true).foregroundStyle(SV.text3)   // as the rows of Video (boards F1, F4)
                     .lineLimit(1).truncationMode(.middle)
                 Text(meta).svSmall()
             }

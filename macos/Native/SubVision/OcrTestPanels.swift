@@ -124,7 +124,9 @@ struct OcrTestPanel: View {
     private func contentView(_ content: Content) -> some View {
         switch content {
         case .prompt:
-            centred(symbol: "magnifyingglass", text: model.t("app.preview.panel_prompt"))
+            // Board A0: before the frames, what comes first.
+            centred(symbol: "magnifyingglass",
+                    text: model.t(model.previewFrames.isEmpty ? "app.preview.panel_no_frames" : "app.preview.panel_prompt"))
         case .batch:
             centred(symbol: "magnifyingglass", text: model.t("app.preview.panel_batch"))
         case .reading:
@@ -137,18 +139,47 @@ struct OcrTestPanel: View {
             VStack(alignment: .leading, spacing: 6) {
                 textBox(r)
                 Text(confidence(r, multi: multi)).svSmall().fixedSize(horizontal: false, vertical: true)
+                // Board A4: the other readings of the vote, in mono chips (all of them in the tooltip).
+                if !r.alts.isEmpty {
+                    HStack(spacing: 6) {
+                        Text(model.t("app.preview.alts")).svSmall().fixedSize()
+                        ForEach(Array(r.alts.prefix(2).enumerated()), id: \.offset) { _, alt in
+                            Text(alt).svFont(10.5, mono: true).foregroundStyle(SV.textCode)
+                                .lineLimit(1).truncationMode(.tail)
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(RoundedRectangle(cornerRadius: 4).fill(SV.chipBg))
+                                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(SV.chipLine))
+                        }
+                    }
+                    .help(tooltip(r))
+                }
             }
         case .empty:
-            centred(symbol: "text.badge.xmark", text: model.t("app.preview.no_text_band"))
+            // Board A5: the reading box, empty, and the sentence under it, as a result is laid out.
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.t("app.preview.empty_read")).svFont(13, leading: 1.45).foregroundStyle(SV.text3)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .background(RoundedRectangle(cornerRadius: SV.Radius.icon).fill(SV.inset))
+                    .overlay(RoundedRectangle(cornerRadius: SV.Radius.icon).strokeBorder(SV.line))
+                Text(model.t("app.preview.no_text_band")).svSmall().fixedSize(horizontal: false, vertical: true)
+            }
         case .failed(let text):
             NoteView(.red, text: text) { EmptyView() }
         case .signsOff:
-            HStack(spacing: 10) {
+            // Board A5: "Turn on the signs band [switch]", what the test reads without it under.
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(model.t("app.preview.signs_turn_on")).svFont(12).foregroundStyle(SV.text)
+                    InspectorSwitch(isOn: $signsOn)
+                        .disabled(model.batch.running)
+                        .help(model.t("app.inspector.help.sig_on"))
+                }
                 Text(model.t("app.preview.signs_off")).svFont(12).foregroundStyle(SV.text3)
-                InspectorSwitch(isOn: $signsOn)
-                    .disabled(model.batch.running)
-                    .help(model.t("app.inspector.help.sig_on"))
+                    .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }

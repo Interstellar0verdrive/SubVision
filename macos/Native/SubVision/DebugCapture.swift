@@ -52,7 +52,10 @@ enum DebugCapture {
         case "disk-free":
             freeGB = argument == "off" ? nil : Double(argument)
             // The note is computed in the body: a write the page observes redraws it.
-            model.skippedItems = model.skippedItems
+            // (Two writes: an observed property set to the same value does not notify.)
+            let skipped = model.skippedItems
+            model.skippedItems = skipped + [""]
+            model.skippedItems = skipped
             return "ok · free \(freeGB.map { "\($0)" } ?? "real")"
         case "batch-fake":
             if argument == "on" {
