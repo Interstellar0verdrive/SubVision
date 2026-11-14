@@ -20,6 +20,7 @@ public enum EngineMethod {
     public static let listsStatus = "lists.status"
     public static let listsImport = "lists.import"
     public static let videosProbe = "videos.probe"
+    public static let videosThumbs = "videos.thumbs"
     public static let batchStart = "batch.start"
     public static let batchStop = "batch.stop"
     public static let previewFrames = "preview.frames"
@@ -179,6 +180,23 @@ public struct VideoInfo: Decodable, Sendable, Equatable {
 
 public struct VideosProbeReply: Decodable, Sendable, Equatable {
     public var videos: [VideoInfo]
+}
+
+/// `videos.thumbs`: five frames of a video (10/30/50/70/90 %) for the to-do drawer.
+/// `frames` has a nil for a frame that could not be taken; `busy` when a batch runs and
+/// the frames are not there yet (ask again when it ends).
+public struct VideoThumbsReply: Decodable, Sendable, Equatable {
+    public var path: String
+    public var frames: [String?]?
+    public var cached: Bool?
+    public var seconds: Double?
+    public var busy: Bool?
+    /// `probe_failed` when the duration could not be read (every frame is nil).
+    public var error: String?
+
+    public var isBusy: Bool { busy == true }
+    /// The frames taken, in order.
+    public var paths: [String] { (frames ?? []).compactMap { $0 } }
 }
 
 /// `preview.test`: the OCR of one frame, per band (`bottom`, and `top` with the signs band on).
@@ -500,6 +518,14 @@ extension EngineClient {
 
     public func probe(_ paths: [String]) async throws -> [VideoInfo] {
         try await call(EngineMethod.videosProbe, params: ["paths": paths], as: VideosProbeReply.self).videos
+    }
+
+    /// The drawer's five frames of a video; `duration` (from the probe) spares an ffprobe.
+    /// Synchronous on the engine's side and never in the job slot.
+    public func videoThumbs(path: String, duration: Double? = nil) async throws -> VideoThumbsReply {
+        var params: [String: Any] = ["path": path]
+        if let duration { params["duration"] = duration }
+        return try await call(EngineMethod.videosThumbs, params: params)
     }
 
     /// `lang` (it, en) is the language of the per-file logs and the reports.
