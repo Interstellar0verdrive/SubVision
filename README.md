@@ -18,9 +18,10 @@ check and fix the few lines the OCR wasn't sure about. It is built for
 **accuracy first**: the defaults always favour quality over speed, so there is
 as little to fix by hand as possible.
 
+<!-- TODO screenshot: video_dark_en.webp and video_light_en.webp, the Video page during a batch (see design/immagini-readme-2.0.md) -->
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_light_en.png">
-  <img alt="SubVision: the Video page running a batch, one file done, one reading its frames with its steps, speed and time left, and the Parameters panel on the right" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_en.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_light_en.webp">
+  <img alt="SubVision: the Video page running a batch, one file done, one reading its frames with its steps, speed and time left, the batch bar at the bottom and the Parameters panel on the right" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_en.webp">
 </picture>
 
 Why Apple Vision instead of an LLM or a vision-language model:
@@ -98,66 +99,112 @@ on the Mac:
 | `.python/`, `.venv/`, `.cache/` | Python, the engine's packages and their caches |
 | `ignore.txt`, `corrections.txt` | your two lists (see [Lists](#lists-ignoretxt-and-correctionstxt)) |
 | `records/` | the logs of the app and of the engine, and the list of your videos |
-| `tmp/` | work folders of the batch (removed when a file is done) and the frames of the Preview |
+| `tmp/` | work folders of the batch (removed when a file is done), the frames of the Preview and the small frames shown in the list |
 
 The outputs never go there: they go next to your videos.
 
 ## How it works
 
-The window has a sidebar with three pages: **Video**, **Review** and
-**Sub fix**. The Preview opens in a window of its own.
+The window has three pages, **Video**, **Review** and **Sub fix**, as tabs in
+the bar at the top (⌘1 ⌘2 ⌘3). The Preview opens inside the Video page, and
+the review report inside the Review page, each with a way back to its
+list.
 
 1. **Add your videos** to the Video page: drop files or whole folders on the
    window, or click **Choose Videos…** (⌘O). Subfolders are included; anything
    that isn't a video is skipped, with a note that says what was left out.
-2. **Check the bands** in the **Preview** window (the **Preview** button of
-   a row, or ⌘Y): drag the two bands on a frame until the subtitles fall
-   inside, and try the OCR on that frame.
-3. **Start** (⌘↩). Each file shows its steps as it runs, with speed and time
-   left.
-4. **Review** the doubtful lines in the review report and save the reviewed
+   New videos come in checked, ready to process.
+2. **Check the bands** in the **Preview** (the **Preview** button of a row, or
+   ⌘Y): it finds 20 frames with text by itself; drag the two bands on a frame
+   until the subtitles fall inside, and try the OCR on that frame.
+3. **Process** (⌘↩): the button at the bottom says what it will do, such as
+   **Process 2 videos**. Each file shows its steps as it runs, with speed and
+   time left.
+4. **Review**: the **Review** button of a finished row opens its report on
+   the Review page, where I check the doubtful lines and save the reviewed
    SRT.
 
 ### Video
 
-<img alt="The Video page after a batch: finished rows with their number of lines and the Review button, the sheet at the end of the batch in front" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_en.png">
+<!-- TODO screenshot: video_rows_dark_en.webp, the Video page before a batch with a finished row and a row to process open (see design/immagini-readme-2.0.md) -->
+<img alt="The Video page before a batch: a finished row open with the time of each step, its result and its files, and a checked row to process open with what SubVision knows about it, its estimate and five frames of the video" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_en.webp">
 
-- **The list of your videos**, with duration, frame rate and size. The list is
-  kept between launches. The area under the list takes more videos at any
-  time; videos added during a batch go to the next one.
-- **Start** runs the whole list, one file at a time. Each row shows its steps,
-  for the dialogue band and, when it is on, the signs band: **Extract** (the
-  frames of the band, with FFmpeg), **Group** (frames that repeat the previous
-  one aren't read twice), **OCR** (each frame read three times, with voting)
-  and **Refine** (start and end of each line moved to the video's own
-  frames). The step in progress shows how far it is, its time left and its
-  speed; the steps still to come show an estimate from the previous file.
-- **Stop the current file** (⌥⌘.) or **Stop All** (⌘.), each with a
-  confirmation. A stopped file never leaves a half-written SRT, and the batch
-  goes on with the next one.
+- **The list of your videos**, with duration, frame rate and size, kept
+  between launches. The strip under the list takes more videos at any time;
+  videos added during a batch go to the next one.
+- **One checkbox per row: to process.** New videos come in checked. The
+  checkbox in the header checks or unchecks all the videos to process at
+  once, and shows a **−** when only some are checked. A finished video shows
+  its outcome instead; check it and it is marked **will be redone** (the new
+  SRT gets the date in its name, the old one stays). A file that can't be read
+  or isn't there any more has no checkbox and stays out of the batch.
+- **Click a row to open it.** A finished video shows the time of each step
+  for the dialogue and the signs, its result (lines, lines dropped, refined
+  boundaries, gaps without subtitles) and its files, with **Show in Finder**,
+  **Open SRT** and **Open Log**. A video still to process shows what is known
+  before starting: the video itself (duration, frame rate, size, codecs, size
+  on disk), what it will read (the two bands and the language), an estimate
+  with the current parameters, an SRT already next to it (in yellow: the new
+  one gets the date in its name) and five frames of the video, which become
+  the Preview's 20 once it has looked for them. A failed or stopped file says
+  what happened and at which step.
+- **One main action per row**: **Preview**, **Review** or **Retry**, and
+  **Stop** on the row in progress. The **⋯** menu holds everything else, and
+  it is the same as the right-click menu.
+- **The keyboard works on the list**: ↑ ↓ move the focus from row to row,
+  Space or → opens a row and ← closes it, ⌫ removes it from the list (⌘Z puts
+  it back), ⌘A checks every video.
+- **Process** (⌘↩) runs the checked videos, one file at a time; next to the
+  button, how many there are and about how long they will take (the estimate
+  learns from the files already done). The row in progress opens by itself
+  and shows its steps, for the dialogue band and, when it is on, the signs
+  band: **Frame extraction** (with FFmpeg), **Grouping** (frames that repeat
+  the previous one aren't read twice), **OCR reading** (each frame read three
+  times, with voting) and **Boundary refinement** (start and end of each line
+  moved to the video's own frames). The step in progress shows how far it is,
+  its time left and its speed.
+- **The batch bar** sits at the bottom of every page while a batch runs, and
+  the Video tab spins: **File 2 of 3**, the name of the file and when the
+  batch should end, a bar with one segment per file, as wide as its
+  duration, the percentage and **Stop All**. Clicking the text shows the file
+  in progress on the Video page.
+- **Stop the current file** (⌥⌘., or **Stop** on its row) or **Stop All**
+  (⌘.), each with a confirmation. A stopped file never leaves a half-written
+  SRT, and the batch goes on with the next one; after Stop All, the videos
+  that didn't start stay checked for the next batch.
 - **The outcome stays on each row**: done with its number of lines, done but
   with no subtitles found, failed (at which step, and why, with its log one
-  click away) or stopped. **Process Again** makes a finished row ready for
-  the next batch.
-- **At the end of the batch** a sheet lists the SRTs made, with **Review** for
-  each file and **Show SRTs in Finder**. The Dock icon shows the progress of
-  the batch while it runs, and macOS notifications tell you when files and the
-  batch are done (both can be turned off in Settings › General).
+  click away) or stopped by you. **Retry** processes a failed or stopped file
+  again at once; during a batch it queues it instead (**Queued, after the
+  batch**), and it starts by itself when the batch ends.
+- **At the end of the batch** a sheet appears over whatever page is open: the
+  SRTs made, with **Review** for each file, the files that failed with their
+  reason and their log, **Show SRTs in Finder** and **Go to Review**. The Dock
+  icon shows the progress of the batch while it runs, and macOS notifications
+  tell you when files and the batch are done (both can be turned off in
+  Settings › General).
 - **Closing the window doesn't stop the batch**: it goes on, with its progress
   on the Dock icon, and clicking the icon brings the window back. **⌘Q** asks
   first, then stops the batch; the SRTs already made stay.
 
+<!-- TODO screenshot: video_finished_dark_en.webp, the end-of-batch sheet with a failed file (see design/immagini-readme-2.0.md) -->
+<img alt="The end-of-batch sheet in front of the Video page: two SRTs ready, each with its Review button, and one file that failed, with its reason and its log" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_en.webp">
+
 ### The Parameters panel
 
-<img alt="The Parameters panel on its Bands tab, light appearance: the diagram of the frame with the signs band at the top and the dialogue band at the bottom, and their sliders" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_en.png" width="360" align="right">
+<!-- TODO screenshot: parameters_light_en.webp, the panel on Bands with one value changed (see design/immagini-readme-2.0.md) -->
+<img alt="The Parameters panel on its Bands tab, light appearance: the diagram of the frame with the signs band at the top and the dialogue band at the bottom, their sliders, and one value changed from its default, in amber" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_en.webp" width="360" align="right">
 
-On the right of the Video page (and of the Preview window) the **Parameters**
-panel holds every OCR setting, in three tabs. The defaults aim at the best
-accuracy: a 24-minute episode takes about 1.5–2 hours. Every value has a
-**(?)** with a full explanation, and its default written under it. A dot
-marks the tabs with values you changed; **Restore** puts them back to their
-defaults, and ⌘Z undoes it. The values are kept between launches and are
-locked while a batch runs.
+On the right of the Video page, Preview included, the **Parameters** panel
+is always open and holds every OCR setting, in three tabs: **Reading**,
+**Bands** and **Lines**. The defaults aim at the best accuracy: a 24-minute
+episode takes about 1.5–2 hours. Every value has a **(?)** with a full
+explanation, and its default written under it. A value that differs from
+its default is in yellow (amber in the light appearance), with a dot on its
+tab, and a grey tick on the slider marks the default: click the tick to go
+back to it. **↺ Restore** puts every value back to its default, and ⌘Z undoes
+it. The values are kept between launches; while a batch runs the panel is
+locked, in grey, because the batch uses the values it started with.
 
 **Reading**
 
@@ -203,72 +250,102 @@ How long it takes, for a 20–24 minute episode on an Apple Silicon Mac:
 
 ### Preview
 
-<img alt="The Preview window: a frame with the signs band and the dialogue band drawn on it, two rows of ten thumbnails, and under them the Dialogue and Signs panels after Try OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_window_dark_en.png">
+<!-- TODO screenshot: preview_dark_en.webp, the Preview inside the Video page after Try OCR, one panel out of date (see design/immagini-readme-2.0.md) -->
+<img alt="The Preview inside the Video page: the title band with the name of the video and the arrows for the video above and below, a frame with the signs band and the dialogue band drawn on it, two rows of ten thumbnails, and under them the Dialogue and Signs panels after Try OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_en.webp">
 
-The Preview window is where I set the bands before a long batch:
+The Preview is where I set the bands before a long batch. It opens inside
+the Video page, over the list (the **Preview** button of a row, a frame in
+an open row, or ⌘Y), with the Parameters panel beside it. Its title band
+has **‹** to go back to the list (⌘[), **Preview of** and the name of the
+video, with its duration, frame rate, size and frames found, and on the
+right the arrows for the video above and below in the list (⌘↑ ⌘↓).
 
-- **Find 20 Frames** splits the video into 20 zones and looks in each one for
-  a frame with text (up to three tries per zone). It starts by itself when
-  you open a video that has no frames yet. Each thumbnail says whether its
-  frame has text in the dialogue band, in the signs band, in both or in
-  neither.
+- **It finds 20 frames by itself** the first time you open a video: it splits
+  the video into 20 zones and looks in each one for a frame with text (up to
+  three tries per zone). The frames appear as they are found, and they are
+  kept. If the search stops (you stopped it, a batch started, or part of the
+  video can't be read), **Try Again** picks it up from the zones still
+  missing. Each thumbnail says whether its frame has text in the dialogue
+  band, in the signs band, in both or in neither.
 - **The bands are drawn on the frame.** Drag the edge of a band for its
   height and its sides for its width (the width stays centred): the values
   are the same as in the Parameters panel, and change in both places.
 - **Try OCR** (⌘T) reads that frame with the current parameters and shows,
   for each band, the text read, its confidence and agreement, the
   alternative readings and the final text as it would go in the SRT. The
-  results stay with their frame while the app is open; if you change a
-  parameter that matters, the panel says it is out of date.
-- During a batch the Preview is read-only.
+  results stay with their frame while the app is open. If you change a
+  parameter that matters after the test, the panel says so (the text below
+  is from before the changes) and **Try OCR Again with the New Parameters**
+  redoes it.
+- During a batch the frame search and Try OCR wait for it to end.
 
 ### Review
 
-<img alt="The Review page with three processed videos, one row open with its times, files and the note on gaps, and the review report window in front" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_en.png">
+<!-- TODO screenshot: review_dark_en.webp, a review report open in the Review page (see design/immagini-readme-2.0.md) -->
+<img alt="A review report open in the Review page: the title band with the name of the video, the report bar with Save reviewed SRT, and lines with their frame, times and duration, one doubtful with its alternative readings and the differing words highlighted" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_en.webp">
 
-The **Review** page lists the videos processed, with their lines, the lines
-dropped, the gaps without subtitles and when they were processed. Open a row
-for its times, its files and the gaps worth a look. **Review** (⌘R) opens the
-video's review report in a window of the app.
+The **Review** page lists the videos processed, with their lines, the gaps
+without subtitles and when they were processed. A **Reviewed SRT** tag says
+that a reviewed SRT is already next to the video, **review missing** that the
+report isn't there any more. Click a row, or **Open**, and the video's
+review report opens in the page, under a title band: **‹** goes back to the
+list (⌘[), **Review of** and the name of the video with its lines, the lines
+to re-check, the gaps and when it was processed, and on the right **Show in
+Finder** and **Open in Browser**. Every **Review** in the app leads there:
+the button of a row on the Video page, ⌘R, the end-of-batch sheet and the
+notification of a finished file.
 
 The review report is an editor, not just a report. In it:
 
-- every line has a thumbnail, its confidence and the agreement between the
-  readings; doubtful lines are highlighted;
+- a bar that stays at the top while you scroll holds the lines included,
+  **merge duplicates**, **Reset all…** (it asks first, and says what would be
+  lost) and **Save reviewed SRT** (⌘S);
+- every line has its frame, its start, end and duration, its confidence and
+  the agreement between the readings; doubtful lines are highlighted, and a
+  thin legend at the bottom of the page explains the colours;
 - the text is **editable**, and **alternative readings** apply with one click,
-  with the words that differ highlighted;
+  with the words that differ highlighted; **↺ Original** puts back what the
+  OCR read, sign box included;
+- **It's a sign (goes on top)**, under each line, writes it in the SRT at the
+  top of the screen (with `{\an8}`);
 - lines can be included or excluded, and the flashes and noise readings that
-  were dropped can be **brought back**;
-- in a long gap you can **add** a line with its times already filled in;
-  times are editable, and `{\an8}` can be switched on per line;
+  were dropped (**Dropped**) can be **brought back**;
+- **Gaps without subtitles** longer than the threshold of Parameters › Lines
+  (6 s by default) are listed with a frame from the middle of each gap, and
+  **+ Add a line here** adds one with its times already inside the gap;
+  **+ Add line** adds one with empty times, to fill in. Lines added by hand
+  have a **+** instead of their number, and next time they are in their
+  place among the others;
 - **Save reviewed SRT** writes `<video>-reviewed-<date>.srt` next to the
   original SRT, which stays as it was. If that folder can't be written to,
   the app offers **Choose Where to Save…**.
 
 Your edits are saved as you go in `<video>.review.json`, next to the report:
-close the window, reopen it, and they are still there. The report follows the
-language of the app. It is also a plain HTML file: **Open in Browser** opens
-it in your browser, where it works on its own, offline. **File › Open a
-Report…** (⌥⌘O) opens any review report, including those made by SubVision
-1.x.
+leave the report, open it again, and they are still there. The report
+follows the language of the app. It is also a plain HTML file: **Open in
+Browser** opens it in your browser, where it works on its own, offline.
+**File › Open a Review…** (⌥⌘O) opens any review report, including those
+made by SubVision 1.x.
 
 ### Sub fix
 
-<img alt="The Sub fix page: the selected SRT on the left with what to fix, the values shared with Video on the right, and the green note of the fixed copy just created" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_en.png">
+<!-- TODO screenshot: subfix_dark_en.webp, the Sub fix page with the tabs at the top (see design/immagini-readme-2.0.md) -->
+<img alt="The Sub fix page: the selected SRT on the left with what to fix, the values shared with Video on the right, and the green note of the fixed copy just created" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_en.webp">
 
 **Sub fix** cleans an existing `.srt` **without redoing the OCR**, in a few
 seconds. SRTs made by SubVision are already clean: Sub fix is for the ones
 from elsewhere (old files, downloads, files edited by hand), or to apply new
 `corrections.txt` rules to episodes already processed.
 
-Drop an `.srt` on the page or open it (⇧⌘O), choose what to fix (merge
-duplicate or similar lines, remove the lines without subtitles and the
-phrases of `ignore.txt`, remove flashes shorter than a minimum) and **Run Sub
-fix** (⌘↩). The fixed copy, `<name>-fixed-<date>.srt`, goes next to the
+Drop an `.srt` on the page or choose it (**Choose SRT…**, ⇧⌘O), choose
+what to fix (merge duplicate or similar lines, remove the lines without
+subtitles and the phrases of `ignore.txt`, remove flashes shorter than a
+minimum) and **Run Sub fix** (⌘↩). The fixed copy, `<name>-fixed-<date>.srt`, goes next to the
 original, which stays as it was. The values shared with the Video page
 (merge gap, line wrap, language, the two lists) are on the same page, and
 changing them there changes them for Video too. Sub fix also works while a
-batch runs (the shared values are locked until it ends).
+batch runs, with the batch bar at the bottom (the shared values are locked
+until it ends).
 
 ### The files SubVision writes
 
@@ -302,7 +379,8 @@ SubVision starts with.
 
 ### Settings
 
-Settings (⌘,) has four tabs, with the default written under each setting:
+Settings (⌘,, or the gear at the right of the tab bar) has four tabs, with
+the default written under each setting:
 
 - **General**: language (it starts in the language of macOS), appearance
   (System, Light, Dark), macOS notifications, progress on the Dock icon.
@@ -312,8 +390,9 @@ Settings (⌘,) has four tabs, with the default written under each setting:
   the languages Vision reads on this Mac.
 - **Lists**: `ignore.txt` and `corrections.txt` (see above).
 - **Updates**: SubVision checks GitHub for a new release at launch, at most
-  once a day, and tells you when there is one. You can turn this off, or
-  check now.
+  once a day. When there is one, a **SubVision 2.x available** capsule
+  appears in the tab bar, next to the gear, and opens the release page. You
+  can turn the check off, or check now (also from the SubVision menu).
 
 Tools and Lists are locked while a batch runs: the batch uses the tools and
 lists it started with.
@@ -322,24 +401,34 @@ lists it started with.
 
 | Shortcut | Action |
 |---|---|
-| ⌘O | Open Videos… (adds them to the list) |
-| ⇧⌘O | Open SRT… (Sub fix) |
-| ⌥⌘O | Open a Report… |
-| ⌘↩ | Start the batch (on Video) · Run Sub fix (on Sub fix) |
+| ⌘O | Choose Videos… (adds them to the list) |
+| ⇧⌘O | Choose SRT… (Sub fix) |
+| ⌥⌘O | Open a Review… |
+| ⌘↩ | Process the checked videos (on Video) · Run Sub fix (on Sub fix) |
 | ⌥⌘. / ⌘. | Stop the Current File / Stop All |
-| ⌘R | Review the selected file |
+| ⌘R | Review the video with the focus |
+| ⌘S | Save the reviewed SRT (with a report open) |
 | ⇧⌘R | Show in Finder |
-| ⌫ | Remove the selected rows from the list (⌘Z puts them back) |
-| ⌘Y | Open the selected video in Preview |
-| ⌘T, ⌘← ⌘→ | Try OCR, previous and next frame (in the Preview window) |
+| ↑ ↓ · Space → ← | Move the focus in the list · open and close the row |
+| ⌫ | Remove the row with the focus from the list (⌘Z puts it back) |
+| ⌘A | Check every video (on Video) |
+| ⌘Y | Open the video with the focus in the Preview |
+| ⌘T, ⌘← ⌘→ | Try OCR, previous and next frame (in the Preview) |
+| ⌘↑ ⌘↓ | Previous and next video (in the Preview) |
+| ⌘[ | Back to the list, from the Preview or a report |
 | ⌘1 ⌘2 ⌘3 | Video, Review, Sub fix |
-| ⌃⌘S | Show or hide the sidebar |
 | ⌘0 | Bring back the main window |
 | ⌘, | Settings |
 | ⌥⌘L | Open the app's log in Console |
 
-The window can be narrow: below 1240 pt the sidebar becomes a bar at the top,
-and below 1000 pt the Parameters panel slides over the page (⌥⌘I).
+Every shortcut is also in the menus. The **SubVision** menu holds the
+version (About SubVision), **Check for Updates…** and **SubVision on
+GitHub**.
+
+The window opens at least 1360 × 860 pt (almost the whole screen, on a
+smaller one), so the list and the Parameters panel fit side by side. It can
+be made narrower: below 1100 pt the panel retracts to a button in the top
+bar, and opens over the page (⌥⌘I).
 
 ## Demo (Sintel)
 
@@ -354,7 +443,7 @@ demo files are attached to the
 | --- | --- |
 | [`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.mp4) / [`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.mp4) | 55 s clips with burned-in subtitles (IT / EN), about 9 MB each |
 | [`sintel_ita_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.srt) / [`sintel_eng_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.srt) | the SRT extracted by SubVision |
-| [`sintel_ita_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.revisione.html) / [`sintel_eng_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.revisione.html) | the review report of each run, made by SubVision 1.0 (open it in a browser, or in the app with File › Open a Report…) |
+| [`sintel_ita_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.revisione.html) / [`sintel_eng_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.revisione.html) | the review report of each run, made by SubVision 1.0 (open it in a browser, or in the app with File › Open a Review…) |
 
 **Accuracy measured on the demo** with a fast profile (6 fps, skip 1, no
 timing refinement, no signs band; about 20 seconds per clip):
@@ -369,8 +458,8 @@ timing refinement, no signs band; about 20 seconds per clip):
 
 To try it yourself: download a clip, drop it on the Video page, set the
 Parameters as above (Reading: 6 frames per second, skip 1; Bands: signs off;
-Lines: refine off) and press **Start**. For the English clip, choose English
-as the subtitle language.
+Lines: refine off) and press **Process 1 video**. For the English clip,
+choose English as the subtitle language.
 
 ## How the accuracy is built
 
@@ -473,7 +562,7 @@ environment of a source checkout apart from the app's. The app is in
   and `correzioni.txt` (they become `ignore.txt` and `corrections.txt`, same
   format), replacing the starter lists or adding to them.
 - **Your SRTs and review reports** stay where they are. The app opens 1.x
-  reports too (File › Open a Report…). Edits you made to a 1.x report in a
+  reports too (File › Open a Review…). Edits you made to a 1.x report in a
   browser stay in that browser.
 - The parameters start from the defaults: set them again in the Parameters
   panel if you had changed them.
