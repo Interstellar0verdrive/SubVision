@@ -308,4 +308,17 @@ L'utente ha letto le tavole C3 (versione 31). Approvate così come sono: **C3-05
 - **C3-11.** «Parametri cambiati dopo questa prova: il testo riportato sotto è precedente ai cambiamenti.» Pulsante «Riprova OCR con i nuovi parametri».
 - **Generale:** ogni funzione con scorciatoia deve essere raggiungibile anche col mouse. Nelle tavole: ⌘[ → cerchio ‹; ⌘↑/⌘↓ → frecce nella fascia; ⌫ → ⋯ › Togli dall'elenco; ⌘Z → menu Modifica; Spazio/→ → clic sulla riga. Da ricontrollare su tutta l'app quando si applica C3.
 
-Da confermare nella versione 32: C3-08 (righe a mano), C3-10 (ambra), la barra del report che si ferma sotto la fascia (C3-07). Poi C3 entra nelle pagine «Native screens» (scuro e chiaro) e si applica all'app.
+Da confermare nella versione 32: C3-08 (righe a mano), C3-10 (ambra), la barra del report che si ferma sotto la fascia (C3-07). — [confermate dall'utente il 14/11]
+
+**Ultime due note (14/11, versione 33).** La casella dell'intestazione vale **solo per le righe che hanno una casella**: un video fatto (spunta verde) non si spunta né si toglie da lì (C3-02, ora con la casella piena perché i due video da fare sono spuntati). Legenda del report: «accordo = tra le letture dei diversi fotogrammi limitrofi analizzati» (testo dell'utente, «frame» reso con «fotogrammi» come nel resto dell'app).
+
+**C3 integrato nelle tavole (versione 33 della tela).** Pagine «Native screens» e «Native screens · light», stesse tavole in scuro e chiaro:
+- **Video:** E0 vuota · E1 prima del lotto (C3-02) · E2 lotto in corso (C3-04) · **E10** tendine (C3-03, nuova) · E3 esiti (fatto, senza sottotitoli, non riuscito, fermato) · E4 non riuscito (C3-05 senza menu) · E5 lotto fermato · E6 fine lotto (C3-12) · E7 banner e note · E8 menu ⋯ (al posto della vecchia selezione) · E9 lista lunga con la casella «−».
+- **Parametri:** I1–I3 con il colore dei predefiniti (giallo / ambra) e la tacca grigia in I2.
+- **Anteprima dentro Video:** A0 cerca i fotogrammi da sola · A1 ricerca interrotta con «Riprova» · A2–A5 come prima nella nuova pagina (fascia del titolo, frecce video sopra/sotto, fotogramma ad angoli vivi) · A3 = C3-09 · A6 durante il lotto con la barra del lotto.
+- **Sub fix:** F0–F3 con le schede; **F5** durante un lotto (C3-01, nuova); F4 invariata.
+- **Revisione:** RV1 elenco (C3-06) · R1 report (C3-07) · R2 report scorso in fondo, barra ferma sotto la fascia e «Salvato» · R3 caricamento, revisione sparita, errore di salvataggio · **R4** conferma di «Ripristina tutto…» (nuova).
+- **T5** motore senza barra laterale · **O9** barra dei menu (SubVision su GitHub, niente «Nascondi barra laterale», «Mostra i parametri», «Trova 20 fotogrammi» e finestre Anteprima/Revisione; Indietro ⌘[, Anteprima ⌘Y, Video precedente/successivo ⌘↑ ⌘↓) · **N1/N2** finestra stretta con la lista nuova.
+- **Design system:** DS1 token `modified` (#E8C547 · #AB5E00) · DS2 «Elabora» al posto di «Avvia» · DS3 righe nuove · **DS4** «Navigazione, lista e barre» al posto della barra laterale.
+
+Prossimo passo: applicare C3 all'app (dopo l'ok dell'utente sulle tavole integrate).
