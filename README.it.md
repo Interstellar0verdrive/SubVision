@@ -19,9 +19,10 @@ controllo e correggo le poche righe di cui l'OCR non era sicuro. È fatta per
 **l'accuratezza prima di tutto**: i predefiniti privilegiano sempre la qualità
 sulla velocità, così c'è il meno possibile da sistemare a mano.
 
+<!-- TODO screenshot: video_dark_it.webp e video_light_it.webp, la pagina Video durante un lotto (vedi design/immagini-readme-2.0.md) -->
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_light_it.png">
-  <img alt="SubVision: la pagina Video durante un lotto, un file finito, uno che legge i fotogrammi con le sue tappe, velocità e tempo che manca, e il pannello Parametri a destra" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_it.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_light_it.webp">
+  <img alt="SubVision: la pagina Video durante un lotto, un file finito, uno che legge i fotogrammi con le sue tappe, velocità e tempo che manca, la barra del lotto in basso e il pannello Parametri a destra" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_it.webp">
 </picture>
 
 Perché Apple Vision invece di un LLM o di un modello visione-linguaggio:
@@ -101,68 +102,116 @@ installato nient'altro:
 | `.python/`, `.venv/`, `.cache/` | Python, i pacchetti del motore e le loro cache |
 | `ignore.txt`, `corrections.txt` | i tuoi due elenchi (vedi [Elenchi](#elenchi-ignoretxt-e-correctionstxt)) |
 | `records/` | i log dell'app e del motore, e l'elenco dei tuoi video |
-| `tmp/` | le cartelle di lavoro del lotto (tolte quando un file è finito) e i fotogrammi dell'Anteprima |
+| `tmp/` | le cartelle di lavoro del lotto (tolte quando un file è finito), i fotogrammi dell'Anteprima e quelli piccoli mostrati nell'elenco |
 
 I risultati non finiscono mai lì: vanno accanto ai tuoi video.
 
 ## Come funziona
 
-La finestra ha una barra laterale con tre pagine: **Video**, **Revisione** e
-**Sub fix**. L'Anteprima si apre in una finestra a sé.
+La finestra ha tre pagine, **Video**, **Revisione** e **Sub fix**, come
+schede nella barra in alto (⌘1 ⌘2 ⌘3). L'Anteprima si apre dentro la pagina
+Video e il report di revisione dentro la pagina Revisione, ognuno con il suo
+modo per tornare all'elenco.
 
 1. **Aggiungi i video** alla pagina Video: trascina file o intere cartelle
    sulla finestra, oppure fai clic su **Scegli video…** (⌘O). Le sottocartelle
    sono incluse; ciò che non è un video viene saltato, con una nota che dice
-   cosa è rimasto fuori.
-2. **Controlla le bande** nella finestra **Anteprima** (il pulsante
-   **Anteprima** di una riga, o ⌘Y): trascina le due bande su un fotogramma
-   finché i sottotitoli ci stanno dentro, e prova l'OCR su quel fotogramma.
-3. **Avvia** (⌘↩). Ogni file mostra le sue tappe mentre gira, con velocità e
-   tempo che manca.
-4. **Rivedi** le righe dubbie nel report di revisione e salva l'SRT
+   cosa è rimasto fuori. I video nuovi entrano già spuntati, pronti da
+   elaborare.
+2. **Controlla le bande** nell'**Anteprima** (il pulsante **Anteprima** di una
+   riga, o ⌘Y): trova da sola 20 fotogrammi con del testo; trascina le due
+   bande su un fotogramma finché i sottotitoli ci stanno dentro, e prova l'OCR
+   su quel fotogramma.
+3. **Elabora** (⌘↩): il pulsante in basso dice cosa farà, per esempio
+   **Elabora 2 video**. Ogni file mostra le sue tappe mentre gira, con
+   velocità e tempo che manca.
+4. **Rivedi**: il pulsante **Rivedi** di una riga finita apre il suo report
+   nella pagina Revisione, dove controllo le righe dubbie e salvo l'SRT
    revisionato.
 
 ### Video
 
-<img alt="La pagina Video dopo un lotto: righe finite con il numero di righe e il pulsante Rivedi, e davanti il foglio di fine lotto" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_it.png">
+<!-- TODO screenshot: video_rows_dark_it.webp, la pagina Video prima di un lotto con una riga finita e una da elaborare aperte (vedi design/immagini-readme-2.0.md) -->
+<img alt="La pagina Video prima di un lotto: una riga finita aperta con il tempo di ogni tappa, il risultato e i file, e una riga spuntata da elaborare aperta con quello che SubVision ne sa, la stima e cinque fotogrammi del video" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_it.webp">
 
-- **L'elenco dei tuoi video**, con durata, frame rate e dimensioni. L'elenco
-  resta fra un avvio e l'altro. L'area sotto l'elenco accetta altri video in
-  ogni momento; quelli aggiunti durante un lotto vanno al lotto dopo.
-- **Avvia** elabora tutto l'elenco, un file alla volta. Ogni riga mostra le
-  sue tappe, per la banda dei dialoghi e, quando è accesa, per quella dei
-  cartelli: **Estrazione** (i fotogrammi della banda, con FFmpeg),
-  **Raggruppamento** (i fotogrammi uguali al precedente non si leggono due
-  volte), **OCR** (ogni fotogramma letto tre volte, con voto) e
-  **Raffinamento** (inizio e fine di ogni riga spostati sui fotogrammi del
-  video). La tappa in corso dice a che punto è, quanto manca e a che velocità
-  va; quelle ancora da fare mostrano una stima presa dal file precedente.
-- **Ferma il file in corso** (⌥⌘.) o **Ferma tutto** (⌘.), ognuno con una
-  conferma. Un file fermato non lascia mai un SRT scritto a metà, e il lotto
-  passa al successivo.
+- **L'elenco dei tuoi video**, con durata, frame rate e dimensioni, che resta
+  fra un avvio e l'altro. La striscia sotto l'elenco accetta altri video in
+  ogni momento; quelli aggiunti durante un lotto vanno nel prossimo.
+- **Una casella per riga: da elaborare.** I video nuovi entrano spuntati. La
+  casella nell'intestazione spunta o toglie la spunta a tutti i video da
+  elaborare in un colpo, e mostra un **−** quando solo alcuni sono spuntati.
+  Un video finito mostra invece il suo esito; spuntalo e diventa **verrà
+  rifatto** (il nuovo SRT avrà la data nel nome, quello vecchio resta). Un
+  file che non si legge o che non c'è più non ha la casella e resta fuori dal
+  lotto.
+- **Un clic su una riga la apre.** Un video finito mostra il tempo di ogni
+  tappa per i dialoghi e per i cartelli, il risultato (righe, righe
+  scartate, confini raffinati, buchi senza sottotitoli) e i suoi file, con
+  **Mostra nel Finder**, **Apri SRT** e **Apri il log**. Un video ancora da
+  elaborare mostra quello che si sa prima di partire: il video (durata, frame
+  rate, dimensioni, codec, peso sul disco), cosa leggerà (le due bande e la
+  lingua), una stima con i parametri attuali, un SRT già presente accanto (in
+  giallo: il nuovo avrà la data nel nome) e cinque fotogrammi del video, che
+  diventano i 20 dell'Anteprima quando li ha cercati. Un file non riuscito o
+  fermato dice cosa è successo e a quale tappa.
+- **Un'azione principale per riga**: **Anteprima**, **Rivedi** o **Riprova**,
+  e **Ferma** sulla riga in corso. Il menu **⋯** raccoglie tutto il resto, ed
+  è uguale al menu del clic destro.
+- **L'elenco si usa anche da tastiera**: ↑ ↓ spostano il fuoco da una riga
+  all'altra, Spazio o → aprono una riga e ← la chiude, ⌫ la toglie
+  dall'elenco (⌘Z la rimette), ⌘A spunta tutti i video.
+- **Elabora** (⌘↩) elabora i video spuntati, un file alla volta; accanto al
+  pulsante, quanti sono e quanto ci metteranno, più o meno (la stima impara
+  dai file già fatti). La riga in corso si apre da sola e mostra le sue
+  tappe, per la banda dei dialoghi e, quando è accesa, per quella dei
+  cartelli: **Estrazione dei fotogrammi** (con FFmpeg), **Raggruppamento** (i
+  fotogrammi uguali al precedente non si leggono due volte), **Lettura OCR**
+  (ogni fotogramma letto tre volte, con voto) e **Raffinamento dei confini**
+  (inizio e fine di ogni riga spostati sui fotogrammi del video). La tappa in
+  corso dice a che punto è, quanto manca e a che velocità va.
+- **La barra del lotto** sta in fondo a ogni pagina mentre un lotto gira, e la
+  scheda Video ha la sua rotella: **File 2 di 3**, il nome del file e verso
+  che ora finisce il lotto, una barra con un segmento per file, largo quanto
+  la sua durata, la percentuale e **Ferma tutto**. Un clic sul testo mostra
+  il file in corso nella pagina Video.
+- **Ferma il file in corso** (⌥⌘., o **Ferma** sulla sua riga) o **Ferma
+  tutto** (⌘.), ognuno con una conferma. Un file fermato non lascia mai un
+  SRT scritto a metà, e il lotto passa al successivo; dopo Ferma tutto, i
+  video che non sono partiti restano spuntati per il prossimo lotto.
 - **L'esito resta sulla riga**: fatto con il numero di righe, fatto ma senza
-  sottotitoli trovati, fallito (a quale tappa e perché, con il suo log a un
-  clic) o fermato. **Elabora di nuovo** rimette una riga finita fra quelle
-  pronte per il lotto dopo.
-- **A fine lotto** un foglio elenca gli SRT creati, con **Rivedi** per ogni
-  file e **Mostra gli SRT nel Finder**. Mentre il lotto gira, l'icona del Dock
-  ne mostra l'avanzamento, e le notifiche di macOS dicono quando i file e il
-  lotto sono finiti (le une e l'altro si spengono in Impostazioni › Generali).
+  sottotitoli trovati, non riuscito (a quale tappa e perché, con il suo log a
+  un clic) o fermato da te. **Riprova** elabora di nuovo subito un file non
+  riuscito o fermato; durante un lotto invece lo mette in coda (**In coda,
+  dopo il lotto**), e parte da solo quando il lotto finisce.
+- **A fine lotto** un foglio compare sopra la pagina in cui sei: gli SRT
+  creati, con **Rivedi** per ogni file, i file non riusciti con il motivo e
+  il loro log, **Mostra gli SRT nel Finder** e **Vai a Revisione**. Mentre il
+  lotto gira, l'icona del Dock ne mostra l'avanzamento, e le notifiche di
+  macOS dicono quando i file e il lotto sono finiti (le une e l'altro si
+  spengono in Impostazioni › Generali).
 - **Chiudere la finestra non ferma il lotto**: va avanti, con l'avanzamento
   sull'icona del Dock, e un clic sull'icona riapre la finestra. **⌘Q** prima
   chiede, poi ferma il lotto; gli SRT già fatti restano.
 
+<!-- TODO screenshot: video_finished_dark_it.webp, il foglio di fine lotto con un file non riuscito (vedi design/immagini-readme-2.0.md) -->
+<img alt="Il foglio di fine lotto davanti alla pagina Video: due SRT pronti, ognuno con il suo pulsante Rivedi, e un file non riuscito, con il motivo e il suo log" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_it.webp">
+
 ### Il pannello Parametri
 
-<img alt="Il pannello Parametri sulla scheda Bande, in chiaro: lo schema del fotogramma con la banda dei cartelli in alto e quella dei dialoghi in basso, e i loro cursori" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_it.png" width="360" align="right">
+<!-- TODO screenshot: parameters_light_it.webp, il pannello sulla scheda Bande con un valore cambiato (vedi design/immagini-readme-2.0.md) -->
+<img alt="Il pannello Parametri sulla scheda Bande, in chiaro: lo schema del fotogramma con la banda dei cartelli in alto e quella dei dialoghi in basso, i loro cursori e un valore diverso dal predefinito, in ambra" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_it.webp" width="360" align="right">
 
-A destra della pagina Video (e della finestra Anteprima) il pannello
-**Parametri** raccoglie tutte le impostazioni dell'OCR, in tre schede. I
-predefiniti puntano alla massima accuratezza: un episodio di 24 minuti
-richiede circa 1,5–2 ore. Ogni valore ha un **(?)** con la spiegazione
-completa, e il suo predefinito scritto sotto. Un puntino segna le schede con
-valori cambiati; **Ripristina** li riporta ai predefiniti, e ⌘Z lo annulla. I
-valori restano fra un avvio e l'altro e sono bloccati durante un lotto.
+A destra della pagina Video, Anteprima compresa, il pannello **Parametri** è
+sempre aperto e raccoglie tutte le impostazioni dell'OCR, in tre schede:
+**Lettura**, **Bande** e **Righe**. I predefiniti puntano alla massima
+accuratezza: un episodio di 24 minuti richiede circa 1,5–2 ore. Ogni valore
+ha un **(?)** con la spiegazione completa, e il suo predefinito scritto
+sotto. Un valore diverso dal predefinito è in giallo (in ambra nel tema
+chiaro), con un puntino sulla sua scheda, e una tacca grigia sul cursore
+segna il predefinito: un clic sulla tacca ci torna. **↺ Ripristina** riporta
+tutti i valori ai predefiniti, e ⌘Z lo annulla. I valori restano fra un
+avvio e l'altro; durante un lotto il pannello è bloccato, in grigio, perché
+il lotto usa i valori con cui è partito.
 
 **Lettura**
 
@@ -208,15 +257,24 @@ Quanto ci mette, per un episodio di 20–24 minuti su un Mac Apple Silicon:
 
 ### Anteprima
 
-<img alt="La finestra Anteprima: un fotogramma con disegnate la banda dei cartelli e quella dei dialoghi, due righe di dieci miniature e sotto i pannelli Dialoghi e Cartelli dopo Prova OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_window_dark_it.png">
+<!-- TODO screenshot: preview_dark_it.webp, l'Anteprima dentro la pagina Video dopo Prova OCR, un pannello superato (vedi design/immagini-readme-2.0.md) -->
+<img alt="L'Anteprima dentro la pagina Video: la fascia del titolo con il nome del video e le frecce per il video sopra e sotto, un fotogramma con disegnate la banda dei cartelli e quella dei dialoghi, due righe di dieci miniature e sotto i pannelli Dialoghi e Cartelli dopo Prova OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_it.webp">
 
-La finestra Anteprima è dove regolo le bande prima di un lotto lungo:
+L'Anteprima è dove regolo le bande prima di un lotto lungo. Si apre dentro
+la pagina Video, sopra l'elenco (il pulsante **Anteprima** di una riga, un
+fotogramma in una riga aperta, o ⌘Y), con accanto il pannello Parametri.
+Nella sua fascia del titolo ci sono **‹** per tornare all'elenco (⌘[),
+**Anteprima di** e il nome del video, con durata, frame rate, dimensioni e
+fotogrammi trovati, e a destra le frecce per il video sopra e sotto
+nell'elenco (⌘↑ ⌘↓).
 
-- **Trova 20 fotogrammi** divide il video in 20 zone e in ognuna cerca un
-  fotogramma con del testo (fino a tre tentativi per zona). Parte da sola
-  quando apri un video che non ha ancora fotogrammi. Ogni miniatura dice se il
-  suo fotogramma ha testo nella banda dei dialoghi, in quella dei cartelli, in
-  tutte e due o in nessuna.
+- **Trova da sola 20 fotogrammi** la prima volta che apri un video: divide il
+  video in 20 zone e in ognuna cerca un fotogramma con del testo (fino a tre
+  tentativi per zona). I fotogrammi compaiono man mano che li trova, e
+  restano. Se la ricerca si ferma (l'hai fermata tu, è partito un lotto, o
+  una parte del video non si legge), **Riprova** la riprende dalle zone che
+  mancano. Ogni miniatura dice se il suo fotogramma ha testo nella banda dei
+  dialoghi, in quella dei cartelli, in tutte e due o in nessuna.
 - **Le bande sono disegnate sul fotogramma.** Trascina il bordo di una banda
   per l'altezza e i lati per la larghezza (la larghezza resta centrata): i
   valori sono gli stessi del pannello Parametri, e cambiano in tutti e due i
@@ -224,56 +282,79 @@ La finestra Anteprima è dove regolo le bande prima di un lotto lungo:
 - **Prova OCR** (⌘T) legge quel fotogramma con i parametri attuali e mostra,
   per ogni banda, il testo letto, confidenza e accordo, le letture alternative
   e il testo finale come andrebbe nell'SRT. I risultati restano legati al loro
-  fotogramma finché l'app è aperta; se cambi un parametro che conta, il
-  pannello dice che sono superati.
-- Durante un lotto l'Anteprima è in sola lettura.
+  fotogramma finché l'app è aperta. Se dopo la prova cambi un parametro che
+  conta, il pannello lo dice (il testo riportato sotto è precedente ai
+  cambiamenti) e **Riprova OCR con i nuovi parametri** la rifà.
+- Durante un lotto la ricerca dei fotogrammi e Prova OCR aspettano che
+  finisca.
 
 ### Revisione
 
-<img alt="La pagina Revisione con tre video elaborati, una riga aperta con tempi, file e la nota sui buchi, e davanti la finestra del report di revisione" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_it.png">
+<!-- TODO screenshot: review_dark_it.webp, un report di revisione aperto nella pagina Revisione (vedi design/immagini-readme-2.0.md) -->
+<img alt="Un report di revisione aperto nella pagina Revisione: la fascia del titolo con il nome del video, la barra del report con Salva SRT revisionato, e le righe con fotogramma, tempi e durata, una dubbia con le sue letture alternative e le parole diverse evidenziate" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_it.webp">
 
-La pagina **Revisione** elenca i video elaborati, con le righe, le righe
-scartate, i buchi senza sottotitoli e quando sono stati elaborati. Apri una
-riga per vederne i tempi, i file e i buchi da guardare. **Rivedi** (⌘R) apre
-il report di revisione del video in una finestra dell'app.
+La pagina **Revisione** elenca i video elaborati, con le righe, i buchi
+senza sottotitoli e quando sono stati elaborati. L'etichetta **SRT
+revisionato** dice che accanto al video c'è già un SRT revisionato,
+**revisione mancante** che il report non c'è più. Un clic su una riga, o
+**Apri**, e il report di revisione del video si apre nella pagina, sotto una
+fascia del titolo: **‹** torna all'elenco (⌘[), **Revisione di** e il nome
+del video con le sue righe, quelle da ricontrollare, i buchi e quando è
+stato elaborato, e a destra **Mostra nel Finder** e **Apri nel browser**.
+Ogni **Rivedi** dell'app porta lì: il pulsante di una riga nella pagina
+Video, ⌘R, il foglio di fine lotto e la notifica di un file finito.
 
 Il report di revisione è un editor, non solo un report. Dentro:
 
-- ogni riga ha una miniatura, la sua confidenza e l'accordo fra le letture; le
-  righe dubbie sono evidenziate;
+- una barra che resta in alto mentre scorri raccoglie le righe incluse,
+  **unisci duplicati**, **Ripristina tutto…** (prima chiede, e dice cosa si
+  perderebbe) e **Salva SRT revisionato** (⌘S);
+- ogni riga ha il suo fotogramma, inizio, fine e durata, la sua confidenza e
+  l'accordo fra le letture; le righe dubbie sono evidenziate, e una legenda
+  sottile in fondo alla pagina spiega i colori;
 - il testo è **modificabile**, e le **letture alternative** si applicano con
-  un clic, con le parole diverse evidenziate;
+  un clic, con le parole diverse evidenziate; **↺ Originale** riporta quello
+  che ha letto l'OCR, casella del cartello compresa;
+- **È un cartello (va in alto)**, sotto ogni riga, la scrive nell'SRT in
+  alto sullo schermo (con `{\an8}`);
 - le righe si includono o si escludono, e i flash e le letture di rumore
-  scartati si possono **recuperare**;
-- in un buco lungo puoi **aggiungere** una riga con i tempi già compilati; i
-  tempi sono modificabili e `{\an8}` si accende riga per riga;
+  scartati (**Scartate**) si possono **recuperare**;
+- i **buchi senza sottotitoli** più lunghi della soglia di Parametri › Righe
+  (6 s se non la cambi) sono elencati con un fotogramma a metà di ogni buco,
+  e **+ Aggiungi una riga qui** ne aggiunge una con i tempi già dentro il
+  buco; **+ Aggiungi riga** ne aggiunge una con i tempi vuoti, da compilare.
+  Le righe aggiunte a mano hanno un **+** al posto del numero, e la volta
+  dopo stanno al loro posto fra le altre;
 - **Salva SRT revisionato** scrive `<video>-reviewed-<data>.srt` accanto
   all'SRT originale, che resta com'era. Se in quella cartella non si può
   scrivere, l'app propone **Scegli dove salvarlo…**.
 
 Le modifiche si salvano man mano in `<video>.review.json`, accanto al report:
-chiudi la finestra, riaprila, e sono ancora lì. Il report segue la lingua
+esci dal report, riaprilo, e sono ancora lì. Il report segue la lingua
 dell'app. È anche un semplice file HTML: **Apri nel browser** lo apre nel tuo
-browser, dove funziona da solo, offline. **File › Apri un report…** (⌥⌘O)
-apre qualunque report di revisione, anche quelli fatti da SubVision 1.x.
+browser, dove funziona da solo, offline. **File › Apri una revisione…**
+(⌥⌘O) apre qualunque report di revisione, anche quelli fatti da SubVision
+1.x.
 
 ### Sub fix
 
-<img alt="La pagina Sub fix: a sinistra l'SRT scelto con cosa correggere, a destra i valori condivisi con Video, e la nota verde della copia corretta appena creata" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_it.png">
+<!-- TODO screenshot: subfix_dark_it.webp, la pagina Sub fix con le schede in alto (vedi design/immagini-readme-2.0.md) -->
+<img alt="La pagina Sub fix: a sinistra l'SRT scelto con cosa correggere, a destra i valori condivisi con Video, e la nota verde della copia corretta appena creata" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_it.webp">
 
 **Sub fix** pulisce un `.srt` esistente **senza rifare l'OCR**, in pochi
 secondi. Gli SRT fatti da SubVision sono già puliti: Sub fix serve per quelli
 che vengono da altrove (file vecchi, scaricati, modificati a mano), o per
 applicare nuove regole di `corrections.txt` a episodi già elaborati.
 
-Trascina un `.srt` sulla pagina o aprilo (⇧⌘O), scegli cosa correggere
-(unisci righe duplicate o simili, togli le righe senza sottotitoli e le frasi
-di `ignore.txt`, togli i flash più brevi di una durata minima) ed **Esegui Sub
-fix** (⌘↩). La copia corretta, `<nome>-fixed-<data>.srt`, va accanto
+Trascina un `.srt` sulla pagina o sceglilo (**Scegli SRT…**, ⇧⌘O), scegli
+cosa correggere (unisci righe duplicate o simili, togli le righe senza
+sottotitoli e le frasi di `ignore.txt`, togli i flash più brevi di una durata
+minima) ed **Esegui Sub fix** (⌘↩). La copia corretta, `<nome>-fixed-<data>.srt`, va accanto
 all'originale, che resta com'era. I valori condivisi con la pagina Video
 (intervallo di unione, a capo, lingua, i due elenchi) stanno nella stessa
 pagina, e cambiarli lì li cambia anche per Video. Sub fix funziona anche
-durante un lotto (i valori condivisi restano bloccati finché non finisce).
+durante un lotto, con la barra del lotto in basso (i valori condivisi restano
+bloccati finché non finisce).
 
 ### I file che SubVision scrive
 
@@ -307,8 +388,8 @@ SubVision parte.
 
 ### Impostazioni
 
-Le Impostazioni (⌘,) hanno quattro schede, con il predefinito scritto sotto
-ogni voce:
+Le Impostazioni (⌘,, o l'ingranaggio a destra della barra delle schede)
+hanno quattro schede, con il predefinito scritto sotto ogni voce:
 
 - **Generali**: lingua (parte nella lingua di macOS), aspetto (Sistema,
   Chiaro, Scuro), notifiche di macOS, avanzamento sull'icona del Dock.
@@ -318,8 +399,10 @@ ogni voce:
   del motore e di Python, e le lingue che Vision legge su questo Mac.
 - **Elenchi**: `ignore.txt` e `corrections.txt` (vedi sopra).
 - **Aggiornamenti**: SubVision controlla su GitHub se c'è una release nuova
-  all'avvio, al massimo una volta al giorno, e te lo dice. Puoi spegnere il
-  controllo, o farlo subito.
+  all'avvio, al massimo una volta al giorno. Quando c'è, nella barra delle
+  schede compare, accanto all'ingranaggio, la capsula **SubVision 2.x
+  disponibile**, che apre la pagina della release. Puoi spegnere il
+  controllo, o farlo subito (anche dal menu SubVision).
 
 Strumenti ed Elenchi sono bloccati durante un lotto: il lotto usa gli
 strumenti e gli elenchi con cui è partito.
@@ -328,25 +411,34 @@ strumenti e gli elenchi con cui è partito.
 
 | Scorciatoia | Azione |
 |---|---|
-| ⌘O | Apri video… (li aggiunge all'elenco) |
-| ⇧⌘O | Apri SRT… (Sub fix) |
-| ⌥⌘O | Apri un report… |
-| ⌘↩ | Avvia il lotto (su Video) · Esegui Sub fix (su Sub fix) |
+| ⌘O | Scegli video… (li aggiunge all'elenco) |
+| ⇧⌘O | Scegli SRT… (Sub fix) |
+| ⌥⌘O | Apri una revisione… |
+| ⌘↩ | Elabora i video spuntati (su Video) · Esegui Sub fix (su Sub fix) |
 | ⌥⌘. / ⌘. | Ferma il file in corso / Ferma tutto |
-| ⌘R | Rivedi il file selezionato |
+| ⌘R | Rivedi il video col fuoco |
+| ⌘S | Salva l'SRT revisionato (con un report aperto) |
 | ⇧⌘R | Mostra nel Finder |
-| ⌫ | Togli dall’elenco le righe selezionate (⌘Z le rimette) |
-| ⌘Y | Apri il video selezionato in Anteprima |
-| ⌘T, ⌘← ⌘→ | Prova OCR, fotogramma precedente e successivo (nella finestra Anteprima) |
+| ↑ ↓ · Spazio → ← | Sposta il fuoco nell'elenco · apri e chiudi la riga |
+| ⌫ | Togli dall’elenco la riga col fuoco (⌘Z la rimette) |
+| ⌘A | Spunta tutti i video (su Video) |
+| ⌘Y | Apri in Anteprima il video col fuoco |
+| ⌘T, ⌘← ⌘→ | Prova OCR, fotogramma precedente e successivo (nell'Anteprima) |
+| ⌘↑ ⌘↓ | Video precedente e successivo (nell'Anteprima) |
+| ⌘[ | Torna all'elenco, dall'Anteprima o da un report |
 | ⌘1 ⌘2 ⌘3 | Video, Revisione, Sub fix |
-| ⌃⌘S | Mostra o nascondi la barra laterale |
 | ⌘0 | Riporta la finestra principale |
 | ⌘, | Impostazioni |
 | ⌥⌘L | Apri il log dell'app in Console |
 
-La finestra può essere stretta: sotto i 1240 pt la barra laterale diventa una
-barra in alto, e sotto i 1000 pt il pannello Parametri scorre sopra la pagina
-(⌥⌘I).
+Ogni scorciatoia è anche nei menu. Il menu **SubVision** ha la versione
+(Informazioni su SubVision), **Controlla aggiornamenti…** e **SubVision su
+GitHub**.
+
+La finestra si apre grande almeno 1360 × 860 pt (quasi tutto lo schermo, se
+è più piccolo), così l'elenco e il pannello Parametri stanno affiancati. Si
+può stringere: sotto i 1100 pt il pannello si ritira in un pulsante nella
+barra in alto, e si apre sopra la pagina (⌥⌘I).
 
 ## Demo (Sintel)
 
@@ -361,7 +453,7 @@ repository, i file della demo sono allegati alla
 | --- | --- |
 | [`sintel_ita_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.mp4) / [`sintel_eng_hardsub_demo.mp4`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.mp4) | clip di 55 s con i sottotitoli impressi (IT / EN), circa 9 MB l'uno |
 | [`sintel_ita_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.srt) / [`sintel_eng_hardsub_demo.srt`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.srt) | l'SRT estratto da SubVision |
-| [`sintel_ita_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.revisione.html) / [`sintel_eng_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.revisione.html) | il report di revisione di ogni elaborazione, fatto da SubVision 1.0 (aprilo nel browser, o nell'app con File › Apri un report…) |
+| [`sintel_ita_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_ita_hardsub_demo.revisione.html) / [`sintel_eng_hardsub_demo.revisione.html`](https://github.com/Interstellar0verdrive/SubVision/releases/download/demo-assets/sintel_eng_hardsub_demo.revisione.html) | il report di revisione di ogni elaborazione, fatto da SubVision 1.0 (aprilo nel browser, o nell'app con File › Apri una revisione…) |
 
 **Accuratezza misurata sulla demo** con un profilo veloce (6 fps, salto 1,
 senza raffinamento dei tempi né banda cartelli; circa 20 secondi per clip):
@@ -375,8 +467,8 @@ senza raffinamento dei tempi né banda cartelli; circa 20 secondi per clip):
 
 Per riprovare tu: scarica un clip, trascinalo sulla pagina Video, imposta i
 Parametri come sopra (Lettura: 6 fotogrammi al secondo, salto 1; Bande:
-cartelli spenti; Righe: raffinamento spento) e premi **Avvia**. Per il clip
-inglese scegli l'inglese come lingua dei sottotitoli.
+cartelli spenti; Righe: raffinamento spento) e premi **Elabora 1 video**.
+Per il clip inglese scegli l'inglese come lingua dei sottotitoli.
 
 ## Come è costruita l'accuratezza
 
@@ -481,8 +573,8 @@ L'app sta in `macos/Native/`, il motore in `src/subvision/`, i suoi test in
   `ignore.txt` e `correzioni.txt` (diventano `ignore.txt` e `corrections.txt`,
   stesso formato), sostituendo gli elenchi di base o aggiungendoli in fondo.
 - **I tuoi SRT e i report di revisione** restano dove sono. L'app apre anche i
-  report della 1.x (File › Apri un report…). Le modifiche fatte a un report
-  della 1.x in un browser restano in quel browser.
+  report della 1.x (File › Apri una revisione…). Le modifiche fatte a un
+  report della 1.x in un browser restano in quel browser.
 - I parametri ripartono dai predefiniti: se li avevi cambiati, reimpostali nel
   pannello Parametri.
 
