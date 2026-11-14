@@ -4,6 +4,7 @@
 // button, the list's checkboxes (the header's one has three states) and the
 // progress bar split into one segment per file of a batch.
 
+import AppKit
 import SwiftUI
 
 // MARK: - Title band
@@ -28,6 +29,8 @@ public struct TitleBand<Trailing: View>: View {
     @ViewBuilder var trailing: () -> Trailing
 
     public static var height: CGFloat { 86 }
+    /// The capitals of the 24 pt bold title.
+    static var titleCapHeight: CGFloat { NSFont.systemFont(ofSize: 24, weight: .bold).capHeight }
 
     public init(prefix: String, name: String, subtitle: String = "", backHelp: String,
                 maxContentWidth: CGFloat? = nil, shortcut: Bool = true, back: @escaping () -> Void,
@@ -43,7 +46,10 @@ public struct TitleBand<Trailing: View>: View {
     }
 
     public var body: some View {
-        HStack(spacing: 16) {
+        // The line the stack aligns on (the circle's middle, the text's) in the band's middle:
+        // a frame would centre the stack's bounds, which reach lower than the text.
+        CentredOnGuide {
+        HStack(alignment: .bandMiddle, spacing: 16) {
             BackCircleButton(help: backHelp, shortcut: shortcut, action: back)
             VStack(alignment: .leading, spacing: 3) {
                 title
@@ -55,14 +61,21 @@ public struct TitleBand<Trailing: View>: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // The round button on the middle of the text as it reads, from the top of the
+            // title's capitals to the details' baseline (C3-07): the title's line box has the
+            // ascenders' room above the capitals, which put the words 2 pt low.
+            .alignmentGuide(.bandMiddle) { d in
+                (d[.firstTextBaseline] - Self.titleCapHeight + d[.lastTextBaseline]) / 2
+            }
             .accessibilityElement(children: .combine)
             HStack(spacing: 8) { trailing() }
                 .fixedSize()
         }
+        }
+        .frame(height: Self.height)
         .frame(maxWidth: maxContentWidth ?? .infinity)
         .padding(.horizontal, 28)
         .frame(maxWidth: .infinity)
-        .frame(height: Self.height)
         .background(SV.bg)
         .overlay(alignment: .bottom) { Rectangle().fill(SV.line).frame(height: 1) }
     }
@@ -71,6 +84,33 @@ public struct TitleBand<Trailing: View>: View {
         let lead = Text(verbatim: prefix.isEmpty ? "" : prefix + " ").font(.system(size: 24, weight: .regular)).foregroundStyle(SV.text2)
         let bold = Text(verbatim: name).font(.system(size: 24, weight: .bold)).foregroundStyle(SV.text)
         return Text("\(lead)\(bold)").tracking(-0.24)
+    }
+}
+
+extension VerticalAlignment {
+    /// The title band's line: the middle of the round button and of the text as it reads.
+    /// A custom alignment, so a stack hands it on (the built-in `.center` of a stack is its
+    /// bounds' middle).
+    private enum BandMiddle: AlignmentID {
+        static func defaultValue(in d: ViewDimensions) -> CGFloat { d[VerticalAlignment.center] }
+    }
+
+    static let bandMiddle = VerticalAlignment(BandMiddle.self)
+}
+
+/// One view, placed so that its `.bandMiddle` line is in the middle of the space, its width
+/// the space's.
+struct CentredOnGuide: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let size = subviews.first?.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil)) ?? .zero
+        return CGSize(width: proposal.width ?? size.width, height: proposal.height ?? size.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let view = subviews.first else { return }
+        let width = ProposedViewSize(width: bounds.width, height: nil)
+        let d = view.dimensions(in: width)
+        view.place(at: CGPoint(x: bounds.minX, y: bounds.midY - d[.bandMiddle]), anchor: .topLeading, proposal: width)
     }
 }
 
