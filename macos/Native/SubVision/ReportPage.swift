@@ -193,7 +193,9 @@ struct ReportPage: View {
         .background(SV.bg)
         // The band's ‹ and View › Back (⌘[) go back to the list.
         .onAppear { model.backAction = { [weak model] in model?.closeReport() } }
-        .onDisappear { model.backAction = nil }
+        // Gone with the report, or with the page; not when a report opened again at once (the
+        // band of the new one appeared before this one finished sliding out).
+        .onDisappear { if model.report.session == nil || model.tab != .review { model.backAction = nil } }
     }
 
     private var content: some View {

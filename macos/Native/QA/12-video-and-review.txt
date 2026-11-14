@@ -60,6 +60,17 @@ theme light
 capture $OUT/RV1-light.png
 ? RV1-light.png$
 theme dark
+# N1 · in a narrow window the time processed goes into the row's second line; the report keeps its band
+size 760x640
+capture $OUT/RV1-narrow-dark.png
+? RV1-narrow-dark.png$
+review 0
+? · ready · 
+capture $OUT/R1-narrow-dark.png
+? R1-narrow-dark.png$
+report-back
+? ^list
+size 1360x840
 # R1 · «Apri»: the report in the page, under the title band; View › Back and ⌘S on
 review 0
 ? ^Revisione di sintel_ita_hardsub_demo\.mp4 · [0-9]+ righe · [0-9]+ da ricontrollare · [0-9]+ buch[io] · elaborato oggi alle [0-9:.]+ · ready · tab review · back on · save on$
