@@ -219,7 +219,7 @@ def test_videos_probe(sidecar: Sidecar, work: dict):
     assert len(vids) == 3
     for v in vids[:2]:
         assert 50 < v["duration"] < 60 and v["fps"] > 20 and v["width"] > 0 and v["height"] > 0
-        assert "error" not in v
+        assert v["video_codec"] == "h264" and "error" not in v
     assert vids[2]["error"] == "probe_failed" and vids[2]["path"] == str(bogus)
     assert vids[2]["code"] == "probe_failed" and vids[2]["tool"] == "ffprobe" and vids[2]["detail"]
 

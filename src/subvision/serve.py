@@ -382,15 +382,18 @@ def _lists_import(params: dict) -> dict:
 # --- videos ----------------------------------------------------------------
 
 def _probe(path: str) -> Dict[str, Any]:
-    """duration, fps, width, height of one video through ffprobe (json output)."""
-    cmd = [core.FFPROBE, "-v", "error", "-select_streams", "v:0",
-           "-show_entries", "stream=width,height,avg_frame_rate,r_frame_rate:format=duration",
+    """duration, fps, width, height of one video through ffprobe (json output),
+    and the codecs of its first video and audio streams (the to-do drawer, C3-02)."""
+    cmd = [core.FFPROBE, "-v", "error",
+           "-show_entries", "stream=codec_type,codec_name,width,height,avg_frame_rate,r_frame_rate:format=duration",
            "-of", "json", path]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=60,
                              check=True, stdin=subprocess.DEVNULL).stdout
         info = json.loads(out)
-        stream = (info.get("streams") or [{}])[0]
+        streams = info.get("streams") or []
+        stream = next((s for s in streams if s.get("codec_type") == "video"), {})
+        audio = next((s for s in streams if s.get("codec_type") == "audio"), {})
         duration = float((info.get("format") or {}).get("duration") or 0)
         fps = 0.0
         for key in ("avg_frame_rate", "r_frame_rate"):
@@ -404,8 +407,13 @@ def _probe(path: str) -> Dict[str, Any]:
                 break
         if duration <= 0 or not stream:
             raise ValueError("no video stream or duration")
-        return {"path": path, "duration": round(duration, 3), "fps": round(fps, 3),
-                "width": int(stream.get("width") or 0), "height": int(stream.get("height") or 0)}
+        reply = {"path": path, "duration": round(duration, 3), "fps": round(fps, 3),
+                 "width": int(stream.get("width") or 0), "height": int(stream.get("height") or 0)}
+        if stream.get("codec_name"):
+            reply["video_codec"] = str(stream["codec_name"])
+        if audio.get("codec_name"):
+            reply["audio_codec"] = str(audio["codec_name"])
+        return reply
     except (OSError, subprocess.SubprocessError, ValueError, KeyError) as e:
         detail = str(e)
         if isinstance(e, subprocess.CalledProcessError) and e.stderr:

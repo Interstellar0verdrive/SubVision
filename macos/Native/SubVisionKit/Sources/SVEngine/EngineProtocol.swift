@@ -170,6 +170,9 @@ public struct VideoInfo: Decodable, Sendable, Equatable {
     public var fps: Double?
     public var width: Int?
     public var height: Int?
+    /// ffprobe's names of the first video and audio streams (`h264`, `aac`); nil from an older engine.
+    public var videoCodec: String?
+    public var audioCodec: String?
     public var error: String?
     public var message: String?
 }
