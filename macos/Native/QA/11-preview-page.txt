@@ -119,11 +119,11 @@ preview-video down
 ? ^ok · sintel_eng_hardsub_demo\.mp4$
 preview-state
 ? complete .* test done
-# Back: the list, its selection, the panel's tab as before, Back off.
+# Back: the list, its focus, the panel's tab as before, Back off.
 preview-close
 ? ^ok · tab process · back off$
 preview-state
 ? ^page hidden .* panel read
-bottom-bar
-? ^selection 1 
+focused
+? ^focus sintel_eng_hardsub_demo\.mp4$
 params default

@@ -43,7 +43,7 @@
 //                                  engine stops it only if it is still the one in progress, else "not_running";
 //                                  without it, the file in progress whatever it is. Replies with the engine's answer.
 //   C2 · Video, Review and the panel: inspector-tab read|bands|lines · params-reset (undoable) ·
-//   focus <idx> (the keyboard's ring on a row of Video; empty lets it go) · bottom-bar · remove-focused ·
+//   focus <idx> (the keyboard's ring on a row of Video; empty lets it go) · focused · bottom-bar · remove-focused ·
 //   review-state · review-select <idx> (the Review list, that row last opened) · review <idx> (its report in the page)
 //   C3 · the frame: batch-bar (the window's batch bar: hidden, or its line, segments and percentage) ·
 //   summary-sheet (the end-of-batch sheet: its title, the page under it and each row's outcome)
@@ -313,6 +313,9 @@ enum DebugQA {
             return "focus \(model.focusedVideo?.name ?? "-") · " + bottomBar(model)
         case "bottom-bar":
             return bottomBar(model)
+        case "focused":
+            // The row with the keyboard's ring, without moving it.
+            return "focus \(model.focusedVideo?.name ?? "-")"
         case "remove-focused":
             guard model.canRemoveFocused else { return "cannot remove" }
             model.removeFocused()
