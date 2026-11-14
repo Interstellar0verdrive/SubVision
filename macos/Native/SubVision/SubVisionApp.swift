@@ -42,6 +42,7 @@ struct SubVisionApp: App {
             Task { await model.engine.terminateNow() }
         }
         SVAlert.iconSource = .default
+        MenuShortcuts.install()
         model.start()
         #if DEBUG
         DebugSnapshot.scheduleIfAsked(model: model)

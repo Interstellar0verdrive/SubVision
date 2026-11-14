@@ -64,17 +64,24 @@ struct ProcessView: View {
     // MARK: - Selection
 
     /// Esc deselects the rows (design note 58), unless a text field, a sheet or the
-    /// inspector laid over a narrow window has a better use for it.
+    /// inspector laid over a narrow window has a better use for it. ⌫ and ⌦ remove the
+    /// rows selected (File › Remove from List): the menu item's ⌫ is U+0008, and the Delete
+    /// key types U+007F, which that key equivalent does not match (manual tests, 14/11).
     private func installEscape() {
         guard escMonitor == nil else { return }
         let chrome = chrome
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [model] event in
-            guard event.keyCode == 53, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+            guard [53, 51, 117].contains(event.keyCode), event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty,
                   model.tab == .process, !model.selection.isEmpty,
                   let window = event.window, window.isMainWindow, window.attachedSheet == nil,
-                  !(window.firstResponder is NSText),
-                  !(model.inspectorOpen && chrome.inspectorOverlays(windowWidth: window.frame.width)) else { return event }
-            model.selection = []
+                  !(window.firstResponder is NSText) else { return event }
+            if event.keyCode == 53 {
+                guard !(model.inspectorOpen && chrome.inspectorOverlays(windowWidth: window.frame.width)) else { return event }
+                model.selection = []
+            } else {
+                guard model.canRemoveSelection else { return event }
+                model.removeSelection()
+            }
             return nil
         }
     }
