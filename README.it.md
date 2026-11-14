@@ -335,9 +335,12 @@ strumenti e gli elenchi con cui è partito.
 | ⌥⌘. / ⌘. | Ferma il file in corso / Ferma tutto |
 | ⌘R | Rivedi il file selezionato |
 | ⇧⌘R | Mostra nel Finder |
+| ⌫ | Togli dall’elenco le righe selezionate (⌘Z le rimette) |
 | ⌘Y | Apri il video selezionato in Anteprima |
 | ⌘T, ⌘← ⌘→ | Prova OCR, fotogramma precedente e successivo (nella finestra Anteprima) |
 | ⌘1 ⌘2 ⌘3 | Video, Revisione, Sub fix |
+| ⌃⌘S | Mostra o nascondi la barra laterale |
+| ⌘0 | Riporta la finestra principale |
 | ⌘, | Impostazioni |
 | ⌥⌘L | Apri il log dell'app in Console |
 

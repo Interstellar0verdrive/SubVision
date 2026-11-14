@@ -329,9 +329,12 @@ lists it started with.
 | ⌥⌘. / ⌘. | Stop the Current File / Stop All |
 | ⌘R | Review the selected file |
 | ⇧⌘R | Show in Finder |
+| ⌫ | Remove the selected rows from the list (⌘Z puts them back) |
 | ⌘Y | Open the selected video in Preview |
 | ⌘T, ⌘← ⌘→ | Try OCR, previous and next frame (in the Preview window) |
 | ⌘1 ⌘2 ⌘3 | Video, Review, Sub fix |
+| ⌃⌘S | Show or hide the sidebar |
+| ⌘0 | Bring back the main window |
 | ⌘, | Settings |
 | ⌥⌘L | Open the app's log in Console |
 
