@@ -1162,9 +1162,14 @@ def _esc(s: str) -> str:
 # the title band above it; in a browser a plain page title comes first.
 # In both the header of the summary box (the report bar) sticks to the top
 # when the page scrolls, and the legend stays fixed at the bottom.
+# <meta name="subvision-report" content="N"> says which template wrote the
+# page (REPORT_VERSION): the app upgrades a report without it, or with an
+# older N, to the current template (report_upgrade.py) before showing it.
+REPORT_VERSION = 2
 _QC_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="__LANG__"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="subvision-report" content="__REPORT_VERSION__">
 <title>__T_TITLE__ __VIDEO__</title>
 <script id="appmode">
  // In the SubVision app the title band is native: hide the page title
@@ -1977,7 +1982,8 @@ def _fmt_seconds(value: float, lang: str) -> str:
 # report; the script picks one at open (see _QC_TEMPLATE).
 # "html": __T_*__ tokens / data-i18n keys of the markup; "js": the T object
 # used by the scripts; "flags": texts of the segment flag codes (FLAG_*) set
-# by the pipeline; "summary": the recap at the top of the report.
+# by the pipeline; "summary": the recap at the top of the report, then
+# "stats" (frames, OCR readings, boundaries refined, time) when known.
 # No emoji and no {\an8} anywhere in the texts (C3, report v2).
 _QC_I18N = {
     "it": {
@@ -2055,9 +2061,9 @@ _QC_I18N = {
         },
         "summary": (
             "SRT <b>{srt}</b> · righe <b>{rows}</b> · da ricontrollare <b>{warn}</b> · "
-            "scartate (recuperabili) <b>{dropped}</b> · buchi oltre {gap} s <b>{gaps}</b> · "
-            "{frames} fotogrammi · {ocr} letture OCR · {refined} confini raffinati · {elapsed}"
+            "scartate (recuperabili) <b>{dropped}</b> · buchi oltre {gap} s <b>{gaps}</b>"
         ),
+        "stats": "{frames} fotogrammi · {ocr} letture OCR · {refined} confini raffinati · {elapsed}",
         "footer": "Generato con SubVision v{version} — <a href=\"{url}\">{host}</a>",
     },
     "en": {
@@ -2133,9 +2139,9 @@ _QC_I18N = {
         },
         "summary": (
             "SRT <b>{srt}</b> · lines <b>{rows}</b> · to re-check <b>{warn}</b> · "
-            "dropped (recoverable) <b>{dropped}</b> · gaps over {gap} s <b>{gaps}</b> · "
-            "{frames} frames · {ocr} OCR readings · {refined} boundaries refined · {elapsed}"
+            "dropped (recoverable) <b>{dropped}</b> · gaps over {gap} s <b>{gaps}</b>"
         ),
+        "stats": "{frames} frames · {ocr} OCR readings · {refined} boundaries refined · {elapsed}",
         "footer": "Generated with SubVision v{version} — <a href=\"{url}\">{host}</a>",
     },
 }
@@ -2166,12 +2172,6 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
     ui_lang ("it" | "en") only sets the initial <html lang> and the texts
     shown before the script runs (kept for signature compatibility).
     """
-    import json
-
-    if ui_lang not in _QC_I18N:
-        ui_lang = "it"
-    tr = _QC_I18N[ui_lang]
-
     def row_cls(s: SegInfo) -> str:
         if s.conf < 0.5 or s.agree < 0.5:
             return "bad"
@@ -2192,39 +2192,76 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
             "cls": "bad" if is_dropped else row_cls(s),
         })
 
-    def gap_edge(a: float, b: float) -> str:
-        # a gap from 0 is the start of the video; one with no line after it, the end
-        if a <= 1e-3:
-            return "start"
-        if not any(s.start >= b - 1e-3 for s in segs):
-            return "end"
-        return ""
+    gap_rows = [{"start": round(a, 3), "end": round(b, 3), "thumb": th} for a, b, th in gaps]
+    warn_rows = sum(1 for s in segs
+                    if s.conf < p.qc_conf_warn or s.agree < p.qc_agree_warn or s.flags)
+    stats_values = {"frames": stats.frames, "ocr": stats.ocr_calls,
+                    "refined": stats.refined, "elapsed": fmt_hms(stats.elapsed)}
+    html = render_qc_html(video_name, srt_name, rows, gap_rows, p.qc_gap_warn,
+                          warn_rows, stats_values, ui_lang)
+    path.write_text(html, encoding="utf-8")
 
+
+def gap_edges(rows: List[Dict[str, Any]], gaps: List[Dict[str, Any]]) -> None:
+    """
+    Sets `edge` on every gap of the report data: "start" for a gap from 0
+    (the start of the video), "end" for one with no line after it (none of
+    the rows not dropped starts at or after its end), "" otherwise.
+    """
+    starts = [r["start"] for r in rows if not r.get("dropped") and r.get("start") is not None]
+    for g in gaps:
+        a, b = g["start"], g["end"]
+        if a <= 1e-3:
+            g["edge"] = "start"
+        elif not any(st >= b - 1e-3 for st in starts):
+            g["edge"] = "end"
+        else:
+            g["edge"] = ""
+
+
+def render_qc_html(video_name: str, srt_name: str, rows: List[Dict[str, Any]],
+                   gaps: List[Dict[str, Any]], gap_warn: float, warn_rows: int,
+                   stats: Optional[Dict[str, Any]], ui_lang: str = "it") -> str:
+    """
+    The review report page (current template, REPORT_VERSION) for the data
+    of write_qc_html: `rows` as it builds them (OCR rows, then the dropped
+    ones), `gaps` as {start, end, thumb} (their `edge` is set here),
+    `gap_warn` the threshold of the gaps in seconds, `warn_rows` the lines
+    to re-check of the summary and `stats` {frames, ocr, refined, elapsed}
+    for its second half (None: left out, as for an upgraded old report that
+    does not say them). Also used by report_upgrade.py.
+    """
+    import json
+
+    if ui_lang not in _QC_I18N:
+        ui_lang = "it"
+    tr = _QC_I18N[ui_lang]
+    gap_edges(rows, gaps)
+    lines = sum(1 for r in rows if not r.get("dropped"))
     data = {
         "srtName": srt_name, "videoName": video_name,
         "rows": rows,
-        "gaps": [{"start": round(a, 3), "end": round(b, 3), "thumb": th, "edge": gap_edge(a, b)}
-                 for a, b, th in gaps],
-        "gapWarn": p.qc_gap_warn,
+        "gaps": gaps,
+        "gapWarn": gap_warn,
     }
-    warn_rows = sum(1 for s in segs
-                    if s.conf < p.qc_conf_warn or s.agree < p.qc_agree_warn or s.flags)
     texts = {}
     for lang, ltr in _QC_I18N.items():
+        summary = ltr["summary"].format(
+            srt=_esc(srt_name), rows=lines, warn=warn_rows,
+            dropped=len(rows) - lines, gap=_fmt_seconds(gap_warn, lang),
+            gaps=len(gaps))
+        if stats:
+            summary += " · " + ltr["stats"].format(**stats)
         texts[lang] = {
             "html": ltr["html"], "js": ltr["js"], "flags": ltr["flags"],
-            "summary": ltr["summary"].format(
-                srt=_esc(srt_name), rows=len(segs), warn=warn_rows,
-                dropped=len(dropped), gap=_fmt_seconds(p.qc_gap_warn, lang),
-                gaps=len(gaps), frames=stats.frames,
-                ocr=stats.ocr_calls, refined=stats.refined,
-                elapsed=fmt_hms(stats.elapsed)),
+            "summary": summary,
             "footer": ltr["footer"].format(version=__version__, url=REPO_URL,
                                            host=REPO_URL.split("://", 1)[-1]),
         }
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     i18n = json.dumps(texts, ensure_ascii=False).replace("</", "<\\/")
-    html = _QC_TEMPLATE.replace("__LANG__", ui_lang)
+    html = (_QC_TEMPLATE.replace("__LANG__", ui_lang)
+            .replace("__REPORT_VERSION__", str(REPORT_VERSION)))
     for key, val in tr["html"].items():
         html = html.replace(f"__T_{key}__", val)
     html = (html
@@ -2233,8 +2270,7 @@ def write_qc_html(path: Path, video_name: str, srt_name: str,
             .replace("__FOOTER__", texts[ui_lang]["footer"]))
     # the two JSON blocks in one pass: their content is never re-scanned
     blocks = {"__DATA__": payload, "__I18N__": i18n}
-    html = re.sub(r"__(?:DATA|I18N)__", lambda m: blocks[m.group(0)], html)
-    path.write_text(html, encoding="utf-8")
+    return re.sub(r"__(?:DATA|I18N)__", lambda m: blocks[m.group(0)], html)
 
 
 # ---------------------------------------------------------------- orchestration
