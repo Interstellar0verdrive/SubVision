@@ -464,3 +464,19 @@ Ramo `c3-decisions` (da `native-2.0`): le decisioni prese su «Da decidere» qui
 **Da guardare:** le icone SF hanno centri diversi tra loro (il fumetto di Video ha la coda in basso, la lente di Revisione scende): con il centro dell'inchiostro restano entro 0,5 pt dalle parole, non a zero. La capsula dell'aggiornamento nelle catture di `capture` ha due trattini ai lati: è il disegno di `cacheDisplay`, nello screenshot vero (`screencapture`) non c'è.
 
 **Verifiche:** `swift test` verde (42 + 10 + 21 + 9, tre test nuovi); test dei cataloghi dell'app verdi; `tools/check_locales.py` OK (715 chiavi per lingua); `pytest` 122 superati e 4 saltati (il test del lanciatore dopo aver ripuntato il venv di sviluppo); QA 18 su 18 (il 10 saltato: servono i video del proprietario); nell'ultimo giro completo il 16 è caduto una volta (Esc arrivato alla finestra invece che all'avviso «Ferma tutto», che non era ancora in primo piano) e rifatto da solo è passato due volte su due; `subvision --version` 2.0.0 dal checkout di `native-2.0`. Catture nella scratchpad della sessione, cartella `c3-decisions-shots` (prima/dopo della centratura in `centring/`).
+
+## Decisioni del proprietario sul giro C3 (14/11, tela versione 35)
+
+1. Buchi: resta la soglia di 6 s (parametro in Parametri › Righe); tavole corrette (E10, E3, R1, R2, RV1).
+2. Capsula «SubVision X disponibile» nella barra delle schede, a sinistra della rotella, neutra con bordo ciano (E3, DS4). — [fatto · `019d873`]
+3. Finestra stretta: va bene il pannello che parte chiuso; niente ×, si chiude ricliccando l'icona nella barra (N2). — [fatto · `3c705d2`]
+4. ⌘[ mostrato come «⌘ò» con la tastiera italiana: standard di macOS, va bene.
+5. «Vai a Revisione»: un video → il suo report, più video → l'elenco. — ok
+6. ⌘S «Salva SRT revisionato» nel menu File; aggiunto alla tavola O9.
+7. «Riprova»: subito con quel solo file senza lotto; durante un lotto «In coda, dopo il lotto» e parte da sola alla fine. — [fatto · `95e9e67`, `f264778`]
+   Nota: la riga «Fermato…» non si nota (testo grigio, icona simile a un pulsante di stop, bordo grigio). **Proposta nelle tavole E3, E5, DS3, DS4: colore lilla per «fermato da te», mano alzata in un cerchio tinto, testo «Fermato da te …» lilla.** — da approvare, poi nell'app
+8. Stima prima del primo file: ok. 9. Testo di A1 dopo «Ferma»: ok, tavola A1; la ricerca interrotta da un lotto è la nuova A7.
+10. Revisione senza voci a zero e «revisione mancante» sulla riga. — [fatto · `dec3bd4`]
+- Striscia di trascinamento alta una volta e mezza (69 pt). — [fatto · `ec200ec`]
+- La pagina «Proposta C3 · scuro» è tolta dalla tela: tutto è nelle pagine «Native screens» scura e chiara.
+- Centratura verticale di icone e testi in tutta l'app (schede, fascia del titolo, barra del lotto, capsule, puntini) e cerchi di stato tutti da 22 pt: fatti nel ramo `c3-decisions`. Il pannello tagliato a destra nella finestra stretta non si è riprodotto: corretto l'unico caso trovato (`51186ba`); se si rivede, servono pagina e larghezza.
