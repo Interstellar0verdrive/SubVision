@@ -22,7 +22,18 @@ public final class ShellAppDelegate: NSObject, NSApplicationDelegate {
     /// Before any window: the saved appearance, so nothing flashes the other one.
     public var willFinishLaunching: @MainActor () -> Void = {}
 
-    public override init() {}
+    public override init() {
+        // No window restoration at all: a main window closed during a batch (⌘W keeps the app
+        // working) was saved as "no windows", and every launch after it came up with none,
+        // the engine never started (QA scenarios stuck on wait-ready). The window's size and
+        // place come from `WindowSizer`, the rest of the state from the app's own records.
+        UserDefaults.standard.register(defaults: ["ApplePersistenceIgnoreState": true, "NSQuitAlwaysKeepsWindows": false])
+        super.init()
+    }
+
+    public func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
+    public func application(_ app: NSApplication, shouldSaveSecureApplicationState coder: NSCoder) -> Bool { false }
+    public func application(_ app: NSApplication, shouldRestoreSecureApplicationState coder: NSCoder) -> Bool { false }
 
     public func applicationWillFinishLaunching(_ notification: Notification) {
         willFinishLaunching()
