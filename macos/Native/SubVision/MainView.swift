@@ -79,23 +79,25 @@ struct Page: View {
     }
 }
 
-/// The top bar's right side, before the shell's gear: a newer release (the yellow
-/// chip, in place of the sidebar's update card) and, in a narrow window, the
-/// parameters button on the pages that have the panel (N1, N2).
+/// The top bar's right side, before the shell's gear: in a narrow window the parameters
+/// button on the pages that have the panel (N1, N2: it opens and closes the panel, "on"
+/// while it is open), then a newer release, right beside the gear: a neutral capsule with
+/// the accent's thin border and text (yellow says a warning or a value changed).
 struct TopBarTrailing: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        if model.tab == .process, model.inspectorOverlays {
+            ChromeIconButton("sidebar.right", help: model.t(model.inspectorOpen ? "app.inspector.close" : "app.process.show_inspector_help"),
+                             on: model.inspectorOpen) {
+                model.toggleInspector()
+            }
+        }
         if let update = model.updateAvailable {
-            TopBarChip(model.t("app.common.update_chip", ["version": update.version]), tone: .yellow) {
+            TopBarChip(model.t("app.common.update_chip", ["version": update.version]), outline: .accent) {
                 NSWorkspace.shared.open(update.url)
             }
             .help(model.t("app.common.update_chip_help"))
-        }
-        if model.tab == .process, model.inspectorOverlays {
-            ChromeIconButton("sidebar.right", help: model.t("app.process.show_inspector_help"), on: model.inspectorOpen) {
-                model.toggleInspector()
-            }
         }
     }
 }
