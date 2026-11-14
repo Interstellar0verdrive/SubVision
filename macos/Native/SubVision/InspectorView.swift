@@ -16,7 +16,7 @@ import SVShell
 import SwiftUI
 
 /// Where the parameters panel is: the main window (Video, with the frame's schema in
-/// Bands) or the Preview window (no schema: the frame is next to it).
+/// Bands) or the Preview page (no schema: the frame is next to it).
 enum InspectorPlace { case main, preview }
 
 /// The panel's tabs (design note 51). The raw values are those of `key` in UserDefaults.
@@ -335,7 +335,7 @@ struct InspectorView: View {
                 .padding(.bottom, 4)
             SectionText(model.t("app.inspector.schema_caption")).padding(.bottom, 4)
         } else {
-            // The Preview window: the frame is next to the panel (C2-A1, C2-A3).
+            // The Preview page: the frame is next to the panel (C2-A1, C3-09).
             SectionText(model.t(locked ? "app.inspector.bands_locked" : "app.inspector.bands_preview")).padding(.top, 12)
         }
         InspectorSection(changed: signsChanges.contains(true),

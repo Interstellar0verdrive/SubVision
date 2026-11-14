@@ -29,6 +29,7 @@ enum DebugSnapshot {
             await capture(model, "\(base)-process-empty.png", schemes: schemes)
             model.openPreview(nil)
             await capture(model, "\(base)-preview-empty.png", schemes: schemes)
+            model.closePreview()
             model.tab = .fix
             await capture(model, "\(base)-fix-empty.png", schemes: schemes)
             if let srt = env["SUBVISION_SNAPSHOT_FIX"], !srt.isEmpty {
@@ -43,6 +44,7 @@ enum DebugSnapshot {
                 await capture(model, "\(base)-process-videos.png", schemes: schemes)
                 model.openPreview(nil)
                 await capture(model, "\(base)-preview-videos.png", schemes: schemes)
+                model.closePreview()
                 model.tab = .process
             }
             // The narrow window (760x640, as N1 and N2): the parameters retracted.
@@ -216,8 +218,7 @@ enum DebugSnapshot {
         guard let video = model.videos.first(where: { $0.state == .ready }) else { return }
         let window = WindowSizer.main(model.config)
         model.inspectorOpen = false
-        model.openPreview(nil)
-        model.selectPreviewVideo(video.id)
+        model.openPreview(video.id)
         try? await Task.sleep(for: .milliseconds(500))
         await capture(model, "\(base)-A1.png", schemes: schemes)
         // A2: the search at zone 12, fed by hand (on the demo clip the real one
@@ -226,6 +227,8 @@ enum DebugSnapshot {
         try? await Task.sleep(for: .milliseconds(400))
         await capture(model, "\(base)-A2.png", schemes: schemes)
         model.preview.search = .idle
+        model.preview.searching = nil
+        _ = await DebugQA.wait(180, { !model.isSearchingFrames })
         model.findFrames()
         guard await DebugQA.wait(180, { !model.isSearchingFrames }), let result = model.previewResult else { return }
         try? await Task.sleep(for: .seconds(1))
@@ -246,8 +249,7 @@ enum DebugSnapshot {
         await capture(model, "\(base)-A4.png", schemes: schemes)
         // A5, fed by hand: no zone with text, the duration not read, a stale test with an empty dialogue band.
         var silent = result
-        silent.frames = result.frames.map { var f = $0; f.bands = []; f.hasText = false; return f }
-        silent.index = min(silent.index, silent.frames.count - 1)
+        for f in result.frames { var g = f; g.bands = []; g.hasText = false; silent.search.add(g, zone: f.zone ?? 0) }
         model.preview.results[video.id] = silent
         model.preview.search = .failed(code: "invalid_duration", message: nil)
         let json = #"{"bands":{"bottom":{"text":"","conf":0,"agree":0,"alts":[],"final":"","ms":214,"variants":3,"empty":true},"top":{"text":"IL MERCATO","conf":0.71,"agree":0.67,"alts":["IL MERCAT0","LL MERCATO"],"final":"{\\an8}IL MERCATO","ms":96,"variants":3,"empty":false}}}"#

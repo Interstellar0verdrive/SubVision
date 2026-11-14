@@ -10,8 +10,8 @@ import SVShell
 import SwiftUI
 
 /// The pages, segments of the top bar (design note 80, C3 navigation N-A): Video (the list, the parameters, Start),
-/// Review (the videos processed), then Sub fix among the tools. Preview is a window of
-/// its own (`PreviewWindow.swift`). `process` keeps its raw value: the notifications
+/// Review (the videos processed), then Sub fix among the tools. Preview is a page over
+/// the list of Video (`PreviewPage.swift`). `process` keeps its raw value: the notifications
 /// and the QA scenarios name the pages by it.
 enum Tab: String, CaseIterable, Identifiable {
     case process, review, fix
@@ -71,8 +71,13 @@ final class AppModel {
     /// The page in front has a title band with its back button (the report in Review, Preview;
     /// C3-07, C3-09): View › Back (⌘[) runs it. The page sets it when it shows the band and
     /// clears it when it goes, and builds its band with `TitleBand(shortcut: false)`.
-    @ObservationIgnored var backAction: (@MainActor () -> Void)? { didSet { canGoBack = backAction != nil } }
+    @ObservationIgnored var backAction: (@MainActor () -> Void)? {
+        didSet { canGoBack = backAction != nil; backGeneration &+= 1 }
+    }
     var canGoBack = false
+    /// Goes up at every change of `backAction`: a page that set it clears it on its way out
+    /// only if no other page has set its own since (their onAppear and onDisappear interleave).
+    @ObservationIgnored var backGeneration = 0
     /// Goes up by one to open the inspector's language menu (O7's "Choose the Language").
     var languageMenuRequest = 0
     var checkingUpdates = false

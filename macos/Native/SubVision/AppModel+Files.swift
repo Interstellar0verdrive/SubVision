@@ -353,7 +353,7 @@ extension AppModel {
     func selectAllInContext() {
         let window = NSApp.keyWindow
         let main = window?.identifier?.rawValue.hasPrefix(config.mainWindowID) == true
-        if main, tab == .process, !videos.isEmpty, !(window?.firstResponder is NSText) {
+        if main, tab == .process, !preview.shown, !videos.isEmpty, !(window?.firstResponder is NSText) {
             selectAll()
         } else {
             NSApp.sendAction(#selector(NSResponder.selectAll(_:)), to: nil, from: nil)
@@ -366,10 +366,10 @@ extension AppModel {
         NSWorkspace.shared.activateFileViewerSelecting(urls)
     }
 
-    /// The row's Preview button, its menus: the Preview window on that video (design note 80).
+    /// The row's Preview button, its menus: the Preview page on that video (C3-09).
     func openInPreview(_ id: UUID) { openPreview(id) }
 
-    /// The video the Preview window shows: the chosen one, else the first of the list.
+    /// The video the Preview page shows: the chosen one, else the first of the list.
     var previewVideo: VideoItem? {
         videos.first { $0.id == previewVideoID } ?? videos.first
     }

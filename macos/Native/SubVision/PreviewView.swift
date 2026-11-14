@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
-// The Preview window's content (design boards C2-A1–A3, design notes 76,
-// 79): one block as wide as the frame, centred left of the parameters
-// panel, that never scrolls and fills the height. The frame with its bands
-// and handles between the arrows, the caption with the badge, the
-// thumbnails in two rows of ten as wide as the frame, the summary with Try
-// OCR, and always the two panels Dialogue | Signs, as tall as each other,
-// in what is left. The frame shrinks so that all of it fits; before the
-// frames exist, a frame-shaped box with the search or a short text.
+// The Preview page's content under its title band (design boards C2-A1–A3,
+// C3 A0–A6, design notes 76, 79): one block as wide as the frame, centred
+// left of the parameters panel, that never scrolls and fills the height.
+// The frame with its bands and handles between the arrows, the caption with
+// the badge, the thumbnails in two rows of ten as wide as the frame, the
+// summary with Try OCR, and always the two panels Dialogue | Signs, as tall
+// as each other, in what is left. The frame shrinks so that all of it fits
+// (in a window too short for that, the block scrolls). Before a frame is
+// shown, a frame-shaped box with the search (A0), the search that stopped
+// with «Riprova» (A1) or a short text, and the frames found so far.
 
 import AppKit
 import SVShell
@@ -68,6 +70,9 @@ struct PreviewLayout: Equatable {
 
     /// Everything in the area, the panels at least their least height (one point of rounding allowed).
     var fits: Bool { panels >= Self.panelsMin - 1 && frameWidth + 2 * Self.arrow <= size.width }
+
+    /// The area's height that gives the panels `panels` with this frame.
+    func height(panels: CGFloat) -> CGFloat { size.height - self.panels + panels }
 }
 
 /// The block, or the box before the frames.
@@ -85,26 +90,38 @@ struct PreviewContent: View {
     var body: some View {
         GeometryReader { g in
             let layout = PreviewLayout(size: g.size, aspect: aspect, notes: notesHeight)
-            Group {
-                if let result = model.previewResult, !result.frames.isEmpty, !model.isSearchingFrames {
-                    FrameBlock(result: result, layout: layout, notes: { notes })
-                        .previewMetric("block")
-                } else {
-                    // Boards A0, A1: the same block before the frames and while they are searched.
-                    EmptyFrameBlock(layout: layout, notes: { notes })
-                        .previewMetric("block")
+            // A window too short for the whole block: the panels keep their least height and it scrolls.
+            let fitted = layout.panels >= PreviewLayout.panelsMin - 1 ? layout
+                : PreviewLayout(size: CGSize(width: g.size.width, height: layout.height(panels: PreviewLayout.panelsMin)),
+                                aspect: aspect, notes: notesHeight)
+            ScrollView(.vertical) {
+                Group {
+                    if let result = model.previewResult, result.index != nil, !result.frames.isEmpty, !model.isSearchingPreviewVideo {
+                        FrameBlock(result: result, layout: fitted, notes: { notes })
+                            .previewMetric("block")
+                    } else {
+                        // Boards A0, A1: the same block before a frame is shown and while they are searched.
+                        EmptyFrameBlock(layout: fitted, notes: { notes })
+                            .previewMetric("block")
+                    }
                 }
+                .frame(width: g.size.width, height: max(g.size.height, fitted.size.height), alignment: .top)
             }
-            .frame(width: g.size.width, height: g.size.height, alignment: .top)
+            .scrollDisabled(fitted == layout)
+            .scrollIndicators(fitted == layout ? .never : .automatic)
             #if DEBUG
-            .onChange(of: layout, initial: true) { PreviewMetrics.layout = layout }
+            .onChange(of: layout, initial: true) {
+                PreviewMetrics.layout = fitted
+                PreviewMetrics.scrolls = fitted != layout
+            }
             #endif
         }
         .previewMetric("content")
         .clipped()
     }
 
-    /// The search that failed, or found no text anywhere: over the frame, as wide as it.
+    /// The search that failed, that stopped (once a frame is shown), or found no text
+    /// anywhere: over the frame, as wide as it.
     @ViewBuilder
     private var notes: some View {
         VStack(spacing: 8) {
@@ -116,8 +133,14 @@ struct PreviewContent: View {
                     .buttonStyle(.plain)
                     .help(model.t("app.common.dismiss"))
                 }
+            } else if stoppedNote, let result = model.previewResult {
+                // A1 after a click on a thumbnail: the box is gone, the stop and «Riprova» stay over the frame.
+                NoteView(.neutral, title: model.t("app.preview.stopped_title", ["k": result.frames.count, "n": result.search.total]),
+                         text: model.t(result.search.stop == .user ? "app.preview.stopped_user" : "app.preview.stopped_text")) {
+                    RetryFramesButton(primary: false)
+                }
             }
-            if let result = model.previewResult, !result.frames.isEmpty, result.found == 0, !model.isSearchingFrames {
+            if noTextNote {
                 NoteView(.yellow, text: model.t("app.preview.none_found")) { EmptyView() }
             }
         }
@@ -125,10 +148,35 @@ struct PreviewContent: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { notesHeight = $0 }
     }
 
+    /// The search stopped short and a frame is shown (A1 once a thumbnail was clicked).
+    private var stoppedNote: Bool {
+        guard let result = model.previewResult, !model.isSearchingPreviewVideo else { return false }
+        return !result.search.complete && result.index != nil
+    }
+
+    /// Board A5: every zone searched, none with text.
+    private var noTextNote: Bool {
+        guard let result = model.previewResult, !model.isSearchingPreviewVideo else { return false }
+        return result.search.complete && result.found == 0
+    }
+
     private var hasNotes: Bool {
         if case .failed = model.preview.search { return true }
-        if let result = model.previewResult, !result.frames.isEmpty, result.found == 0, !model.isSearchingFrames { return true }
-        return false
+        return stoppedNote || noTextNote
+    }
+}
+
+/// «Riprova» (A1): the search goes on with the zones left; off while it cannot run (a batch).
+struct RetryFramesButton: View {
+    @Environment(AppModel.self) private var model
+    var primary = true
+
+    var body: some View {
+        Button { model.findFrames() } label: { Label(model.t("app.common.retry"), systemImage: "arrow.clockwise") }
+            .svButton(primary ? .primary : .secondary, primary ? .regular : .small)
+            .fixedSize()
+            .disabled(!model.canFindFrames)
+            .help(model.t("app.preview.retry_help"))
     }
 }
 
@@ -139,7 +187,8 @@ struct FrameBlock<Notes: View>: View {
     var layout: PreviewLayout
     @ViewBuilder var notes: () -> Notes
 
-    private var frame: PreviewFrame? { result.frames.indices.contains(result.index) ? result.frames[result.index] : nil }
+    private var index: Int { result.index ?? 0 }
+    private var frame: PreviewFrame? { result.frames.indices.contains(index) ? result.frames[index] : nil }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -166,7 +215,7 @@ struct FrameBlock<Notes: View>: View {
     }
 
     private func navButton(previous: Bool) -> some View {
-        let off = previous ? result.index == 0 : result.index >= result.frames.count - 1
+        let off = previous ? index == 0 : index >= result.frames.count - 1
         return Button { previous ? model.previousFrame() : model.nextFrame() } label: {
             Image(systemName: previous ? "chevron.left" : "chevron.right").svFont(13, .semibold).foregroundStyle(SV.text)
                 .frame(width: 30, height: 30)
@@ -186,7 +235,7 @@ struct FrameBlock<Notes: View>: View {
     private var caption: some View {
         if let frame {
             HStack(spacing: 10) {
-                Text(model.frameCaption(frame, index: result.index, count: result.frames.count))
+                Text(model.frameCaption(frame, index: index, count: result.frames.count))
                     .svFont(12, mono: true).foregroundStyle(SV.text2)
                 badge(frame)
             }
@@ -216,7 +265,8 @@ struct FrameBlock<Notes: View>: View {
             .layoutPriority(1)
             Spacer(minLength: 8)
             if model.batch.running {
-                Text(model.t("app.preview.batch_off")).svSmall(SV.text3).lineLimit(1)
+                // Whole (board A6): the summary takes its short form instead.
+                Text(model.t("app.preview.batch_off")).svSmall(SV.text3).lineLimit(1).fixedSize()
             }
             Button { model.tryOCR() } label: { Label(model.t("app.preview.test"), systemImage: "magnifyingglass") }
                 .svButton(.primary, .regular)
@@ -231,6 +281,8 @@ struct FrameBlock<Notes: View>: View {
     private func summary(short: Bool) -> String {
         let values: [String: Any] = ["n": result.frames.count, "k": result.found, "s": result.foundSigns,
                                      "m": result.frames.count - result.found]
+        // Board A5: "20 fotogrammi · nessuno con testo".
+        if result.found == 0 { return model.t("app.preview.summary_no_text", values) }
         let signs = model.ocrParams.topBand || result.foundSigns > 0
         let key = short ? (signs ? "app.preview.summary_signs_short" : "app.preview.summary_short")
             : (signs ? "app.preview.summary_signs" : "app.preview.summary")
@@ -238,29 +290,37 @@ struct FrameBlock<Notes: View>: View {
     }
 }
 
-/// Boards A0 and A1: the block before the frames exist, laid out as `FrameBlock`: the
-/// frame-shaped box (what Find does and its button, or the search's progress), the arrows
-/// off, "No frames" / "Searching", twenty empty places (the zones searched filled in
-/// grey: the frames themselves come with the end of the search), the summary with Try
-/// OCR off and the two panels.
+/// Boards A0 and A1: the block before a frame is shown, laid out as `FrameBlock`: the
+/// frame-shaped box (the search's progress and Stop, the search that stopped and
+/// «Riprova», or a short text), the arrows, "Ricerca in corso" / "7 fotogrammi su 20",
+/// the frames found so far (clickable) then the empty places of the zones left, the
+/// summary with Try OCR off and the two panels.
 struct EmptyFrameBlock<Notes: View>: View {
     @Environment(AppModel.self) private var model
     var layout: PreviewLayout
     @ViewBuilder var notes: () -> Notes
 
+    /// The search of the video shown: zones done of total, frames with text (zero while it
+    /// waits for another video's search to stop).
     private var progress: (done: Int, total: Int, found: Int)? {
-        if case .running(let done, let total, let found) = model.preview.search { return (done, total, found) }
-        return nil
+        guard model.isSearchingPreviewVideo else { return nil }
+        if case .running(let done, let total, let found) = model.preview.search, model.preview.searching == model.previewVideo?.id {
+            return (done, total, found)
+        }
+        return (0, PreviewState.zones, 0)
     }
+
+    private var frames: [PreviewFrame] { model.previewFrames }
+    private var total: Int { model.previewResult?.search.total ?? PreviewState.zones }
 
     var body: some View {
         VStack(spacing: 0) {
             notes()
             PreviewPlaceholder(width: layout.frameWidth, height: layout.frameHeight)
-                .overlay(alignment: .leading) { arrow("chevron.left").offset(x: -PreviewLayout.arrow) }
-                .overlay(alignment: .trailing) { arrow("chevron.right").offset(x: PreviewLayout.arrow) }
+                .overlay(alignment: .leading) { arrow(previous: true).offset(x: -PreviewLayout.arrow) }
+                .overlay(alignment: .trailing) { arrow(previous: false).offset(x: PreviewLayout.arrow) }
                 .previewMetric("frame")
-            Text(model.t(progress == nil ? "app.preview.caption_none" : "app.preview.caption_searching"))
+            Text(caption)
                 .svFont(12, mono: true).foregroundStyle(SV.text3)
                 .frame(height: PreviewLayout.caption)
                 .padding(.top, PreviewLayout.captionTop)
@@ -287,37 +347,58 @@ struct EmptyFrameBlock<Notes: View>: View {
         .padding(.top, PreviewLayout.top)
     }
 
-    private var summary: String {
-        guard let p = progress else { return model.t("app.preview.summary_none") }
-        return model.t("app.preview.summary_searching", ["i": p.done, "n": p.total, "k": p.found])
+    /// "Ricerca in corso", "7 fotogrammi su 20", "Nessun fotogramma".
+    private var caption: String {
+        if progress != nil { return model.t("app.preview.caption_searching") }
+        if !frames.isEmpty { return model.t("app.preview.caption_partial", ["k": frames.count, "n": total]) }
+        return model.t("app.preview.caption_none")
     }
 
-    /// Two rows of ten: the zones already searched in grey, the others dashed.
+    /// "12 di 20 zone · 9 con testo" while it searches, "7 di 20 zone · 5 con testo" once it stopped.
+    private var summary: String {
+        if let p = progress { return model.t("app.preview.summary_searching", ["i": p.done, "n": p.total, "k": p.found]) }
+        if let r = model.previewResult, !r.frames.isEmpty {
+            return model.t("app.preview.summary_searching", ["i": r.frames.count, "n": r.search.total, "k": r.found])
+        }
+        return model.t("app.preview.summary_none")
+    }
+
+    /// Two rows of ten: the frames found so far, in the order of their zones (a click shows one),
+    /// then the places of the zones left, dashed.
     private var slots: some View {
-        let done = progress?.done ?? 0
-        return VStack(alignment: .leading, spacing: PreviewLayout.gap) {
+        VStack(alignment: .leading, spacing: PreviewLayout.gap) {
             ForEach(0..<PreviewLayout.rows, id: \.self) { row in
                 HStack(spacing: PreviewLayout.gap) {
                     ForEach(0..<PreviewLayout.columns, id: \.self) { column in
                         let i = row * PreviewLayout.columns + column
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(i < done ? SV.track : Color.clear)
-                            .overlay(RoundedRectangle(cornerRadius: 4)
-                                .strokeBorder(SV.line, style: StrokeStyle(lineWidth: 1, dash: i < done ? [] : [3, 2])))
-                            .frame(width: layout.thumbWidth, height: layout.thumbHeight)
+                        if let result = model.previewResult, result.frames.indices.contains(i) {
+                            PreviewThumbnail(result: result, i: i, layout: layout, selectable: progress == nil)
+                        } else {
+                            RoundedRectangle(cornerRadius: 4)
+                                .strokeBorder(SV.line, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                                .frame(width: layout.thumbWidth, height: layout.thumbHeight)
+                        }
                     }
                 }
             }
         }
     }
 
-    private func arrow(_ symbol: String) -> some View {
-        Image(systemName: symbol).svFont(13, .semibold).foregroundStyle(SV.text)
-            .frame(width: 30, height: 30)
-            .background(Circle().fill(SV.glass))
-            .overlay(Circle().strokeBorder(SV.glassLine))
-            .opacity(0.45)
-            .accessibilityHidden(true)
+    /// Off while it searches; once it stopped, → shows the first frame found, ← the last.
+    private func arrow(previous: Bool) -> some View {
+        let off = progress != nil || frames.isEmpty
+        return Button { previous ? model.previousFrame() : model.nextFrame() } label: {
+            Image(systemName: previous ? "chevron.left" : "chevron.right").svFont(13, .semibold).foregroundStyle(SV.text)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(SV.glass))
+                .overlay(Circle().strokeBorder(SV.glassLine))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(off)
+        .opacity(off ? 0.45 : 1)
+        .help(model.t(previous ? "app.preview.prev_frame" : "app.preview.next_frame"))
+        .accessibilityLabel(model.t(previous ? "app.preview.prev_frame" : "app.preview.next_frame"))
     }
 }
 
@@ -334,21 +415,38 @@ struct PreviewThumbnails: View {
             ForEach(0..<PreviewLayout.rows, id: \.self) { row in
                 let start = row * PreviewLayout.columns
                 HStack(spacing: PreviewLayout.gap) {
-                    ForEach(start..<min(start + PreviewLayout.columns, result.frames.count), id: \.self) { i in
-                        thumbnail(i)
+                    ForEach(start..<start + PreviewLayout.columns, id: \.self) { i in
+                        if result.frames.indices.contains(i) {
+                            PreviewThumbnail(result: result, i: i, layout: layout, selectable: true)
+                        } else if !result.search.complete {
+                            // A search that stopped short (A1): the places of the zones left.
+                            RoundedRectangle(cornerRadius: 4)
+                                .strokeBorder(SV.line, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                                .frame(width: layout.thumbWidth, height: layout.thumbHeight)
+                        }
                     }
                 }
                 .frame(width: layout.frameWidth, height: layout.thumbHeight, alignment: .leading)
             }
         }
     }
+}
 
-    private func thumbnail(_ i: Int) -> some View {
+/// One thumbnail: the chosen one ringed in the accent, the ones without text grey at half
+/// strength, dots for the bands with text; a click shows its frame.
+struct PreviewThumbnail: View {
+    @Environment(AppModel.self) private var model
+    var result: PreviewState.Result
+    var i: Int
+    var layout: PreviewLayout
+    var selectable: Bool
+
+    var body: some View {
         let f = result.frames[i]
         let selected = i == result.index
         return ZStack(alignment: .bottomTrailing) {
             Group {
-                if let image = result.thumbnails.indices.contains(i) ? result.thumbnails[i] : nil {
+                if let image = result.thumbnail(i) {
                     Image(nsImage: image).resizable().interpolation(.high).aspectRatio(contentMode: .fill)
                 } else {
                     Rectangle().fill(SV.track)
@@ -366,13 +464,14 @@ struct PreviewThumbnails: View {
         .opacity(f.hasText ? 1 : 0.5)
         .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(selected ? SV.primary : SV.line, lineWidth: selected ? 2 : 1))
         .contentShape(Rectangle())
-        .onTapGesture { model.selectFrame(i) }
+        .onTapGesture { if selectable { model.selectFrame(i) } }
         .help(model.frameCaption(f, index: i, count: result.frames.count))
     }
 }
 
-/// Before the frames: the frame's shape, dashed, with what Find does, its button and the three
-/// steps (A0), the search's progress and Stop (A1), or a short text (no video, the batch, an error).
+/// Before a frame is shown: the frame's shape, dashed, with the search's progress and Stop
+/// (A0), the search that stopped and «Riprova» (A1), or a short text (no video, the batch,
+/// a video that cannot be read).
 struct PreviewPlaceholder: View {
     @Environment(AppModel.self) private var model
     var width: CGFloat
@@ -380,21 +479,15 @@ struct PreviewPlaceholder: View {
 
     var body: some View {
         Group {
-            if case .running(let done, let total, let found) = model.preview.search {
-                searching(done: done, total: total, found: found)
-            } else if model.canFindFrames, !failed {
-                intro
+            if model.isSearchingPreviewVideo {
+                searching
+            } else if let result = model.previewResult, !result.search.complete, !failed {
+                stopped(result)
             } else {
                 VStack(spacing: 10) {
-                    Image(systemName: "viewfinder").svFont(failed ? 22 : 40, .light)
+                    Image(systemName: "viewfinder").svFont(failed ? 22 : 30, .light)
                     Text(text).svFont(failed ? 12 : 13).multilineTextAlignment(.center)
-                    if model.canFindFrames {
-                        Button { model.findFrames() } label: { Label(model.t("app.preview.find"), systemImage: "magnifyingglass") }
-                            .svButton(.primary, .regular)
-                            .fixedSize()
-                            .help(model.t("app.preview.find_help"))
-                            .padding(.top, 4)
-                    }
+                    if failed { RetryFramesButton().padding(.top, 4) }
                 }
                 .foregroundStyle(SV.text3)
                 .padding(24)
@@ -407,58 +500,48 @@ struct PreviewPlaceholder: View {
         .clipped()
     }
 
-    /// A0: the symbol, the sentence, what the search does, the button; the three steps when there is room.
-    private var intro: some View {
-        let head = VStack(spacing: 8) {
-            Image(systemName: "viewfinder").svFont(30, .light).foregroundStyle(SV.text3)
-                .padding(.bottom, 4)
-            Text(model.t("app.preview.placeholder")).svFont(13.5, .semibold).foregroundStyle(SV.text)
-                .multilineTextAlignment(.center)
-            Text(model.t("app.preview.find_help")).svSmall().multilineTextAlignment(.center)
-                .frame(maxWidth: 520).fixedSize(horizontal: false, vertical: true)
-            Button { model.findFrames() } label: { Label(model.t("app.preview.find"), systemImage: "magnifyingglass") }
-                .svButton(.primary, .regular)
-                .fixedSize()
-                .help(model.t("app.preview.find_help"))
-                .padding(.top, 4)
-        }
-        return ViewThatFits(in: .vertical) {
-            VStack(spacing: 20) {
-                head
-                HStack(alignment: .top, spacing: 12) {
-                    ForEach(1...3, id: \.self) { n in
-                        StepCard(number: n, title: model.t("app.preview.step\(n)"), text: model.t("app.preview.step\(n)_text"))
-                    }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 680)
-            }
-            head
-        }
-        .padding(24)
-    }
-
     private var failed: Bool { if case .failed = model.preview.search { return true }; return false }
 
     private var text: String {
         if model.previewVideo == nil { return model.t("app.preview.no_video") }
         if failed { return model.t("app.preview.unavailable") }
         if model.batch.running { return model.t("app.preview.placeholder_batch") }
-        return model.t("app.preview.placeholder")
+        return model.t("app.preview.unavailable")
     }
 
-    /// A1, centred: the spinner, "Zona 12 di 20 · 9 con testo", its bar, what the search does, Stop.
-    private func searching(done: Int, total: Int, found: Int) -> some View {
-        VStack(spacing: 10) {
+    /// A0, centred: the spinner, "Cerco 20 fotogrammi… zona 12 di 20 · 9 con testo", its bar,
+    /// what the search does, Stop. Zero while another video's search stops first.
+    private var searching: some View {
+        var done = 0, total = PreviewState.zones, found = 0
+        if case .running(let d, let t, let f) = model.preview.search, model.preview.searching == model.previewVideo?.id {
+            (done, total, found) = (d, t, f)
+        }
+        return VStack(spacing: 10) {
             Spinner(size: 18)
             Text(model.t("app.preview.searching", ["i": done, "n": total, "k": found])).svFont(13.5, .semibold).foregroundStyle(SV.text)
             SVBar(total > 0 ? Double(done) / Double(total) : 0)
                 .frame(width: min(320, width - 48))
-            Text(model.t("app.preview.find_help")).svSmall().multilineTextAlignment(.center)
+            Text(model.t("app.preview.search_help")).svSmall().multilineTextAlignment(.center)
                 .frame(maxWidth: 520).fixedSize(horizontal: false, vertical: true)
             Button { model.stopFrames() } label: { Label(model.t("app.common.stop"), systemImage: "stop.fill") }
                 .svButton(.secondary, .small)
                 .padding(.top, 2)
+        }
+        .padding(24)
+    }
+
+    /// A1: "La ricerca dei fotogrammi si è fermata a 7 di 20.", why, «Riprova» (it resumes).
+    private func stopped(_ result: PreviewState.Result) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: "viewfinder").svFont(30, .light).foregroundStyle(SV.text3)
+                .padding(.bottom, 2)
+            Text(model.t("app.preview.stopped_title", ["k": result.frames.count, "n": result.search.total]))
+                .svFont(13.5, .semibold).foregroundStyle(SV.text).multilineTextAlignment(.center)
+            Text(model.t(result.search.stop == .user ? "app.preview.stopped_user" : "app.preview.stopped_text"))
+                .svSmall().multilineTextAlignment(.center)
+                .frame(maxWidth: 520).fixedSize(horizontal: false, vertical: true)
+            RetryFramesButton()
+                .padding(.top, 4)
         }
         .padding(24)
     }
@@ -491,8 +574,9 @@ struct FrameBox: View {
                 }
                 .foregroundStyle(SV.text3)
                 .frame(width: size.width, height: size.height)
-                .background(RoundedRectangle(cornerRadius: SV.Radius.field).fill(SV.surface))
-                .overlay(RoundedRectangle(cornerRadius: SV.Radius.field).strokeBorder(SV.line))
+                // Square, as the frame (design note 89).
+                .background(Rectangle().fill(SV.surface))
+                .overlay(Rectangle().strokeBorder(SV.line))
             }
         }
         .frame(width: size.width, height: size.height)
@@ -542,6 +626,8 @@ struct BothBandsChip: View {
 @MainActor
 enum PreviewMetrics {
     static var layout: PreviewLayout?
+    /// The window is too short for the block: it scrolls, the panels at their least height.
+    static var scrolls = false
     static var rects: [String: CGRect] = [:]
 }
 

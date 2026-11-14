@@ -105,22 +105,26 @@ struct AppCommands: Commands {
             Button(model.t("app.menu.restore_defaults")) { model.resetAllParameters() }
                 .disabled(model.batch.running)
             Divider()
-            // The Preview window (design note 80): on the row selected, else on the video shown last.
+            // The Preview page (C3-09): on the row selected, else on the video shown last.
             Button(model.t("app.menu.preview")) { model.openPreview(model.selectedSingle?.id) }
                 .keyboardShortcut("y", modifiers: .command)
                 .disabled(model.videos.isEmpty)
-            // In the Preview window, when it is the key window.
-            Button(model.t("app.menu.find_frames")) { model.findFrames() }
-                .disabled(!model.preview.windowKey || !model.canFindFrames)
+            // On the Preview page (board O9); each has its button on the page too.
             Button(model.t("app.menu.try_ocr")) { model.tryOCR() }
                 .keyboardShortcut("t", modifiers: .command)
-                .disabled(!model.preview.windowKey || !model.canTryOCR)
+                .disabled(!model.previewShown || !model.canTryOCR)
             Button(model.t("app.menu.prev_frame")) { model.previousFrame() }
                 .keyboardShortcut(.leftArrow, modifiers: .command)
-                .disabled(!model.preview.windowKey || !model.canBrowseFrames)
+                .disabled(!model.previewShown || !model.canBrowseFrames)
             Button(model.t("app.menu.next_frame")) { model.nextFrame() }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
-                .disabled(!model.preview.windowKey || !model.canBrowseFrames)
+                .disabled(!model.previewShown || !model.canBrowseFrames)
+            Button(model.t("app.menu.prev_video")) { model.showNeighbourVideo(-1) }
+                .keyboardShortcut(.upArrow, modifiers: .command)
+                .disabled(!model.previewShown || model.previewNeighbour(-1) == nil)
+            Button(model.t("app.menu.next_video")) { model.showNeighbourVideo(1) }
+                .keyboardShortcut(.downArrow, modifiers: .command)
+                .disabled(!model.previewShown || model.previewNeighbour(1) == nil)
             Divider()
             // F5.3: active only on the Sub fix page, where Start is not (design note 15).
             Button(model.t("app.menu.run_fix")) { model.runFix() }
@@ -130,9 +134,6 @@ struct AppCommands: Commands {
         CommandGroup(after: .windowArrangement) {
             Button(model.t("app.menu.main_window")) { openWindow(id: model.config.mainWindowID) }
                 .keyboardShortcut("0", modifiers: .command)
-            // "Preview · <video>" (board O9): the video the window shows, or would show.
-            Button(previewWindowTitle) { model.openPreview(nil) }
-                .disabled(model.videos.isEmpty)
         }
         CommandGroup(replacing: .help) {
             Button(model.t("app.menu.guide")) { NSWorkspace.shared.open(AppConfig.guideURL) }
@@ -141,11 +142,6 @@ struct AppCommands: Commands {
                 .keyboardShortcut("l", modifiers: [.command, .option])
             Button(model.t("app.menu.report_problem")) { NSWorkspace.shared.open(AppConfig.issuesURL) }
         }
-    }
-
-    private var previewWindowTitle: String {
-        guard let name = model.previewVideo?.name else { return model.t("app.menu.preview_window") }
-        return model.t("app.menu.preview_window_named", ["name": name])
     }
 
     /// A page of View: a toggle, so the menu shows the check mark on the page in front.
