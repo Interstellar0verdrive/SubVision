@@ -5,6 +5,11 @@ the same ones used to diff the reports before and after activity 1.2.
 Since C2 (item 72) every report carries BOTH languages and picks one when
 it opens (window.__subvisionLang, else the browser language); ui_lang only
 prefills the markup.
+Since C3 (report v2) the page has the look of the R1/R2 boards: report bar
+as the sticky header of the summary box, legend fixed at the bottom, sign
+box instead of the {\an8} tag, "Original" / "Remove" per row, manual rows
+back at their time on reopen. The behaviours run in headless Chrome when
+it is installed.
 """
 
 from __future__ import annotations
@@ -41,22 +46,22 @@ def _fixed_report(tmp_path: Path, lang: str) -> str:
     return out.read_text(encoding="utf-8")
 
 
-IT_TEXTS = ('"merged_fade": "unito da fade/typo"',
-            '"too_short": "scartato: troppo breve"',
-            '"noise": "scartato: probabile rumore grafico"',
-            "Righe: <b>3</b> · da ricontrollare: <b>1</b> · "
-            "scartate (recuperabili): <b>2</b> · buchi lunghi: <b>1</b>",
-            "Frame: 330 · OCR: 120 · confini raffinati: 4 · tempo: 00:12",
-            "💾 Salva SRT revisionato", "unisci duplicati",
+IT_TEXTS = ('"merged_fade": "unita da fade/typo"',
+            '"too_short": "scartata: troppo breve"',
+            '"noise": "scartata: probabile rumore grafico"',
+            "righe <b>3</b> · da ricontrollare <b>1</b> · "
+            "scartate (recuperabili) <b>2</b> · buchi oltre 6 s <b>1</b>",
+            "330 fotogrammi · 120 letture OCR · 4 confini raffinati · 00:12",
+            "Salva SRT revisionato", "unisci duplicati",
             '"addedFlag": "aggiunta a mano"',
             f"Generato con SubVision v{core.__version__}")
 EN_TEXTS = ('"merged_fade": "merged across fade/typo"',
             '"too_short": "dropped: too short"',
             '"noise": "dropped: likely graphic noise"',
-            "Lines: <b>3</b> · to re-check: <b>1</b> · "
-            "dropped (recoverable): <b>2</b> · long gaps: <b>1</b>",
-            "Frames: 330 · OCR: 120 · boundaries refined: 4 · time: 00:12",
-            "💾 Save reviewed SRT", "merge duplicates",
+            "lines <b>3</b> · to re-check <b>1</b> · "
+            "dropped (recoverable) <b>2</b> · gaps over 6 s <b>1</b>",
+            "330 frames · 120 OCR readings · 4 boundaries refined · 00:12",
+            "Save reviewed SRT", "merge duplicates",
             '"addedFlag": "added by hand"',
             f"Generated with SubVision v{core.__version__}")
 
@@ -76,9 +81,9 @@ def test_report_carries_both_languages(tmp_path: Path, lang: str):
     html = _fixed_report(tmp_path, lang)
     # ui_lang only prefills the markup (what shows before the script runs)
     if lang == "it":
-        assert '<html lang="it">' in html and "<title>Revisione — video.mp4</title>" in html
+        assert '<html lang="it">' in html and "<title>Revisione di video.mp4</title>" in html
     else:
-        assert '<html lang="en">' in html and "<title>Review — video.mp4</title>" in html
+        assert '<html lang="en">' in html and "<title>Review of video.mp4</title>" in html
     # ...but the texts of both languages are in every report ("</" is
     # written "<\\/" inside the JSON blocks)
     flat = html.replace("<\\/", "</")
@@ -88,8 +93,8 @@ def test_report_carries_both_languages(tmp_path: Path, lang: str):
     assert set(i18n) == {"it", "en"}
     for code in ("too_short", "noise", "merged_fade"):
         assert code in i18n["it"]["flags"] and code in i18n["en"]["flags"]
-    assert i18n["it"]["html"]["TITLE"] == "Revisione" and i18n["en"]["html"]["TITLE"] == "Review"
-    assert "Righe: <b>3</b>" in i18n["it"]["summary"] and "Lines: <b>3</b>" in i18n["en"]["summary"]
+    assert i18n["it"]["html"]["TITLE"] == "Revisione di" and i18n["en"]["html"]["TITLE"] == "Review of"
+    assert "righe <b>3</b>" in i18n["it"]["summary"] and "lines <b>3</b>" in i18n["en"]["summary"]
     assert "Generato con" in i18n["it"]["footer"] and "Generated with" in i18n["en"]["footer"]
     # the rows carry the flag CODES: the script translates them when shown
     flags = [r["flags"] for r in _data_block(html)["rows"]]
@@ -128,7 +133,7 @@ def test_report_language_api(tmp_path: Path):
                   "document.getElementById('hint').innerHTML = BRIDGE ? T.hintApp : L.html.HINT",
                   "getElementById('summary').innerHTML = L.summary",
                   "getElementById('foot').innerHTML = L.footer",
-                  "n.dataset.wide = L.html.SRT_SAVED"):
+                  "getElementById('gapsTitle').textContent = T.gapsTitle"):
         assert piece in static, piece
     # rows and gaps keep a refresher for their labels (edits are not touched)
     assert js.count("._i18n = () => {") == 2
@@ -192,51 +197,119 @@ def test_report_app_bridge_and_state(tmp_path: Path):
     # in-app hint swapped at load (and on a language switch), both languages
     assert "document.getElementById('hint').innerHTML = BRIDGE ? T.hintApp : L.html.HINT" in js
     assert '<div class="hint" id="hint">' in html
-    for lang, err, hint in (("it", "Errore nel salvataggio:", "accanto al video"),
-                            ("en", "Could not save:", "next to the video")):
+    for lang, err, hint in (("it", "Errore nel salvataggio:", "accanto all’originale"),
+                            ("en", "Could not save:", "next to the original")):
         h = _fixed_report(tmp_path, lang)
         assert f'"srtError": "{err}"' in h
         assert '"hintApp": "' in h and hint in h
-        assert "Chrome/Edge" in h          # the browser hint is unchanged
+    # the browser hint says where the changes stay
+    assert "Le modifiche restano in questo browser" in _fixed_report(tmp_path, "it")
+    assert "Changes stay in this browser" in _fixed_report(tmp_path, "en")
 
 
-def test_report_export_note_does_not_push_the_top_bar(tmp_path: Path):
+def test_report_save_message_in_the_bar(tmp_path: Path):
     """
-    F6 (report 2.0): after an export through the app the note is the short
-    "SRT saved" only, with the path as its tooltip, and the note always
-    keeps the width of that message, so the title and the buttons of the
-    top bar stay where they are. In a browser the message is the 1.0 one.
+    After a save the report bar shows "Salvato: <file>" (green) in place of
+    the counter for a few seconds (board R2); through the app the file name
+    comes from the bridge's reply and the full path goes in the tooltip.
     """
-    for lang, short, resting in (("it", "SRT salvato ✓", "salvato ✓"),
-                                 ("en", "SRT saved ✓", "saved ✓")):
+    for lang, saved in (("it", "Salvato: {name}"), ("en", "Saved: {name}")):
         html = _fixed_report(tmp_path, lang)
         js = html.split("<script>", 1)[1]
         css = html.split("<style>", 1)[1].split("</style>", 1)[0]
-        assert f'"srtSaved": "{short}"' in html
-        # the note reserves the width of the short export message (invisible sizer)
-        assert f'<span class="saved" id="savedNote" data-wide="{short}">{resting}</span>' in html
-        assert ".saved::after{content:attr(data-wide);height:0;visibility:hidden}" in css
-        saved = re.search(r"\.saved\{([^}]*)\}", css).group(1)
-        assert "display:inline-grid" in saved and "flex:none" in saved and "white-space:nowrap" in saved
-        # through the bridge: short message, path (and merge note) in the tooltip
+        assert f'"savedAs": "{saved}"' in html
+        assert '<span class="savedmsg" id="savedNote" role="status"></span>' in html
+        assert ".rhead.flash #counter{display:none}" in css
+        assert ".rhead.flash .savedmsg{display:inline-flex}" in css
+        assert "color:var(--ok)" in re.search(r"\.savedmsg\{([^}]*)\}", css).group(1)
         bridge = js[js.index("if (BRIDGE) {"):js.index("window.showSaveFilePicker")]
-        assert "flash(T.srtSaved, ((r && r.path) || fname) + mergeNote);" in bridge
-        assert "T.srtSaved + ' ('" not in bridge
-        assert "flash(T.srtError + ' ' + e);" in bridge
-        # flash: the tooltip lives as long as the message, then both go back
-        flash = js[js.index("function flash(msg, tip){"):js.index("async function exportSrt()")]
-        assert "n.title = tip || '';" in flash and "n.title='';" in flash
-        assert "n.textContent=T.saved;" in flash
-        # anything longer than the short message (file name, error) wraps as before
-        assert "n.classList.toggle('long', msg !== T.srtSaved);" in flash
-        assert "n.classList.remove('long');" in flash
-        assert ".saved.long{flex:0 1 auto;white-space:normal}" in css
-        # in a browser nothing changes: the file name stays in the message
-        browser = js[js.index("window.showSaveFilePicker"):js.index("function resetAll()")]
-        assert "flash(T.srtSaved + ' (' + fname + ')' + mergeNote);" in browser
-        assert "flash(T.srtDownloaded + ' (' + fname + ')' + mergeNote);" in browser
-        # the look of the note is the 1.0 one
-        assert "color:var(--ok);font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s" in saved
+        assert "flash(savedHtml('savedAs', (r && r.name) || fname), ((r && r.path) || fname) + mergeNote);" in bridge
+        assert "flash(esc(T.srtError + ' ' + e), '', true);" in bridge
+        browser = js[js.index("window.showSaveFilePicker"):js.index("async function askReset()")]
+        assert "flash(savedHtml('savedAs', h.name || fname) + esc(mergeNote));" in browser
+        assert "flash(savedHtml('srtDownloaded', fname) + esc(mergeNote));" in browser
+
+
+def test_report_layout_app_and_browser(tmp_path: Path):
+    """
+    In the app the page starts with the summary box (the title band is
+    native); in a browser a plain title comes first. The report bar is the
+    sticky header of the summary box, the column is 1180 px at most, the
+    legend is fixed at the bottom. No emoji anywhere in the texts.
+    """
+    html = _fixed_report(tmp_path, "it")
+    head = html.split("<style>", 1)[0]
+    css = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    body = html.split("</style>", 1)[1].split('<script type="application/json"', 1)[0]
+    # app mode decided before the first paint, from the message handler
+    assert '<script id="appmode">' in head and "messageHandlers.subvision" in head
+    assert "classList.add('app')" in head
+    assert "html.app .ptitle{display:none}" in css
+    assert '<h1 class="ptitle"><span data-i18n="TITLE">Revisione di</span> <b>video.mp4</b></h1>' in body
+    # no back button, Finder or browser buttons in the page
+    for gone in ("Finder", "Apri nel browser", "‹", "Torna"):
+        assert gone not in body, gone
+    # sticky bar: header of the summary box, as wide as the column
+    assert ".rhead{position:sticky;top:0;z-index:5}" in css
+    assert ".wrap{max-width:1236px;margin:0 auto;padding:16px 28px 72px}" in css   # 1180 + 2 × 28
+    bar = body[body.index('<div class="rhead" id="rhead">'):body.index('<div class="rsum">')]
+    for piece in ('id="counter"', 'id="mergeOnSave"', 'onclick="resetAll()"', "Ripristina tutto…",
+                  'class="btn pri" onclick="exportSrt()"', "Salva SRT revisionato"):
+        assert piece in bar, piece
+    # legend fixed at the bottom, with the exact texts
+    assert ".legend{position:fixed;left:0;right:0;bottom:0;height:34px" in css
+    legend = body[body.index('<div class="legend"'):]
+    for text in ("da ricontrollare", "molto dubbio o scartato", "aggiunta a mano",
+                 '<span class="hl" data-i18n="LEG_WORD">parola</span>',
+                 "dove la lettura alternativa è diversa",
+                 "<b>98 %</b> confidenza dell’OCR · accordo = tra le letture dei diversi "
+                 "fotogrammi limitrofi analizzati"):
+        assert text in legend, text
+    en = core._QC_I18N["en"]["html"]["LEG_CONF"]
+    assert en.startswith("<b>98%</b> OCR confidence · agreement = ")
+    # no emoji left in the strings of either language
+    emoji = re.compile("[\U0001F300-\U0001FAFF☀-➿⭐⭕]")
+    for lang in ("it", "en"):
+        for section in ("html", "js", "flags"):
+            for key, val in core._QC_I18N[lang][section].items():
+                assert not emoji.search(val), (lang, key, val)
+    # section titles
+    it = core._QC_I18N["it"]
+    assert it["html"]["DROPPED_H"] == "Scartate"
+    assert it["html"]["DROPPED_SUB"] == "flash brevi o rumore · spunta per rimetterle nell’SRT"
+    assert it["js"]["gapsTitle"] == "Buchi senza sottotitoli oltre {n} s"
+    assert it["html"]["GAPS_SUB"] == "possibili righe saltate"
+    assert it["js"]["addHere"] == "+ Aggiungi una riga qui"
+    assert it["html"]["ADDROW"] == "+ Aggiungi riga"
+
+
+def test_report_no_an8_in_the_interface():
+    """{\\an8} is written in the SRT only: never in a text of the page."""
+    for lang in ("it", "en"):
+        for section in ("html", "js", "flags"):
+            for key, val in core._QC_I18N[lang][section].items():
+                assert "an8" not in val, (lang, key)
+    markup = core._QC_TEMPLATE.split("<script>", 1)[0]
+    assert "an8" not in markup.split("<style>", 1)[1].split("</style>", 1)[1]
+    assert core._QC_I18N["it"]["js"]["sign"] == "È un cartello (va in alto)"
+
+
+def test_report_reset_question_texts():
+    it, en = core._QC_I18N["it"]["js"], core._QC_I18N["en"]["js"]
+    assert it["resetTitle"] == "Ripristinare tutto il report?"
+    assert it["resetText"] == ("Perderai tutte le modifiche fatte in questo report: testi corretti, "
+                               "letture scelte, tempi, spunte, cartelli e righe aggiunte a mano. "
+                               "Gli SRT revisionati già salvati non cambiano.")
+    assert (it["resetConfirm"], it["resetCancel"]) == ("Ripristina tutto", "Annulla")
+    assert en["resetTitle"] and en["resetText"] and (en["resetConfirm"], en["resetCancel"]) == ("Reset all", "Cancel")
+    js = core._QC_TEMPLATE.split("<script>", 1)[1]
+    ask = js[js.index("async function askReset(){"):js.index("async function resetAll(){")]
+    # the app gets title, text and buttons; anything else: confirm() with title, blank line, text
+    assert ("BRIDGE.postMessage({type:'confirm', title: T.resetTitle,\n"
+            "        text: T.resetText, confirm: T.resetConfirm, cancel: T.resetCancel, destructive: true})") in ask
+    assert "if (r && typeof r.confirmed === 'boolean') return r.confirmed;" in ask
+    assert "return confirm(T.resetTitle + '\\n\\n' + T.resetText);" in ask
+    assert "if(!(await askReset())) return;" in js
 
 
 def test_report_light_and_dark_palettes(tmp_path: Path):
@@ -248,13 +321,13 @@ def test_report_light_and_dark_palettes(tmp_path: Path):
     # every variable of the dark palette has a light value
     names = set(re.findall(r"--([a-z0-9-]+):", dark.split("}")[0]))
     assert names and names == set(re.findall(r"--([a-z0-9-]+):", light.split("}")[0]))
-    # the dark palette is the 1.0 one; the light one is readable
-    assert "--bg:#14161a" in dark and "--fg:#e8e8e8" in dark
-    assert "--bg:#F6F7F9" in light and "--fg:#16181B" in light
-    # no hard-coded colour left in the markup (legend dots use classes)
+    # the app's tokens: cyan accent in the dark, blue in the light
+    assert "--bg:#101113" in dark and "--fg:#E8EAED" in dark and "--accent:#2AC9DE" in dark
+    assert "--bg:#F6F7F9" in light and "--fg:#16181B" in light and "--accent:#0275B6" in light
+    # no hard-coded colour left in the markup (legend swatches use classes)
     body = html.split("</style>", 1)[1].split("<script", 1)[0]
     assert 'style="background:#' not in body
-    assert '<span class="dot warn"></span>' in body
+    assert '<i class="sw warn"></i>' in body
 
 
 def test_qc_i18n_languages_are_aligned():
@@ -265,9 +338,212 @@ def test_qc_i18n_languages_are_aligned():
     assert set(it["flags"]) == {core.FLAG_TOO_SHORT, core.FLAG_NOISE, core.FLAG_MERGED_FADE}
     # every token of the template has a text in both languages, and the
     # markup tells the script where it goes (or the script sets it itself)
-    by_script = {"SAVED", "SRT_SAVED", "HINT"}
+    by_script = {"HINT"}
     for key in it["html"]:
         assert f"__T_{key}__" in core._QC_TEMPLATE, key
         assert (f'data-i18n="{key}"' in core._QC_TEMPLATE
                 or f'data-i18n-title="{key}"' in core._QC_TEMPLATE
                 or key in by_script), key
+
+
+def test_report_rows_data(tmp_path: Path):
+    """Dropped rows keep their number; gaps say whether they are at the start or the end."""
+    data = _data_block(_fixed_report(tmp_path, "it"))
+    assert [r["n"] for r in data["rows"]] == [1, 2, 3, 4, 5]
+    assert data["gapWarn"] == OcrParams().qc_gap_warn
+    assert [g["edge"] for g in data["gaps"]] == ["end"]          # 10-20 s, nothing after it
+    segs = [SegInfo(4.0, 5.0, "a", conf=1, agree=1, nframes=3)]
+    out = tmp_path / "edges.review.html"
+    core.write_qc_html(out, "v.mp4", "v.srt", segs, [], [(0.0, 4.0, ""), (5.0, 9.0, "")],
+                       RunStats(), OcrParams(), ui_lang="it")
+    assert [g["edge"] for g in _data_block(out.read_text())["gaps"]] == ["start", "end"]
+    segs.append(SegInfo(12.0, 13.0, "b", conf=1, agree=1, nframes=3))
+    core.write_qc_html(out, "v.mp4", "v.srt", segs, [], [(5.0, 12.0, "")],
+                       RunStats(), OcrParams(), ui_lang="it")
+    assert [g["edge"] for g in _data_block(out.read_text())["gaps"]] == [""]
+
+
+# ---------------------------------------------------------------- in a browser
+CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+needs_chrome = pytest.mark.skipif(not CHROME.exists(), reason="Google Chrome not available")
+
+
+def _run_in_chrome(tmp_path: Path, html: str, head: str = "", tail: str = "") -> dict:
+    """
+    Opens the report in headless Chrome with `head` injected first in <head>
+    and `tail` (an async function body, run after the report's own script)
+    at the end of <body>; returns what `tail` returns, as JSON.
+    """
+    head = "<script>window.__subvisionLang = 'it';</script>" + head
+    html = html.replace('<head><meta charset="utf-8">', '<head><meta charset="utf-8">' + head, 1)
+    runner = ("<script>(async () => { let out; try { out = await (async () => {" + tail +
+              "})(); } catch (e) { out = {error: String(e && e.stack || e)}; }"
+              " const pre = document.createElement('pre'); pre.id = 'qa-out';"
+              " pre.textContent = JSON.stringify(out); document.body.appendChild(pre); })();</script>")
+    html = html.replace("</body>", runner + "</body>", 1)
+    page = tmp_path / "qa.review.html"
+    page.write_text(html, encoding="utf-8")
+    res = subprocess.run([str(CHROME), "--headless=new", "--disable-gpu", "--no-first-run",
+                          f"--user-data-dir={tmp_path / 'chrome'}", "--virtual-time-budget=5000",
+                          "--dump-dom", page.as_uri()],
+                         capture_output=True, text=True, timeout=120)
+    m = re.search(r'<pre id="qa-out">(.*?)</pre>', res.stdout, re.S)
+    assert m, res.stderr[-2000:]
+    raw = m.group(1).replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&amp;", "&")
+    out = json.loads(raw)
+    assert not (isinstance(out, dict) and "error" in out), out
+    return out
+
+
+def _with_state(state: dict) -> str:
+    return "<script>window.__subvisionState = " + json.dumps(state) + ";</script>"
+
+
+@needs_chrome
+def test_manual_rows_come_back_at_their_time(tmp_path: Path):
+    state = {
+        "newA": {"text": "tra la 2 e la 3", "start": 4.2, "end": 4.8, "included": True, "added": True},
+        "newB": {"text": "prima di tutte", "start": 0.1, "end": 0.4, "included": True, "added": True},
+        "newC": {"text": "", "start": None, "end": None, "included": True, "added": True},
+        "newD": {"text": "in fondo", "start": 99.0, "end": 100.0, "included": True, "added": True},
+        "newE": {"text": "dal buco", "start": 10.5, "end": 12.5, "included": True, "added": True, "gap": 0},
+    }
+    out = _run_in_chrome(tmp_path, _fixed_report(tmp_path, "it"), _with_state(state), """
+      const rows = [...document.querySelectorAll('#rows .row')];
+      return {ids: rows.map(r => r.dataset.id), nums: rows.map(r => r.querySelector('.n').textContent),
+              thumbs: rows.map(r => r.querySelector('.thumb').tagName + ':' + r.querySelector('.thumb').textContent),
+              emptyTimes: [...rows[rows.length - 1].querySelectorAll('.tin')].map(i => i.value + '|' + i.className),
+              removeLabel: rows[0].querySelector('.link').textContent,
+              origLabel: rows[1].querySelector('.link').textContent};
+    """)
+    assert out["ids"] == ["newB", "s1", "s2", "newA", "s3", "newE", "newD", "newC"]
+    assert out["nums"] == ["+", "1", "2", "+", "3", "+", "+", "+"]
+    # the row from the gap gets the gap's frame back; the others have none
+    assert out["thumbs"][5] == "IMG:" and out["thumbs"][3] == "DIV:nessun fotogramma"
+    assert out["emptyTimes"] == ["|tin mono bad", "|tin mono bad"]
+    assert out["removeLabel"] == "Togli" and out["origLabel"] == "Originale"
+
+
+@needs_chrome
+def test_original_restores_text_and_sign(tmp_path: Path):
+    out = _run_in_chrome(tmp_path, _fixed_report(tmp_path, "it"), "", """
+      const row = id => document.querySelector('.row[data-id="' + id + '"]');
+      const look = id => { const r = row(id), ta = r.querySelector('textarea');
+        return {text: ta.value, edited: ta.classList.contains('edited'),
+                sign: r.querySelector('.subl input').checked, orig: !r.querySelector('.link').disabled,
+                cur: [...r.querySelectorAll('.altc.cur')].map(c => c.dataset.txt)}; };
+      const res = {start: look('s2')};
+      row('s2').querySelector('.altc').click();               // an alternative reading
+      const sign = row('s2').querySelector('.subl input'); sign.click();   // and the sign box
+      res.changed = look('s2'); res.savedChanged = saved.s2;
+      row('s2').querySelector('.link').click();               // Originale
+      res.back = look('s2'); res.savedBack = saved.s2;
+      // a sign of the OCR unticked by hand comes back ticked
+      row('s3').querySelector('.subl input').click();
+      res.s3changed = look('s3');
+      row('s3').querySelector('.link').click();
+      res.s3back = look('s3');
+      res.durS2 = row('s2').querySelector('.rdur').textContent;
+      res.conf = row('s2').querySelector('.cf').textContent;
+      res.confCls = row('s2').querySelector('.cf').className;
+      const t2 = row('s2').querySelectorAll('.tin')[1];
+      t2.value = '00:00:03,000'; t2.dispatchEvent(new Event('input'));
+      res.durEdited = row('s2').querySelector('.rdur').textContent;
+      t2.value = '00:00:02,000'; t2.dispatchEvent(new Event('input'));
+      res.badOrder = [t2.className, row('s2').querySelector('.rdur').className];
+      return res;
+    """)
+    assert out["start"] == {"text": "Bene, grazie", "edited": False, "sign": False, "orig": False, "cur": []}
+    assert out["changed"] == {"text": "Bene grazie", "edited": True, "sign": True, "orig": True,
+                              "cur": ["Bene grazie"]}
+    assert out["savedChanged"]["text"] == "Bene grazie" and out["savedChanged"]["top"] is True
+    assert out["back"] == out["start"]
+    assert out["savedBack"]["text"] == "Bene, grazie" and out["savedBack"]["top"] is False
+    assert out["s3changed"]["sign"] is False and out["s3changed"]["orig"] is True
+    assert out["s3back"]["sign"] is True and out["s3back"]["orig"] is False
+    # duration under the times, recomputed; invalid times in red
+    assert out["durS2"] == "1,50 s" and out["durEdited"] == "0,50 s"
+    assert out["badOrder"] == ["tin mono bad", "rdur mono bad"]
+    assert out["conf"] == "70 %accordo 60 %" and out["confCls"] == "cf c-warn"
+
+
+@needs_chrome
+def test_no_an8_on_the_page_but_in_the_srt(tmp_path: Path):
+    out = _run_in_chrome(tmp_path, _fixed_report(tmp_path, "it"), "", """
+      return {text: document.body.innerText, srt: buildSrt()};
+    """)
+    assert "an8" not in out["text"]
+    assert "È un cartello (va in alto)" in out["text"]
+    assert "{\\an8}CARTELLO" in out["srt"]
+
+
+@needs_chrome
+def test_added_rows_times_and_places(tmp_path: Path):
+    out = _run_in_chrome(tmp_path, _fixed_report(tmp_path, "it"), "", """
+      const alerts = []; window.alert = m => alerts.push(m);
+      addRow(null);
+      const rows = [...document.querySelectorAll('#rows .row')], top = rows[rows.length - 1];
+      const res = {topTimes: [...top.querySelectorAll('.tin')].map(i => i.value + '|' + i.className),
+                   topThumb: top.querySelector('.thumb').textContent, topNum: top.querySelector('.n').textContent,
+                   topState: saved[top.dataset.id], dur: top.querySelector('.rdur').textContent};
+      res.srtEmpty = buildSrt() !== null && alerts.length === 0;     // an empty line is skipped
+      const ta = top.querySelector('textarea'); ta.value = 'Nuova'; ta.dispatchEvent(new Event('input'));
+      res.srtNoTimes = buildSrt(); res.alerts = alerts.slice();
+      addRow(DATA.gaps[0]);
+      const g = DATA.gaps[0]._el.nextElementSibling;
+      res.gapRow = {cls: g.className, times: [...g.querySelectorAll('.tin')].map(i => i.value),
+                    thumb: g.querySelector('.thumb').tagName, state: saved[g.dataset.id]};
+      top.querySelector('.link').click();                          // Togli
+      res.afterRemove = {inPage: !!document.querySelector('.row[data-id="' + top.dataset.id + '"]'),
+                         inState: top.dataset.id in saved};
+      return res;
+    """)
+    assert out["topTimes"] == ["|tin mono bad", "|tin mono bad"]
+    assert out["topThumb"] == "nessun fotogramma" and out["topNum"] == "+"
+    assert out["topState"]["start"] is None and out["topState"]["end"] is None
+    assert out["dur"] == "mancano i tempi"
+    assert out["srtEmpty"] is True
+    assert out["srtNoTimes"] is None and out["alerts"] == ['Tempi non validi nella riga: "Nuova"']
+    assert out["gapRow"]["cls"] == "row added"
+    assert out["gapRow"]["times"] == ["00:00:10,500", "00:00:12,500"]
+    assert out["gapRow"]["thumb"] == "IMG" and out["gapRow"]["state"]["gap"] == 0
+    assert out["afterRemove"] == {"inPage": False, "inState": False}
+
+
+@needs_chrome
+def test_reset_asks_first(tmp_path: Path):
+    html = _fixed_report(tmp_path, "it")
+    expected = ("Ripristinare tutto il report?\n\nPerderai tutte le modifiche fatte in questo report: "
+                "testi corretti, letture scelte, tempi, spunte, cartelli e righe aggiunte a mano. "
+                "Gli SRT revisionati già salvati non cambiano.")
+    # a browser: confirm() with title, blank line, text; "no" keeps everything
+    out = _run_in_chrome(tmp_path, html, _with_state({"s1": {"text": "x"}}), """
+      const asked = []; window.confirm = m => { asked.push(m); return false; };
+      await resetAll();
+      return {asked: asked, kept: saved.s1};
+    """)
+    assert out == {"asked": [expected], "kept": {"text": "x"}}
+    # the app: a "confirm" message with the title, the text and the buttons
+    bridge = """<script>window.__posted = [];
+      window.webkit = {messageHandlers: {subvision: {postMessage(m) { window.__posted.push(m);
+        return Promise.resolve(m.type === 'confirm' ? {confirmed: false} : {ok: true}); }}}};</script>"""
+    out = _run_in_chrome(tmp_path, html, bridge, """
+      const asked = []; window.confirm = m => { asked.push(m); return true; };
+      await resetAll();
+      return {asked: asked, posted: window.__posted.filter(m => m.type === 'confirm'),
+              app: document.documentElement.classList.contains('app'),
+              title: getComputedStyle(document.querySelector('.ptitle')).display};
+    """)
+    assert out["asked"] == [] and out["app"] is True and out["title"] == "none"
+    assert out["posted"] == [{"type": "confirm", "title": "Ripristinare tutto il report?",
+                              "text": expected.split("\n\n", 1)[1], "confirm": "Ripristina tutto",
+                              "cancel": "Annulla", "destructive": True}]
+    # an app that does not know the message: confirm() as in a browser
+    old = bridge.replace("{confirmed: false}", "Promise.reject('unknown type confirm')").replace(
+        "return Promise.resolve(m.type === 'confirm' ? Promise.reject", "return (m.type === 'confirm' ? Promise.reject")
+    out = _run_in_chrome(tmp_path, html, old, """
+      const asked = []; window.confirm = m => { asked.push(m); return false; };
+      await resetAll();
+      return {asked: asked};
+    """)
+    assert out == {"asked": [expected]}
