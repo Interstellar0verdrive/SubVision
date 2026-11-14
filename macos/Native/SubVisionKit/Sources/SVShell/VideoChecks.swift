@@ -95,16 +95,49 @@ public enum VideoChecks {
 
     public static func startButton(checked: Int) -> StartButton { checked > 0 ? .process(checked) : .nothing }
 
-    /// What Retry on a failed or stopped row does (C3-05, E5): with no batch running and
-    /// nothing else checked it processes that file at once; otherwise it checks the row,
-    /// which joins the others for the next batch.
+    /// What Retry on a failed or stopped row does (C3-05, E5): with no batch running it
+    /// processes that file at once, in a batch of its own (the other checked rows stay
+    /// checked, for later); during a batch the file is queued: a batch of its own takes it
+    /// as soon as the running one ends (the engine takes no file into a running batch).
     public enum RetryAction: Sendable, Equatable {
         case startNow
-        case check
+        case queue
     }
 
-    public static func retry(batchRunning: Bool, othersChecked: Int) -> RetryAction {
-        !batchRunning && othersChecked == 0 ? .startNow : .check
+    public static func retry(batchRunning: Bool) -> RetryAction { batchRunning ? .queue : .startNow }
+}
+
+/// The files Retry queued during a batch (C3-05): "In coda, dopo il lotto" on their rows;
+/// when the batch ends they start, alone, in a batch of their own. Stop All drops them:
+/// the rows go back to what they were.
+public struct RetryQueue<ID: Hashable & Sendable>: Sendable, Equatable {
+    /// In the order Retry was clicked.
+    public private(set) var ids: [ID] = []
+
+    public init(_ ids: [ID] = []) {
+        for id in ids { add(id) }
+    }
+
+    public var isEmpty: Bool { ids.isEmpty }
+    public var count: Int { ids.count }
+    public func contains(_ id: ID) -> Bool { ids.contains(id) }
+
+    /// Queues a file once; false when it was queued already.
+    @discardableResult
+    public mutating func add(_ id: ID) -> Bool {
+        guard !ids.contains(id) else { return false }
+        ids.append(id)
+        return true
+    }
+
+    public mutating func remove(_ id: ID) { ids.removeAll { $0 == id } }
+
+    /// The batch is over: the queue empties, and the reply is what to start now, in the
+    /// queue's order: nothing after Stop All, else the files that can still be processed
+    /// (`startable`: still in the list, on disk, not processed meanwhile).
+    public mutating func drain(stoppedAll: Bool, startable: (ID) -> Bool) -> [ID] {
+        defer { ids = [] }
+        return stoppedAll ? [] : ids.filter(startable)
     }
 }
 

@@ -30,7 +30,6 @@ enum InspectorTab: String, CaseIterable {
 struct InspectorView: View {
     var place: InspectorPlace = .main
     @Environment(AppModel.self) private var model
-    @Environment(\.svInspectorOverlaid) private var overlaid
     @AppStorage(InspectorTab.key) private var tab: InspectorTab = .read
     @AppStorage(OcrKey.fps) private var fps: Double = ocrDefaults.fps
     @AppStorage(OcrKey.langHint) private var lang: String = ocrDefaults.langHint
@@ -112,17 +111,7 @@ struct InspectorView: View {
             HStack(spacing: 8) {
                 Text(model.t("app.inspector.title")).svFont(15, .bold).foregroundStyle(SV.text)
                 Spacer(minLength: 0)
-                // Only laid over a narrow window (C2-N1, note 57): beside the page it stays.
-                if overlaid {
-                    Button { model.inspectorOpen = false } label: {
-                        Image(systemName: "xmark").svFont(11, .semibold).foregroundStyle(SV.text2)
-                            .frame(width: 22, height: 22).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .svHover(RoundedRectangle(cornerRadius: 5))
-                    .help(model.t("app.inspector.close"))
-                    .accessibilityLabel(model.t("app.inspector.close"))
-                }
+                // No × even over a narrow window (N2): the top bar's panel button closes it, as Esc does.
             }
             .frame(height: 24)
             Text(model.t("app.inspector.subtitle")).svFont(11.5, leading: 1.4).foregroundStyle(SV.text2)
@@ -163,10 +152,12 @@ struct InspectorView: View {
             ForEach(InspectorTab.allCases, id: \.self) { item in
                 let on = item == tab
                 Button { tab = item } label: {
-                    HStack(spacing: 6) {
+                    // The dot on the middle of the word's capitals.
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(model.t("app.inspector.tab.\(item.rawValue)")).svControlFont(12, on ? .medium : .regular)
                         if tabChanged(item) {
                             Circle().fill(SV.modified).frame(width: 6, height: 6)
+                                .svOnCapsMiddle(12)
                                 .accessibilityLabel(model.t("app.inspector.changed"))
                         }
                     }
@@ -568,14 +559,16 @@ struct ParamRow<Control: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
+            // The texts on one baseline; the (?), the dot and a control beside the title on the
+            // middle of its capitals.
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(title).svFont(12).foregroundStyle(SV.text).fixedSize(horizontal: false, vertical: true)
-                HelpButton(text: help, defaultText: defaultText, title: title)
+                HelpButton(text: help, defaultText: defaultText, title: title).svOnCapsMiddle(12)
                 Spacer(minLength: 8)
                 if let note { Text(note.0).svFont(11.5).foregroundStyle(note.1) }
-                if changed { ChangedDot() }
+                if changed { ChangedDot().svOnCapsMiddle(12) }
                 if let value { Text(value).svFont(SVFont.numbers).foregroundStyle(changed ? SV.modified : SV.textCode) }
-                if !below { control() }
+                if !below { control().svOnCapsMiddle(12) }
             }
             .frame(minHeight: 20)
             .opacity(enabled ? 1 : 0.45)

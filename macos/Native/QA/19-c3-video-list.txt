@@ -6,9 +6,12 @@
 # boxes become circles and do not change; a video added meanwhile comes in
 # checked for the next batch. A done row checked by hand "will be redone"
 # (⋯ › Elabora di nuovo does the same); the header's none puts it back.
-# Retry on a failed row with nothing else checked processes it at once. The
-# ⋯ menu has the context menu's items in its order. Then the boards' states,
-# fed by hand, captured in dark and light.
+# Retry on a failed row with no batch processes that file at once, alone (a row
+# checked meanwhile stays checked); during a batch it goes «In coda, dopo il
+# lotto» and starts by itself when the batch ends; Stop All drops it (its alert
+# says so) and the row is failed again. The ⋯ menu has the context menu's items
+# in its order. Then the boards' states, fed by hand, captured in dark and light,
+# the update capsule beside the gear and the narrow window's panel (N2, no ×).
 ! cp "$DEMO/sintel_ita_hardsub_demo.mp4" a.mp4 && cp "$DEMO/sintel_eng_hardsub_demo.mp4" b.mp4 && cp "$DEMO/sintel_ita_hardsub_demo.mp4" c.mp4 && cp "$DEMO/sintel_eng_hardsub_demo.mp4" d.mp4
 ! printf '1\n00:00:01,000 --> 00:00:02,500\nCiao.\n' > c.srt
 @launch
@@ -95,16 +98,66 @@ row-menu 2
 ? \| ✓Elabora di nuovo \(off\) \|
 check 2
 ? c\.mp4=- d\.mp4=off$
-# Retry on a failed row with nothing else checked: processed at once
+# Retry on a failed row with no batch: that file alone, at once; d, checked, stays checked for later
 video-fake failed
 ? ^ok · failed · header off · a\.mp4=- b\.mp4=- c\.mp4=- d\.mp4=off$
+check 3
+? d\.mp4=on$
 retry 1
-? ^running true
+? ^running true · queued - · 
 wait-batch 300
 ? ^batch done · done 1 failed 0
 summary-seen
 states
 ? ^a\.mp4=done:12 b\.mp4=done:12 c\.mp4=done:14 d\.mp4=ready$
+checks
+? d\.mp4=on$
+# Retry during a batch (the defaults, slower, to catch it): «In coda, dopo il lotto», then a batch of its own
+params default
+inspector-set langHint it-IT
+video-fake failed
+start
+? status ready
+states
+? b\.mp4=failed@ocr:bottom c\.mp4=done:14 d\.mp4=(waiting|running)$
+retry 1
+? ^running true · queued b\.mp4 · 
+retry 1
+? queued b\.mp4 · 
+capture $OUT/retry-queued-dark.png
+? retry-queued-dark.png$
+theme light
+capture $OUT/retry-queued-light.png
+theme dark
+stop-all-ask
+alert-state
+? ^all · .* · text .*Il file in coda per «Riprova» non partirà\.$
+alert-press 1
+? pressed Continua
+wait-batch 900
+? ^batch done · done 1 failed 0
+summary-seen
+states
+? ^a\.mp4=done:12 b\.mp4=done:12 c\.mp4=done:14 d\.mp4=done:12$
+queued
+? ^queued -$
+# Stop All drops the queued Retry: the row says what it said before
+video-fake failed
+check 3
+? d\.mp4=redo$
+start
+retry 1
+? queued b\.mp4 · 
+stop-all
+wait-batch 300
+? ^batch done
+summary-seen
+queued
+? ^queued -$
+states
+? ^a\.mp4=done:12 b\.mp4=failed@ocr:bottom c\.mp4=done:14 d\.mp4=stopped
+params fast
+inspector-set langHint it-IT
 # The boards' states, fed by hand, in dark and light
 video-fake before
 capture $OUT/C3-02-dark.png
@@ -121,6 +174,9 @@ theme dark
 video-fake batch
 capture $OUT/C3-04-dark.png
 ? C3-04-dark.png$
+# As the screen shows it (the running circle as wide as the done one, 22 pt)
+screen-shot $OUT/C3-04-screen-dark.png
+? C3-04-screen-dark\.png$
 theme light
 capture $OUT/C3-04-light.png
 theme dark
@@ -152,10 +208,26 @@ theme light
 capture $OUT/E5-light.png
 theme dark
 video-fake before
+settings-feed update available 2.1.0
+capture $OUT/topbar-update-dark.png
+? topbar-update-dark.png$
+theme light
+capture $OUT/topbar-update-light.png
+theme dark
 size 760x640
 inspector open
+? ^inspector open$
 capture $OUT/N2-dark.png
+theme light
+capture $OUT/N2-light.png
+theme dark
+screen-shot $OUT/N2-screen-dark.png
+? N2-screen-dark\.png$
+# The panel has no ×: the top bar's button (toggleInspector) closes it
+inspector
+? ^inspector closed$
 inspector close
+settings-feed clear
 size 1360x860
 video-fake off
 theme system

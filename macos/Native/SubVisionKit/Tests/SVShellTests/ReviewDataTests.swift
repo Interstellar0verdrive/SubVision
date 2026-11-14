@@ -49,6 +49,18 @@ struct ReviewDataTests {
         #expect(ReviewData.totals([]) == .init(videos: 0, lines: 0, gaps: nil))
     }
 
+    @Test func detailsLeaveOutWhatIsZero() {
+        #expect(ReviewData.details(lines: 12, toCheck: 2, gaps: 3) == [.lines(12), .toCheck(2), .gaps(3)])
+        // "12 righe · elaborato oggi alle 08:57": no "0 da ricontrollare", no "0 buchi".
+        #expect(ReviewData.details(lines: 12, toCheck: 0, gaps: 0) == [.lines(12)])
+        // A 1.x report does not mark its rows; a list saved before the gaps were sent does not know them.
+        #expect(ReviewData.details(lines: 12, toCheck: nil, gaps: nil) == [.lines(12)])
+        #expect(ReviewData.details(lines: 24, gaps: 0) == [.lines(24)])
+        // Without subtitles: nothing to count.
+        #expect(ReviewData.details(lines: 0, toCheck: 0, gaps: 0).isEmpty)
+        #expect(ReviewData.details(lines: nil, gaps: 4) == [.gaps(4)])
+    }
+
     @Test func theDayOfAProcessedFile() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try #require(TimeZone(identifier: "Europe/Rome"))

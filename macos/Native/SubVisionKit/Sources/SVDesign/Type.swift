@@ -41,6 +41,9 @@ public enum SVType {
                                             17.5, 18, 19, 19.5, 20, 20, 20.5, 21.5, 22, 22.5, 23, 24, 24.5, 25, 25.5,
                                             26.5, 27, 27.5, 28, 28.5, 29, 29.5, 30, 30.5, 31.5, 32, 32.5]
 
+    /// Half the cap height of SF Pro at this size: the middle of the capitals above the baseline.
+    public static func capCentre(_ size: CGFloat) -> CGFloat { NSFont.systemFont(ofSize: size).capHeight / 2 }
+
     public static func normalLineHeight(_ size: CGFloat, mono: Bool) -> CGFloat {
         let table = mono ? sfMono : pro
         let i = Int(((size - 7) * 2).rounded())
@@ -66,6 +69,22 @@ extension View {
     /// which sat half a point low in the middle of a capsule.
     public func svControlFont(_ size: CGFloat, _ weight: Font.Weight = .regular) -> some View {
         font(SVTextStyle(size, weight).font)
+    }
+
+    /// A smaller text on the line of a bigger one that is centred in its row with its own line
+    /// box (`svControlFont`, which puts the capitals in the middle, measured within 0.1 pt):
+    /// this one sits on that text's baseline instead of being centred itself. `size` is the
+    /// bigger text's.
+    public func svBaseline(ofCentred size: CGFloat) -> some View {
+        alignmentGuide(VerticalAlignment.center) { $0[.firstTextBaseline] - SVType.capCentre(size) }
+    }
+
+    /// A mark beside a text (a dot, a swatch, a checkbox, a chip, a small circle) in an
+    /// `HStack(alignment: .firstTextBaseline)`: its middle on the middle of the capitals of
+    /// the text of `size`, whatever that text's line box. A plain `.center` stack centres it on
+    /// the line box instead, which put the marks up to a point off the capitals.
+    public func svOnCapsMiddle(_ size: CGFloat) -> some View {
+        alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + SVType.capCentre(size) }
     }
 
     public func svFont(_ size: CGFloat, _ weight: Font.Weight = .regular, mono: Bool = false, leading: CGFloat? = nil) -> some View {

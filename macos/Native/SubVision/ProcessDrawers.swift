@@ -208,8 +208,10 @@ struct TodoDrawer: View {
                      model.t("app.process.drawer.dialogue_where", ["pct": p.bottomKeepPct]))
             bandLine(swatch: AnyView(DrawerSwatch(band: "top", on: p.topBand)), model.t("app.steps.band.signs"),
                      p.topBand ? model.t("app.process.drawer.signs_where", ["pct": p.topKeepPct]) : model.t("app.process.drawer.signs_off"))
-            HStack(spacing: 7) {
+            // The texts on one baseline, the symbol on the middle of their capitals.
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
                 Image(systemName: "character.bubble").font(.system(size: 10.5)).foregroundStyle(SV.text3).frame(width: 9)
+                    .svOnCapsMiddle(12)
                 Text(model.t("app.process.drawer.language")).svFont(12).foregroundStyle(SV.text)
                 Text("· \(model.languageName(p.langHint))").svFont(12).foregroundStyle(SV.text3)
                 Text(p.langHint).svFont(11, mono: true).foregroundStyle(SV.text3)
@@ -221,8 +223,8 @@ struct TodoDrawer: View {
     }
 
     private func bandLine(swatch: AnyView, _ name: String, _ detail: String) -> some View {
-        HStack(spacing: 7) {
-            swatch
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            swatch.svOnCapsMiddle(12)
             Text(name).svFont(12).foregroundStyle(SV.text)
             Text(detail).svFont(12).foregroundStyle(SV.text3).lineLimit(1)
         }
@@ -491,8 +493,8 @@ struct StepsTable: View {
             HStack(spacing: gap) {
                 header(Text(model.t("app.process.drawer.step").uppercased())).frame(width: labelWidth, alignment: .leading)
                 ForEach(bands, id: \.self) { band in
-                    HStack(spacing: 6) {
-                        DrawerSwatch(band: band)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        DrawerSwatch(band: band).svOnCapsMiddle(10.5)
                         header(Text(model.bandName(band).uppercased()))
                     }
                     .frame(maxWidth: .infinity, minHeight: 22, maxHeight: 22, alignment: .leading)

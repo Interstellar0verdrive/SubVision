@@ -101,6 +101,7 @@ enum DebugQA {
             case "close": model.inspectorOpen = false
             default: model.toggleInspector()
             }
+            return "inspector \(model.inspectorOpen ? "open" : "closed")"
         case "lang":
             model.setLanguage(argument)
         case "theme":
@@ -539,9 +540,11 @@ enum DebugQA {
         let rows = model.reviewVideos.map { v in
             "\(v.name) lines \(v.segments.map(String.init) ?? "-") dropped \(v.dropped.map(String.init) ?? "-")"
                 + " gaps \(v.gaps.map { String($0.count) } ?? "-") lang \(v.ocrLang ?? "-") fps \(v.ocrFPS.map { String(Int($0)) } ?? "-")"
-                + " report \(v.outputReport != nil ? "yes" : "no") reviewed \(model.hasReviewedSRT(v) ? "yes" : "no")"
+                + " report \(v.outputReport != nil ? "yes" : v.reviewReport != nil ? "missing" : "no")"
+                + " reviewed \(model.hasReviewedSRT(v) ? "yes" : "no")"
         }
-        return (["review \(rows.count)"] + rows).joined(separator: " · ")
+        let totals = rows.isEmpty ? [] : ["totals " + model.reviewTotals]
+        return (["review \(rows.count)"] + rows + totals).joined(separator: " · ")
     }
 
     private static func statusLine(_ model: AppModel) -> String {
@@ -588,7 +591,7 @@ enum DebugQA {
         case .all: what = "all"
         }
         return "\(what) · window \(open.presentation.windowNumber) · buttons \(open.presentation.alert.buttons.map(\.title).joined(separator: "|"))"
-            + " · running \(runningIndex(model).map(String.init) ?? "-")"
+            + " · running \(runningIndex(model).map(String.init) ?? "-")" + " · text \(open.presentation.alert.texts.joined(separator: " "))"
     }
 
     /// "done 2 failed 0 stopped 0 skipped 0 elapsed 12.3" of the last batch.

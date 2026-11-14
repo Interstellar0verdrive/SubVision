@@ -128,14 +128,14 @@ final class ReportSession {
 
 extension AppModel {
     /// The title band's details: "12 righe · 2 da ricontrollare · 3 buchi · elaborato oggi alle 08:57"
-    /// (R1); a report no longer there says only when it was processed (R3).
+    /// (R1), without what is zero ("12 righe · elaborato oggi alle 08:57"); a report no longer
+    /// there says only when it was processed (R3).
     func reportDetails(_ session: ReportSession) -> String {
         var parts: [String] = []
         if session.phase != .gone, session.phase != .unreadable {
             let video = session.video
-            if let lines = session.counts?.lines ?? video?.segments { parts.append(tn("app.review.sum.lines", lines)) }
-            if let toCheck = session.counts?.toCheck { parts.append(t("app.review.report.to_check", ["n": toCheck])) }
-            if let gaps = session.counts?.gaps ?? video?.gaps?.count { parts.append(tn("app.review.sum.gaps", gaps)) }
+            parts = ReviewData.details(lines: session.counts?.lines ?? video?.segments, toCheck: session.counts?.toCheck,
+                                       gaps: session.counts?.gaps ?? video?.gaps?.count).map(detailText)
         }
         if let when = session.video?.finished ?? Self.modified(session.url) { parts.append(processedOn(when)) }
         return join(parts)

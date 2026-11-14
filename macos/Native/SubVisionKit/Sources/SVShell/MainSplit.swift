@@ -179,34 +179,51 @@ public struct ShellTopBar<Trailing: View>: View {
     }
 }
 
-/// A small status capsule for the top bar's right side (a tone, a word, a spinner while busy).
+/// A small status capsule for the top bar's right side: a tone with its dot (a spinner while
+/// busy), or `outline`, a neutral capsule with a thin border and the text in the outline's
+/// tone, no dot (the update available, beside the gear).
 public struct TopBarChip: View {
     var title: String
     var tone: SVTone
+    var outline: Bool
     var busy: Bool
     var action: () -> Void
+    @State private var hover = false
 
     public init(_ title: String, tone: SVTone, busy: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.tone = tone
+        self.outline = false
         self.busy = busy
+        self.action = action
+    }
+
+    public init(_ title: String, outline tone: SVTone, action: @escaping () -> Void) {
+        self.title = title
+        self.tone = tone
+        self.outline = true
+        self.busy = false
         self.action = action
     }
 
     public var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                if busy { Spinner(size: 10) } else { StatusDot(tone) }
-                Text(title).svFont(11.5).lineLimit(1)
+                if !outline {
+                    if busy { Spinner(size: 10) } else { StatusDot(tone) }
+                }
+                // The font's own line box: `svFont` set the words half a point low in the capsule.
+                Text(title).svControlFont(11.5, outline ? .medium : .regular).lineLimit(1)
             }
             .foregroundStyle(tone.text)
-            .padding(.horizontal, 9)
+            .padding(.horizontal, outline ? 10 : 9)
             .frame(height: 24)
-            .background(Capsule().fill(tone.background))
-            .overlay(Capsule().strokeBorder(tone.line))
+            .background(Capsule().fill(outline ? (hover ? SV.glassHover : SV.bg) : tone.background))
+            .overlay(Capsule().strokeBorder(outline ? tone.solid : tone.line, lineWidth: 1))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .onHover { hover = $0 }
         .fixedSize()
     }
 }

@@ -9,9 +9,12 @@
 //   header                         a click on the header's box; replies as checks
 //   drawer <idx> open|close|toggle the row's drawer, as a click on the row; replies as drawers
 //   drawers                        the rows whose drawer is open
-//   retry <idx>                    Retry on a failed or stopped row; replies the states and checks
+//   retry <idx>                    Retry on a failed or stopped row: at once without a batch, queued during one;
+//                                  replies "running … · queued … · " and the checks
+//   queued                         the rows Retry queued during the batch ("queued b.mp4", "queued -")
 //   row-menu <idx>                 opens the row's ⋯ menu, reads its items ("title ⌘key", "(off)", "✓", "—") and closes it
 //   row-menu-shot <idx> <path>     the main window with that ⋯ menu open over it (`screencapture`, the scheme in use)
+//   screen-shot <path>             the main window as the screen shows it (`screencapture`), the scheme in use
 //   video-fake before|drawers|batch|failed|outcomes|stopped|off
 //                                  the first three videos of the list in the states of the boards, fed by hand
 //                                  (a batch on the demo clips is over too fast to catch); off puts them back
@@ -49,9 +52,12 @@ enum DebugVideo {
             return drawers(model)
         case "retry":
             guard let idx = Int(argument), model.videos.indices.contains(idx) else { return "bad index" }
+            let wasRunning = model.batch.running
             model.retry(model.videos[idx].id)
-            _ = await DebugQA.wait(5) { model.batch.running }
-            return "running \(model.batch.running) · " + checks(model)
+            if !wasRunning { _ = await DebugQA.wait(5) { model.batch.running } }
+            return "running \(model.batch.running) · " + queued(model) + " · " + checks(model)
+        case "queued":
+            return queued(model)
         case "row-menu":
             guard let idx = Int(argument), model.videos.indices.contains(idx) else { return "bad index" }
             return await rowMenu(model, idx, shot: nil)
@@ -60,6 +66,13 @@ enum DebugVideo {
             return await rowMenu(model, idx, shot: args[1])
         case "video-fake":
             return fake(argument, model)
+        case "screen-shot":
+            // The main window as the screen shows it (`screencapture`), not drawn again by `capture`.
+            guard !argument.isEmpty else { return "usage: screen-shot <path>" }
+            NSApp.activate(ignoringOtherApps: true)
+            WindowSizer.main(model.config)?.makeKeyAndOrderFront(nil)
+            try? await Task.sleep(for: .milliseconds(400))
+            return capture(model, argument)
         default:
             return nil
         }
@@ -75,6 +88,12 @@ enum DebugVideo {
             return "\(v.name)=\(mark)"
         }
         return "header \(header) · " + each.joined(separator: " ")
+    }
+
+    /// "queued b.mp4": the rows Retry queued during the batch, "queued -" without any.
+    static func queued(_ model: AppModel) -> String {
+        let names = model.videos.filter { model.retryQueued($0.id) }.map(\.name)
+        return "queued " + (names.isEmpty ? "-" : names.joined(separator: " "))
     }
 
     static func drawers(_ model: AppModel) -> String {

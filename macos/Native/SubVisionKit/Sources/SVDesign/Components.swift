@@ -476,7 +476,8 @@ public struct StatusCircle: View {
             case .waiting:
                 Circle().strokeBorder(SV.text3, style: StrokeStyle(lineWidth: 1.2, dash: [2.4, 2.6]))
             case .running:
-                Spinner(size: Self.size)
+                // As its siblings: 22 pt outside, a 1 pt ring, the arc inside it.
+                Spinner(size: Self.size, lineWidth: 1.8, trackWidth: 1)
             case .done:
                 Circle().fill(SV.greenBg)
                 Circle().strokeBorder(SV.greenLine)
@@ -702,19 +703,27 @@ public struct SVBar: View {
 public struct Spinner: View {
     var size: CGFloat
     var tint: Color
+    var lineWidth: CGFloat?
+    var trackWidth: CGFloat?
     @State private var turning = false
 
-    /// `tint` for a spinner on a coloured fill (the selected top-bar segment).
-    public init(size: CGFloat = 14, tint: Color = SV.primary) {
+    /// `tint` for a spinner on a coloured fill (the selected top-bar segment). `lineWidth` is
+    /// the turning arc's, `trackWidth` the ring's under it (the same by default).
+    public init(size: CGFloat = 14, tint: Color = SV.primary, lineWidth: CGFloat? = nil, trackWidth: CGFloat? = nil) {
         self.size = size
         self.tint = tint
+        self.lineWidth = lineWidth
+        self.trackWidth = trackWidth
     }
 
     public var body: some View {
+        let arc = lineWidth ?? (size > 12 ? 2 : 1.6)
+        // Both strokes inside the frame: `size` is the outer diameter (a centred stroke
+        // made a 22 pt spinner 24 pt wide, bigger than the circles beside it).
         ZStack {
-            Circle().stroke(tint == SV.primary ? SV.softLine : tint.opacity(0.3), lineWidth: size > 12 ? 2 : 1.6)
-            Circle().trim(from: 0, to: 0.25)
-                .stroke(tint, style: StrokeStyle(lineWidth: size > 12 ? 2 : 1.6, lineCap: .round))
+            Circle().strokeBorder(tint == SV.primary ? SV.softLine : tint.opacity(0.3), lineWidth: trackWidth ?? arc)
+            Circle().inset(by: arc / 2).trim(from: 0, to: 0.25)
+                .stroke(tint, style: StrokeStyle(lineWidth: arc, lineCap: .round))
                 .rotationEffect(.degrees(turning ? 360 : 0))
         }
         .frame(width: size, height: size)
@@ -745,7 +754,8 @@ public struct UnderlineLink: View {
     public var body: some View {
         Button(action: action) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                if let symbol { Image(systemName: symbol).svFont(10, .medium) }
+                // The symbol on the middle of the capitals (on the baseline it sat half a point high).
+                if let symbol { Image(systemName: symbol).svFont(10, .medium).svOnCapsMiddle(12.5) }
                 Text(title)
                     .underline(true, color: tone.text.opacity(hover ? 1 : 0.55))
             }
@@ -785,13 +795,16 @@ public struct TopBarSegment: View {
     public var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                // While the page works the spinner takes the icon's place, before the word (board N1).
+                // While the page works the spinner takes the icon's place, before the word (board N1),
+                // as wide as the icon.
+                // Natural line boxes (`svControlFont`), centred: the fixed line box of `svFont` put
+                // the word 0.75 pt under the segment's centre and under the symbol (measured at 2x).
                 if busy {
-                    Spinner(size: 10, tint: selected ? SV.onPrimary : SV.primary).frame(width: 12)
+                    Spinner(size: 12, tint: selected ? SV.onPrimary : SV.primary)
                 } else {
-                    Image(systemName: symbol).svFont(12)
+                    Image(systemName: symbol).svControlFont(12)
                 }
-                Text(title).svFont(12.5, selected ? .semibold : .regular).lineLimit(1)
+                Text(title).svControlFont(12.5, selected ? .semibold : .regular).lineLimit(1)
                 // The number stays while the batch works.
                 if let count {
                     // A neutral capsule, glass on the bar, a darker veil on the current segment.
@@ -940,8 +953,9 @@ public struct StatusLink: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 if busy { Spinner(size: size - 1) } else { StatusDot(tone) }
-                Text(title).svFont(size).lineLimit(1)
-                Image(systemName: "chevron.right").svFont(8, .semibold)
+                // The font's own line box: centred on the dot and the chevron.
+                Text(title).svControlFont(size).lineLimit(1)
+                Image(systemName: "chevron.right").svControlFont(8, .semibold)
             }
             .foregroundStyle(tone.text)
             .padding(.horizontal, 4).padding(.vertical, 2)

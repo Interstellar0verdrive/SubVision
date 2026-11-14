@@ -8,8 +8,9 @@ import SVDesign
 import SwiftUI
 
 extension EnvironmentValues {
-    /// True for a parameters panel laid over the page of a narrow window: it shows
-    /// its × (design note 57); beside the page it cannot be closed.
+    /// True for a parameters panel laid over the page of a narrow window (N2); beside
+    /// the page it cannot be closed. The panel has no × of its own: the top bar's
+    /// panel button closes it.
     @Entry public var svInspectorOverlaid = false
 }
 
@@ -17,8 +18,8 @@ extension EnvironmentValues {
 /// In a window of `SVChrome.inspectorOverlayBelow` or more (read from
 /// `svWindowWidth`, which `MainSplit` sets) the panel is always there and
 /// `isOpen` does not matter. In a narrower window the panel covers the page
-/// with a shadow while `isOpen`, and closes with Esc, a click outside it or
-/// its × (`svInspectorOverlaid`). The panel's look (background, header,
+/// with a shadow while `isOpen`, and closes with the top bar's panel button
+/// (the app's), Esc or a click outside it (`svInspectorOverlaid`). The panel's look (background, header,
 /// sections) is the app's.
 public struct InspectorSplit<Page: View, Inspector: View>: View {
     @Binding var isOpen: Bool
@@ -37,7 +38,12 @@ public struct InspectorSplit<Page: View, Inspector: View>: View {
     public var body: some View {
         let overlays = chrome.inspectorOverlays(windowWidth: windowWidth)
         HStack(spacing: 0) {
-            page().frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The page takes the room left and never more: a page whose content asks for more
+            // than the window would widen the split past the window's right edge, and the panel,
+            // beside it or laid over it from the trailing edge, would be cut off there.
+            page()
+                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
             if !overlays {
                 pane
             }
