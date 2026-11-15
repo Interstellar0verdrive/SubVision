@@ -28,7 +28,7 @@ I designed every screen from scratch, in light and dark, and rebuilt the app aro
 
 - **All the OCR settings in three tabs**, Reading, Bands and Lines, always open beside the list instead of a long sidebar. Every value has its explanation and its default; a value you changed is in yellow (amber in light), its tab has a dot, a grey tick marks the default on each slider, and **Restore** puts everything back (⌘Z undoes it).
 - **Kept between launches.** In 1.x they were lost at every reload. During a batch the panel is locked: the batch keeps the values it started with.
-- **The OCR language is a menu** of the languages Vision reads on your Mac, instead of a free-text field that, with an unknown language, gave an empty SRT without an error.
+- **The OCR language is a menu** of the languages Vision reads on your Mac, instead of a free-text field that, with an unknown language, gave an empty SRT without an error. It starts in the language of macOS (English if Vision doesn't read it), and **Settings › General** sets the default.
 
 ### Preview
 
@@ -42,7 +42,7 @@ I designed every screen from scratch, in light and dark, and rebuilt the app aro
 - **A Review page** with every video processed, its lines, its gaps without subtitles and when it was processed, and a tag when a reviewed SRT is already there.
 - **The review report opens right in the page** (from the list, from **Review** on a Video row, ⌘R, the end-of-batch sheet or a notification). **Save reviewed SRT** (⌘S) writes the file next to the original, with no save dialog and no detour through Downloads. Your edits are saved as you go in `<video>.review.json`, so leaving and reopening keeps them.
 - **A cleaner report that does more:** a bar that stays at the top while you scroll, the duration of every line, the words that differ highlighted in the alternative readings, **Original** to go back to what the OCR read, an **It's a sign (goes on top)** box under each line, a legend fixed at the bottom, **Reset all…** that asks first, and lines added by hand that stay in their place.
-- The report is still a plain HTML file that works in a browser, and it follows the language of the app. Reports made by 1.x open too (File › Open a Review…).
+- The report is still a plain HTML file that works in a browser, and it follows the language of the app. Reports made by 1.x open too (File › Open a Review…), shown with the new layout and in the language of the app; the file itself isn't changed.
 
 ### Sub fix
 
@@ -74,7 +74,7 @@ I designed every screen from scratch, in light and dark, and rebuilt the app aro
 
 - **2.0 is a separate app and starts fresh.** It doesn't read the settings or the folders of 1.0, and it doesn't touch them: delete your 1.0 folder when you no longer need it.
 - **Your lists:** in Settings › Lists, **Import…** your old `ignore.txt` and `correzioni.txt`; they keep their format.
-- **Your SRTs and review reports** stay where they are, and the app opens 1.0 reports too. Edits you made to a report in a browser stay in that browser.
+- **Your SRTs and review reports** stay where they are, and the app opens 1.0 reports too, with the new layout. Edits you made to a report in a browser stay in that browser.
 - **Parameters** start from the defaults.
 
 ## Which file to download
@@ -129,7 +129,7 @@ Ho disegnato da capo ogni schermata, in chiaro e in scuro, e ho ricostruito l'ap
 
 - **Tutte le impostazioni dell'OCR in tre schede**, Lettura, Bande e Righe, sempre aperte accanto all'elenco invece che in una lunga barra laterale. Ogni valore ha la sua spiegazione e il suo predefinito; un valore cambiato è in giallo (in ambra nel tema chiaro), la sua scheda ha un puntino, una tacca grigia segna il predefinito su ogni cursore, e **Ripristina** riporta tutto indietro (⌘Z lo annulla).
 - **Restano fra un avvio e l'altro.** Nella 1.x si perdevano a ogni ricarica. Durante un lotto il pannello è bloccato: il lotto tiene i valori con cui è partito.
-- **La lingua dell'OCR è un menu** con le lingue che Vision legge sul tuo Mac, invece di un campo libero che, con una lingua sconosciuta, dava un SRT vuoto senza errore.
+- **La lingua dell'OCR è un menu** con le lingue che Vision legge sul tuo Mac, invece di un campo libero che, con una lingua sconosciuta, dava un SRT vuoto senza errore. Parte nella lingua di macOS (in inglese se Vision non la legge), e il predefinito si sceglie in **Impostazioni › Generali**.
 
 ### Anteprima
 
@@ -143,7 +143,7 @@ Ho disegnato da capo ogni schermata, in chiaro e in scuro, e ho ricostruito l'ap
 - **Una pagina Revisione** con ogni video elaborato, le sue righe, i buchi senza sottotitoli e quando è stato elaborato, e un'etichetta quando c'è già un SRT revisionato.
 - **Il report di revisione si apre direttamente nella pagina** (dall'elenco, da **Rivedi** su una riga di Video, ⌘R, dal foglio di fine lotto o da una notifica). **Salva SRT revisionato** (⌘S) scrive il file accanto all'originale, senza dialogo di salvataggio e senza passare dalla cartella Download. Le modifiche si salvano man mano in `<video>.review.json`, quindi uscendo e rientrando restano.
 - **Un report più pulito che fa di più:** una barra che resta in alto mentre scorri, la durata di ogni riga, le parole diverse evidenziate nelle letture alternative, **Originale** per tornare a quello che ha letto l'OCR, una casella **È un cartello (va in alto)** sotto ogni riga, una legenda fissa in fondo, **Ripristina tutto…** che prima chiede, e le righe aggiunte a mano che restano al loro posto.
-- Il report è ancora un semplice file HTML che funziona nel browser, e segue la lingua dell'app. Si aprono anche i report fatti dalla 1.x (File › Apri una revisione…).
+- Il report è ancora un semplice file HTML che funziona nel browser, e segue la lingua dell'app. Si aprono anche i report fatti dalla 1.x (File › Apri una revisione…), con l'aspetto nuovo e nella lingua dell'app; il file non viene cambiato.
 
 ### Sub fix
 
@@ -175,7 +175,7 @@ Ho disegnato da capo ogni schermata, in chiaro e in scuro, e ho ricostruito l'ap
 
 - **La 2.0 è un'app a sé e riparte da capo.** Non legge le impostazioni né le cartelle della 1.0, e non le tocca: cancella la cartella della 1.0 quando non ti serve più.
 - **I tuoi elenchi:** in Impostazioni › Elenchi, **Importa…** i vecchi `ignore.txt` e `correzioni.txt`; il formato resta quello.
-- **I tuoi SRT e i report di revisione** restano dove sono, e l'app apre anche i report della 1.0. Le modifiche fatte a un report in un browser restano in quel browser.
+- **I tuoi SRT e i report di revisione** restano dove sono, e l'app apre anche i report della 1.0, con l'aspetto nuovo. Le modifiche fatte a un report in un browser restano in quel browser.
 - **I parametri** ripartono dai predefiniti.
 
 ## Quale file scaricare

@@ -213,7 +213,7 @@ il lotto usa i valori con cui è partito.
 
 | Impostazione | Predefinito | Cosa fa |
 |---|---|---|
-| Lingua dei sottotitoli | Italiano | la lingua dei sottotitoli impressi: aiuta l'OCR con accenti e apostrofi. Il menu elenca le lingue che Vision legge sul tuo Mac |
+| Lingua dei sottotitoli | la lingua di macOS, se Vision la legge; altrimenti inglese | la lingua dei sottotitoli impressi: aiuta l'OCR con accenti e apostrofi. Il menu elenca le lingue che Vision legge sul tuo Mac; il predefinito si sceglie in Impostazioni › Generali |
 | Fotogrammi al secondo | 12 (4–12) | quanti fotogrammi al secondo si leggono; meno è più veloce ma può perdere le righe brevissime |
 | Lettura multipla con voto | sì | ogni fotogramma è letto tre volte (Vision così com'è, Vision con più contrasto, LiveText) e vince la lettura con più voti pesati per confidenza; circa tre volte il tempo dell'OCR |
 | Confidenza minima | 0,30 | il testo letto con meno confidenza viene ignorato (finisce comunque nel report di revisione) |
@@ -328,7 +328,8 @@ esci dal report, riaprilo, e sono ancora lì. Il report segue la lingua
 dell'app. È anche un semplice file HTML: **Apri nel browser** lo apre nel tuo
 browser, dove funziona da solo, offline. **File › Apri una revisione…**
 (⌥⌘O) apre qualunque report di revisione, anche quelli fatti da SubVision
-1.x.
+1.x e dalle prime build della 2.0: si vedono con l'aspetto di oggi, nella
+lingua dell'app, e il file non viene mai cambiato.
 
 ### Sub fix
 
@@ -384,8 +385,11 @@ SubVision parte.
 Le Impostazioni (⌘,, o l'ingranaggio a destra della barra delle schede)
 hanno quattro schede, con il predefinito scritto sotto ogni voce:
 
-- **Generali**: lingua (parte nella lingua di macOS), aspetto (Sistema,
-  Chiaro, Scuro), notifiche di macOS, avanzamento sull'icona del Dock.
+- **Generali**: lingua dell'app (parte nella lingua di macOS), lingua dei
+  sottotitoli predefinita (quella da cui partono i Parametri e a cui tornano:
+  la lingua di macOS se Vision la legge, altrimenti l'inglese), aspetto
+  (Sistema, Chiaro, Scuro), notifiche di macOS, avanzamento sull'icona del
+  Dock.
 - **Strumenti**: quali FFmpeg e FFprobe usare: quelli scaricati
   (predefinito), quelli di Homebrew quando li ha tutti e due, oppure **Una
   cartella mia…** che li contenga entrambi; **Scarica di nuovo**; le versioni
@@ -566,7 +570,8 @@ L'app sta in `macos/Native/`, il motore in `src/subvision/`, i suoi test in
   `ignore.txt` e `correzioni.txt` (diventano `ignore.txt` e `corrections.txt`,
   stesso formato), sostituendo gli elenchi di base o aggiungendoli in fondo.
 - **I tuoi SRT e i report di revisione** restano dove sono. L'app apre anche i
-  report della 1.x (File › Apri una revisione…). Le modifiche fatte a un
+  report della 1.x (File › Apri una revisione…), con l'aspetto di oggi; il
+  file resta com'era. Le modifiche fatte a un
   report della 1.x in un browser restano in quel browser.
 - I parametri ripartono dai predefiniti: se li avevi cambiati, reimpostali nel
   pannello Parametri.

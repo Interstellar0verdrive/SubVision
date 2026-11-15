@@ -206,7 +206,7 @@ locked, in grey, because the batch uses the values it started with.
 
 | Setting | Default | What it does |
 |---|---|---|
-| Subtitle language | Italian | the language of the burned-in subtitles: it helps the OCR with accents and apostrophes. The menu lists the languages Vision reads on your Mac |
+| Subtitle language | the language of macOS, if Vision reads it; otherwise English | the language of the burned-in subtitles: it helps the OCR with accents and apostrophes. The menu lists the languages Vision reads on your Mac; Settings › General sets the default |
 | Frames per second | 12 (4–12) | how many frames a second are read; lower is faster but may miss very short lines |
 | Multiple readings with voting | on | each frame is read three times (Vision as is, Vision with more contrast, LiveText) and the reading with the most confidence-weighted votes wins; about three times the OCR time |
 | Minimum confidence | 0.30 | text read with less confidence is ignored (it still ends up in the review report) |
@@ -319,7 +319,9 @@ leave the report, open it again, and they are still there. The report
 follows the language of the app. It is also a plain HTML file: **Open in
 Browser** opens it in your browser, where it works on its own, offline.
 **File › Open a Review…** (⌥⌘O) opens any review report, including those
-made by SubVision 1.x.
+made by SubVision 1.x and by the first 2.0 builds: they are shown with the
+current layout, in the language of the app, and the file itself is never
+changed.
 
 ### Sub fix
 
@@ -375,8 +377,11 @@ SubVision starts with.
 Settings (⌘,, or the gear at the right of the tab bar) has four tabs, with
 the default written under each setting:
 
-- **General**: language (it starts in the language of macOS), appearance
-  (System, Light, Dark), macOS notifications, progress on the Dock icon.
+- **General**: the app's language (it starts in the language of macOS), the
+  default subtitle language (the one the Parameters start from and go back
+  to: the language of macOS if Vision reads it, otherwise English),
+  appearance (System, Light, Dark), macOS notifications, progress on the
+  Dock icon.
 - **Tools**: which FFmpeg and FFprobe to use: the downloaded ones (default),
   the ones from Homebrew when it has both, or **A folder of mine…** with both
   inside; **Download Again**; the versions of the engine and of Python, and
@@ -555,7 +560,8 @@ environment of a source checkout apart from the app's. The app is in
   and `correzioni.txt` (they become `ignore.txt` and `corrections.txt`, same
   format), replacing the starter lists or adding to them.
 - **Your SRTs and review reports** stay where they are. The app opens 1.x
-  reports too (File › Open a Review…). Edits you made to a 1.x report in a
+  reports too (File › Open a Review…), with the current layout; the file
+  stays as it was. Edits you made to a 1.x report in a
   browser stay in that browser.
 - The parameters start from the defaults: set them again in the Parameters
   panel if you had changed them.
