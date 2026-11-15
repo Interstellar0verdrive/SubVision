@@ -39,10 +39,10 @@ PRODUCT="$DERIVED/Build/Products/Release/SubVision.app"
 APP="$STAGE/SubVision.app"
 
 # Every file and folder of the release gets this date (touch -t format, local
-# time): Sunday 15 November 2026, 09:56. ZIP_STAMP is how `zipinfo -T` shows it
+# time): Sunday 15 November 2026, 11:34. ZIP_STAMP is how `zipinfo -T` shows it
 # (zip entries keep even seconds only).
-STAMP="202611150956"
-ZIP_STAMP="20261115.095600"
+STAMP="202611151134"
+ZIP_STAMP="20261115.113400"
 
 SMOKE=0
 for arg in "$@"; do
