@@ -1,0 +1,101 @@
+# C3 · old reports (report_upgrade.py, ReportBridge.swift): a review report written by 1.0 or by
+# a 2.0 build before report v2 opens in the Review page through the copy the engine renders with
+# the current template (report.upgrade, in <state>/tmp/reports): the template marker, the legend
+# fixed at the bottom, the app's language (English here, Italian after a switch). The review state
+# stays next to the original: the edits saved for the old report show in the copy, a new edit goes
+# to the same .review.json, "Reset all" reloads the copy, ⌘S writes next to the original; nothing
+# else is written there and the original does not change. A report the engine cannot read opens as
+# it is, with the neutral note at the bottom. The fixtures are the ones of the Python tests
+# (tests/fixtures/old-reports: the old engines' own pages, synthetic data). Captures in both themes.
+! cp "$ROOT/tests/fixtures/old-reports/old-1.0-it.revisione.html" "$ROOT/tests/fixtures/old-reports/old-2.0-early.revisione.html" "$WORK/"
+! printf '%s' '{"s1":{"text":"Edited in the old report"},"s2":{"included":false},"new1794664414631_1":{"text":"Added in the old report","start":30,"end":32,"included":true,"added":true}}' > "$WORK/old-2.0-early.revisione.review.json"
+! printf '%s' '<html><body><h1>Broken</h1><script type="application/json" id="qcdata">{"rows": [</script></body></html>' > "$WORK/broken.revisione.html"
+@launch
+wait-ready 600
+? ^ready
+lang en
+theme dark
+size 1360x840
+# A 1.0 report (Italian, no bridge of its own): the engine's copy, with the bridge
+report-open $WORK/old-1.0-it.revisione.html
+? ^ready · old-1\.0-it\.revisione\.html · bridged · upgraded from 1\.x$
+report-file
+? ^page .*/state/tmp/reports/[0-9a-f]{16}/old-1\.0-it\.revisione\.html · original .*/work/old-1\.0-it\.revisione\.html · state .*/work/old-1\.0-it\.revisione\.review\.json · current false · note none$
+report-page
+? · 4 lines · 2 to re-check · 2 gaps · processed .* · ready · tab review · back on · save on$
+report-js document.querySelector('meta[name="subvision-report"]').content + ' · ' + document.documentElement.lang + ' · ' + document.documentElement.classList.contains('app') + ' · ' + getComputedStyle(document.querySelector('.legend')).position + ' · ' + getComputedStyle(document.querySelector('.rhead')).position
+? ^2 · en · true · fixed · sticky$
+report-js document.getElementById('summary').textContent + ' · ' + document.getElementById('gapsTitle').textContent
+? lines 4 · to re-check 2 · dropped \(recoverable\) 2 · gaps over 6 s 2 · 480 frames · 900 OCR readings · 6 boundaries refined · 01:16 · Gaps without subtitles over 6 s$
+report-js [...document.querySelectorAll('#rows .row')].map(r => r.dataset.id + ':' + r.querySelector('.n').textContent).join(' ') + ' · ' + [...document.querySelectorAll('#dropped .row .n')].map(n => n.textContent).join(',') + ' · ' + document.getElementById('dropped').textContent.includes('dropped: too short') + ' · ' + document.querySelector('.row[data-id="s3"] .subl label input').checked
+? ^s1:1 s2:2 s3:3 s4:4 · 5,6 · true · true$
+capture $OUT/old-1.0-en-dark.png
+? old-1.0-en-dark.png$
+# The language follows the app, in place
+lang it
+report-js document.documentElement.lang + ' · ' + document.getElementById('summary').textContent.includes('480 fotogrammi') + ' · ' + document.querySelector('#rows .row .link').textContent
+? ^it · true · Originale$
+lang en
+# A new edit goes to <name>.review.json next to the original
+report-run const t = document.querySelector('.row[data-id="s1"] textarea'); t.value = 'edited in the copy'; t.dispatchEvent(new Event('input', {bubbles: true})); return 'ok';
+? ok
+! sleep 1
+! grep -q '"s1":{"text":"edited in the copy"}' "$WORK/old-1.0-it.revisione.review.json"
+# ⌘S: the reviewed SRT next to the original, with the edit
+report-save
+? /work/clip-a-reviewed-.*\.srt$
+! grep -q 'edited in the copy' "$WORK"/clip-a-reviewed-*.srt
+! grep -q '{\\an8}NORTH GATE' "$WORK"/clip-a-reviewed-*.srt
+# Reset all: the state goes, the copy comes back as the engine made it
+report-confirm yes
+report-run resetAll(); return 'ok';
+! sleep 2
+report-js document.querySelector('.row[data-id="s1"] textarea').value + ' · ' + location.pathname.includes('/state/tmp/reports/')
+? ^Hello there, Mira\. · true$
+! grep -q '^{}$' "$WORK/old-1.0-it.revisione.review.json"
+report-confirm ask
+report-close
+? ok
+# A 2.0 report of before report v2, with edits saved in it: they apply to the copy (same row ids)
+report-open $WORK/old-2.0-early.revisione.html
+? ^ready · old-2\.0-early\.revisione\.html · bridged · upgraded from 2\.0$
+report-js document.querySelector('.row[data-id="s1"] textarea').value + ' · ' + document.querySelector('.row[data-id="s2"]').classList.contains('excluded') + ' · ' + [...document.querySelectorAll('#rows .row')].map(r => r.dataset.id).join(',')
+? ^Edited in the old report · true · s1,s2,s3,s4,new1794664414631_1$
+capture $OUT/old-2.0-en-dark.png
+? old-2.0-en-dark.png$
+theme light
+capture $OUT/old-2.0-en-light.png
+? old-2.0-en-light.png$
+lang it
+report-page
+? ^Revisione di .* · 4 righe · 2 da ricontrollare · 2 buchi · elaborato .* · ready
+capture $OUT/old-2.0-it-light.png
+? old-2.0-it-light.png$
+theme dark
+capture $OUT/old-2.0-it-dark.png
+? old-2.0-it-dark.png$
+lang en
+report-close
+? ok
+# Opened again: the engine's copy from its cache
+report-open $WORK/old-2.0-early.revisione.html
+? upgraded from 2\.0$
+! grep -q 'report upgrade old-2.0-early.revisione.html: cached from 2.0' "$STATE/records/app.log"
+report-close
+# The engine cannot read it: the original as it is, with the neutral note
+report-open $WORK/broken.revisione.html
+? ^ready · broken\.revisione\.html · legacy · old version note$
+report-file
+? · current false · note shown$
+screen-shot $OUT/old-note-dark.png
+? old-note-dark.png$
+theme light
+screen-shot $OUT/old-note-light.png
+? old-note-light.png$
+theme dark
+report-close
+# Nothing else next to the originals, which did not change
+! cmp -s "$ROOT/tests/fixtures/old-reports/old-1.0-it.revisione.html" "$WORK/old-1.0-it.revisione.html"
+! cmp -s "$ROOT/tests/fixtures/old-reports/old-2.0-early.revisione.html" "$WORK/old-2.0-early.revisione.html"
+! test -z "$(ls "$WORK" | grep -v -E '^(old-1\.0-it\.revisione\.(html|review\.json)|old-2\.0-early\.revisione\.(html|review\.json)|broken\.revisione\.html|clip-a-reviewed-[0-9_-]+\.srt)$')"
+lang it
