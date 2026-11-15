@@ -130,7 +130,7 @@ Pannello a destra di Elabora e di Anteprima **[?1]**, largo 300 pt, aperto e chi
 
   | Gruppo | Voce (IT / EN, proposta) | Controllo | Predefinito | Intervallo · passo | `OcrParams` | Oggi |
   |---|---|---|---|---|---|---|
-  | **OCR** | Lingua dei sottotitoli / Subtitle language | menu con le 33 lingue del livello "accurate" di Vision su questo Mac (`hello.languages`, spike S5), nomi nella lingua dell'app, codice BCP-47 in grigio **[?19]** | Italiano (`it-IT`) | lingue del Mac | `lang_hint` | campo di testo libero "Lingua (hint)" |
+  | **OCR** | Lingua dei sottotitoli / Subtitle language | menu con le 33 lingue del livello "accurate" di Vision su questo Mac (`hello.languages`, spike S5), nomi nella lingua dell'app, codice BCP-47 in grigio **[?19]** | la lingua di macOS se Vision la legge, altrimenti inglese (Impostazioni › Generali, P1) | lingue del Mac | `lang_hint` | campo di testo libero "Lingua (hint)" |
   | | Fotogrammi al secondo / Frames per second | `SnapSlider` a 5 tacche | 12 | 4 · 6 · 8 · 10 · 12 | `fps` | `select_slider` |
   | | Lettura multipla con voto / Multiple readings with voting | interruttore | acceso | — | `multi_variant` | casella |
   | | Raffina i tempi al fotogramma nativo / Refine timing to native frames | interruttore | acceso | — | `refine_timing` | casella |
@@ -213,7 +213,8 @@ Corregge un `.srt` esistente senza rifare l'OCR. Uscita `<nome>-fixed-<data>.srt
 `SettingsKit` di AnimeUp: finestra di 640 pt, schede con simbolo, gruppi, una riga per voce con descrizione e "Predefinito: …" sotto.
 
 - ◻︎ **ST1 · Generali** `(ST1)`:
-  - **Lingua**: English / Italiano (capsule); "Parte nella lingua di macOS; in inglese se non è una di queste. Vale anche per i report di revisione nuovi."
+  - **Lingua dell'app**: English / Italiano (capsule); "Menu, finestre e report di revisione nuovi. Parte nella lingua di macOS; in inglese se non è una di queste."
+  - **Lingua dei sottotitoli predefinita** (P1, 15/11): menu delle lingue di Vision su questo Mac; "La lingua che i Parametri usano per i video nuovi e quando li riporti al predefinito." Predefinito: la lingua di macOS, se Vision la sa leggere; altrimenti inglese.
   - **Aspetto**: Sistema / Chiaro / Scuro; "Sistema segue l'aspetto di macOS."; Predefinito: Sistema. Cambia al volo finestra, fogli, avvisi e finestre dei report.
   - gruppo **Durante l'elaborazione**: **Notifiche di macOS** ("File finito, lotto finito, problemi."; Predefinito: acceso), **Avanzamento sull'icona del Dock** (Predefinito: acceso).
 - ◻︎ **ST2 · Strumenti** `(ST2)`:

@@ -521,3 +521,13 @@ Ramo `c3-thumbs` (da `native-2.0`). La tendina di un video da elaborare non most
 - campi numerici che non seguivano il cambio di lingua («0,6 s» in inglese) e colonna Durata stretta per «DURATION» (`f1db9aa`).
 
 **Verifiche finali:** QA 21 su 21 (anche la 10 con `_test-1.mkv` della chiavetta e la 21 nuova delle catture), `pytest` 130 superati e 4 saltati, `swift test` verde. Documentazione aggiornata (README it/en, CHANGELOG, note di rilascio, senza il paragrafo sull'altra app nei crediti). Catture del README in WebP rifatte sul ramo `assets` (`c963780`): solo clip Sintel, percorso «~/Movies/SubVision demo».
+
+## Note del proprietario dopo le prove (15/11)
+
+1. **Miniature in grigio nell'Anteprima.** Sono i fotogrammi senza testo (grigi e a metà intensità, voluto). Chiarito.
+2. **Tacca del predefinito che spariva trascinando un cursore.** Ora resta visibile mentre si trascina e sparisce solo quando il valore torna al predefinito. — [fatto · `0300be6`]
+3. **Pagina Revisione senza legenda in basso e con pezzi in italiano in un'app in inglese.** Era un report fatto prima della 2.0 (`_test-1_20261113_224348.revisione.html`): il motore ne fa una copia aggiornata al modello nuovo, con legenda e lingua dell'app; stato, esportazioni e Finder restano sull'originale. — ramo `c3-oldreports`
+4. **Fumetto del pulsante «indietro» sotto la fascia del titolo.** Ora è il fumetto di sistema, sopra tutto (anche sopra il report). — [fatto · `0300be6`]
+5. **Lingua dei sottotitoli predefinita (proposta P1, approvata).** Nuova riga in Impostazioni › Generali, con un menu delle lingue che Vision legge su questo Mac. Al primo avvio è la lingua di macOS se Vision la legge, altrimenti l'inglese (non più l'italiano per tutti). I video nuovi la usano, e «↺ Predefinito» e «Ripristina» del pannello Parametri tornano a questa; il giallo dei valori cambiati si misura su questa. «Lingua» diventa «Lingua dell'app». Il codice in grigio accanto al nome della lingua sta sulla linea di base del nome, in tutti i menu delle lingue. Tavole ST1 scura e chiara aggiornate (tela versione 37), P1 tolta. QA 22. — [fatto · `0beef51`]
+6. **Anteprima in una finestra grande: pallini poco visibili e riquadri Dialoghi/Cartelli allungati a vuoto.** Proposta P2 sulla tela (versione 38): il fotogramma cresce oltre i 640 pt quando c'è spazio, i riquadri restano a 232 pt (alternativa: 170 pt, fotogramma più grande ma l'avviso scorre), pallini da 7 pt con filo bianco su una capsula scura. Nelle finestre medie e piccole non cambia nulla. — da approvare
+
