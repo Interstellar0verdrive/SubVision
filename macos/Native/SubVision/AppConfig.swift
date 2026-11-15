@@ -65,4 +65,7 @@ enum DefaultsKey {
     static let previewVideo = "previewVideo"
     /// The OCR language of the inspector (`OcrParams.langHint`), also the warm-up's.
     static let ocrLanguage = "langHint"
+    /// The subtitle language of Settings › General: what `ocrLanguage` falls back to
+    /// (new videos, "↺ Predefinito", "Ripristina"). Absent until the user picks one.
+    static let subtitleLanguageDefault = "subtitleLanguageDefault"
 }

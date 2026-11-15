@@ -223,7 +223,7 @@ struct InspectorView: View {
     private func differs(_ a: Double, _ b: Double) -> Bool { abs(a - b) > 1e-9 }
 
     private var recognitionChanges: [Bool] {
-        [lang != o.langHint, differs(fps, o.fps), multiVariant != o.multiVariant, differs(minConfidence, o.minConfidence)]
+        [lang != model.subtitleLanguageDefault, differs(fps, o.fps), multiVariant != o.multiVariant, differs(minConfidence, o.minConfidence)]
     }
     private var speedChanges: [Bool] { [skipHamming != o.skipHamming, workers != o.workers] }
     private var signsChanges: [Bool] { [topBand != o.topBand, topKeepPct != o.topKeepPct, topKeepWPct != o.topKeepWPct] }
@@ -252,8 +252,8 @@ struct InspectorView: View {
         InspectorSection(title: model.t("app.inspector.sec.recognition"), changed: recognitionChanges.contains(true),
                          reset: { model.restoreDefaults([OcrKey.langHint, OcrKey.fps, OcrKey.multiVariant, OcrKey.minConfidence]) }) {
             ParamRow(title: model.t("app.inspector.lang"), help: model.t("app.inspector.help.lang"),
-                     defaultText: model.t("app.inspector.default_only", ["value": languageName(o.langHint)]),
-                     changed: lang != o.langHint, below: true) {
+                     defaultText: model.t("app.inspector.default_only", ["value": languageName(model.subtitleLanguageDefault)]),
+                     changed: lang != model.subtitleLanguageDefault, below: true) {
                 languagePopup
             }
             ParamRow(title: model.t("app.inspector.fps"), help: model.t("app.inspector.help.fps"),
@@ -293,8 +293,10 @@ struct InspectorView: View {
     private var languagePopup: some View {
         PopupMenu({ languageItems }, openRequest: languageMenuOpen) {
             HStack(spacing: 6) {
-                Text(languageName(lang)).svFont(12).foregroundStyle(languageMissing ? SV.yellowText : SV.text).lineLimit(1)
-                Text(lang).svFont(11, mono: true).foregroundStyle(SV.text3)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(languageName(lang)).svFont(12).foregroundStyle(languageMissing ? SV.yellowText : SV.text).lineLimit(1)
+                    Text(lang).svFont(11, mono: true).foregroundStyle(SV.text3)
+                }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.up.chevron.down").svFont(9, .semibold).foregroundStyle(SV.text2)
             }

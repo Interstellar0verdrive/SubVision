@@ -14,6 +14,9 @@
 //   windows                        the visible windows: number, class, title, frame
 //   activate [main|settings|alert] the app active and that window key (switches in the accent)
 //   settings-tab general|tools|lists|updates   the Settings window's tab, as a click on its toolbar item
+//   sublang [<code>|clear|system <pref>,…]  the default subtitle language of Settings › General (P1): sets it,
+//                                  forgets the user's pick, or says what macOS languages <pref> would give;
+//                                  replies "default it-IT · ocr it-IT · picked yes|no"
 //   settings-feed redownload <MB> <MB> | own <path> <error> | update ok|available <version>|error | clear
 //   alert-show quit|close|novideos <folder>|already <path>|import|update   O3, O4, O8a–d over the main window
 //   alerts-close                   every alert panel up, as with Esc
@@ -82,6 +85,17 @@ enum DebugCapture {
             return NSApp.windows.filter(\.isVisible).map {
                 "\($0.windowNumber) \(type(of: $0)) «\($0.title)» \(Int($0.frame.minX)),\(Int($0.frame.minY)) \(Int($0.frame.width))x\(Int($0.frame.height))"
             }.joined(separator: " | ")
+        case "sublang":
+            switch args.first ?? "" {
+            case "": break
+            case "clear": model.defaults.removeObject(forKey: DefaultsKey.subtitleLanguageDefault); model.registerSubtitleLanguageDefault()
+            case "system":
+                let pref = (args.dropFirst().first ?? "").split(separator: ",").map(String.init)
+                return "system " + AppModel.systemSubtitleLanguage(among: model.hello?.languages, preferred: pref)
+            default: model.subtitleLanguageDefault = args[0]
+            }
+            let picked = model.defaults.string(forKey: DefaultsKey.subtitleLanguageDefault) != nil
+            return "default \(model.subtitleLanguageDefault) · ocr \(model.ocrParams.langHint) · picked \(picked ? "yes" : "no")"
         case "settings-tab":
             return settingsTab(argument, model)
         case "settings-feed":

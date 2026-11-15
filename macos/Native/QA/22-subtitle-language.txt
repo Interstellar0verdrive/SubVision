@@ -1,0 +1,42 @@
+# The default subtitle language of Settings › General (proposal P1): the language of
+# macOS when Vision reads it, else English; a pick there is what the parameters'
+# language falls back to (new videos, "Predefinito", "Ripristina").
+@state base
+@launch
+wait-ready 600
+? ^ready
+lang it
+params default
+sublang clear
+? picked no$
+sublang system en-GB
+? ^system en-US$
+sublang system ja-JP,it-IT
+? ^system ja-JP$
+sublang system xx-XX,it-IT
+? ^system it-IT$
+sublang system xx-XX
+? ^system en-US$
+sublang system zh-Hant-TW
+? ^system zh-Hant$
+sublang fr-FR
+? ^default fr-FR · ocr fr-FR · picked yes$
+inspector-set langHint it-IT
+sublang
+? ^default fr-FR · ocr it-IT
+params default
+sublang
+? ^default fr-FR · ocr fr-FR
+settings
+settings-tab general
+! sleep 1
+capture-window settings $OUT/st1_it.png
+? png
+lang en
+! sleep 1
+capture-window settings $OUT/st1_en.png
+? png
+lang it
+sublang clear
+? picked no$
+params default

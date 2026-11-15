@@ -93,6 +93,10 @@ struct GeneralSettings: View {
                 CapsuleSegments([("en", "English"), ("it", "Italiano")],
                                 selection: Binding(get: { model.language }, set: { model.setLanguage($0) }))
             }
+            SettingsRow(model.t("app.settings.subtitle_language"), description: model.t("app.settings.subtitle_language_desc"),
+                        defaultText: model.t("app.settings.subtitle_language_default")) {
+                subtitleLanguagePopup
+            }
             SettingsRow(model.t("app.settings.appearance"), description: model.t("app.settings.appearance_desc"),
                         defaultText: model.defaultText(model.t("app.settings.theme.system"))) {
                 CapsuleSegments([("system", model.t("app.settings.theme.system")), ("light", model.t("app.settings.theme.light")),
@@ -108,6 +112,24 @@ struct GeneralSettings: View {
                 Toggle("", isOn: $model.dockProgress).toggleStyle(.switch).controlSize(.small).labelsHidden().tint(SV.sysAccent)
             }
         }
+    }
+}
+
+extension GeneralSettings {
+    /// The Vision languages by name in the app's language, the code in grey, as in the parameters panel (P1).
+    private var subtitleLanguagePopup: some View {
+        let current = model.subtitleLanguageDefault
+        return PopupMenu({
+            guard let list = model.hello?.languages, !list.isEmpty else { return [] }
+            let sorted = list.map { ($0, model.languageName($0)) }.sorted { $0.1.localizedCaseInsensitiveCompare($1.1) == .orderedAscending }
+            return sorted.map { code, name in
+                .item(name, detail: code, checked: code.caseInsensitiveCompare(current) == .orderedSame) { model.subtitleLanguageDefault = code }
+            }
+        }) {
+            PopupLabel(title: model.languageName(current), detail: current, width: 220)
+        }
+        .fixedSize()
+        .disabled(model.hello?.languages.isEmpty ?? true)
     }
 }
 
@@ -219,11 +241,16 @@ struct ToolsSettings: View {
 /// The popup's label: text and chevrons in a field.
 struct PopupLabel: View {
     var title: String
+    var detail: String? = nil
     var width: CGFloat
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(title).svFont(12.5).foregroundStyle(SV.text).lineLimit(1)
+            // The code in grey on the name's baseline (the name is centred, the code follows it).
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(title).svFont(12.5).foregroundStyle(SV.text).lineLimit(1)
+                if let detail { Text(detail).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1) }
+            }
             Spacer(minLength: 0)
             Image(systemName: "chevron.up.chevron.down").svFont(9, .semibold).foregroundStyle(SV.text2)
         }

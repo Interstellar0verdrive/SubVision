@@ -163,6 +163,7 @@ final class AppModel {
         AppLog.shared = AppLog(subsystem: config.logSubsystem, file: configuration.stateFolder.appendingPathComponent("records/app.log"))
         log.info("SubVision \(config.appVersion) · code \(configuration.codeFolder.path) · state \(configuration.stateFolder.path)")
         readUpdateDefaults()
+        registerSubtitleLanguageDefault()
         customFFmpeg = defaults.string(forKey: DefaultsKey.customFFmpeg).map { CustomFFmpeg(path: $0) }
         loadVideos()
         tools.onFinished = { [weak self] in
@@ -237,8 +238,57 @@ final class AppModel {
 
     /// The OCR language of the inspector (`OcrParams.langHint`); the warm-up prepares it.
     var ocrLanguage: String {
-        get { defaults.string(forKey: DefaultsKey.ocrLanguage) ?? OcrParams().langHint }
+        get { defaults.string(forKey: DefaultsKey.ocrLanguage) ?? subtitleLanguageDefault }
         set { withMutation(keyPath: \.ocrLanguage) { defaults.set(newValue, forKey: DefaultsKey.ocrLanguage) } }
+    }
+
+    /// The default subtitle language (Settings › General, proposal P1): the user's pick,
+    /// else the language of macOS when Vision reads it, else English. It is registered as
+    /// the default of the OCR language key, so the parameters panel, "↺ Predefinito",
+    /// "Ripristina" and the "changed" colour all measure against it.
+    var subtitleLanguageDefault: String {
+        get {
+            access(keyPath: \.subtitleLanguageDefault)
+            return defaults.string(forKey: DefaultsKey.subtitleLanguageDefault) ?? Self.systemSubtitleLanguage(among: hello?.languages)
+        }
+        set {
+            withMutation(keyPath: \.subtitleLanguageDefault) {
+                defaults.set(newValue, forKey: DefaultsKey.subtitleLanguageDefault)
+                registerSubtitleLanguageDefault()
+            }
+        }
+    }
+
+    func registerSubtitleLanguageDefault() {
+        defaults.register(defaults: [DefaultsKey.ocrLanguage: subtitleLanguageDefault])
+    }
+
+    /// The Vision code for the first macOS language that Vision reads: among the engine's
+    /// list once it has said it, else from the usual codes of Vision; English otherwise.
+    static func systemSubtitleLanguage(among languages: [String]?, preferred: [String] = Locale.preferredLanguages) -> String {
+        let usual = ["en": "en-US", "it": "it-IT", "fr": "fr-FR", "de": "de-DE", "es": "es-ES", "pt": "pt-BR",
+                     "ja": "ja-JP", "ko": "ko-KR", "zh": "zh-Hans", "ru": "ru-RU", "uk": "uk-UA", "th": "th-TH",
+                     "vi": "vi-VT", "ar": "ar-SA", "tr": "tr-TR", "id": "id-ID", "cs": "cs-CZ", "da": "da-DK",
+                     "nl": "nl-NL", "no": "no-NO", "nb": "nb-NO", "nn": "nn-NO", "ms": "ms-MY", "pl": "pl-PL",
+                     "ro": "ro-RO", "sv": "sv-SE"]
+        func parts(_ c: String) -> [String] { c.split(whereSeparator: { $0 == "-" || $0 == "_" }).map { $0.lowercased() } }
+        for pref in preferred {
+            let p = parts(pref)
+            guard let base = p.first else { continue }
+            guard let list = languages, !list.isEmpty else {
+                if let code = usual[base] { return code }
+                continue
+            }
+            // Same language and script or region first (zh-Hant-TW → zh-Hant), then the usual code, then any variant.
+            let same = list.filter { parts($0).first == base }
+            if let hit = same.first(where: { p.count > 1 && parts($0).dropFirst().contains(p[1]) }) { return hit }
+            if let code = usual[base], let hit = same.first(where: { $0.caseInsensitiveCompare(code) == .orderedSame }) { return hit }
+            if let hit = same.first { return hit }
+        }
+        if let list = languages, !list.isEmpty, !list.contains(where: { $0.caseInsensitiveCompare("en-US") == .orderedSame }) {
+            return list.first { parts($0).first == "en" } ?? "en-US"
+        }
+        return "en-US"
     }
 
     // MARK: - Engine
@@ -309,6 +359,7 @@ final class AppModel {
             }
         }
         hello = h
+        registerSubtitleLanguageDefault()
         log.info("engine \(h.engine) \(h.version) protocol \(h.protocol) · python \(h.python ?? "?") · pid \(h.pid ?? 0) · vision \(h.vision) · livetext \(h.livetext) · \(h.languages.count) languages")
         if !h.isCompatible {
             status = .failed("engine protocol \(h.protocol), app protocol \(EngineProtocol.version)")

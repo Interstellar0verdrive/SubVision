@@ -331,8 +331,10 @@ struct FixSharedSection: View {
     private var languagePopup: some View {
         PopupMenu({ languageItems }) {
             HStack(spacing: 6) {
-                Text(model.languageName(lang)).svFont(12).foregroundStyle(languageMissing ? SV.yellowText : SV.text).lineLimit(1)
-                Text(lang).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(model.languageName(lang)).svFont(12).foregroundStyle(languageMissing ? SV.yellowText : SV.text).lineLimit(1)
+                    Text(lang).svFont(11, mono: true).foregroundStyle(SV.text3).lineLimit(1)
+                }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.up.chevron.down").svFont(9, .semibold).foregroundStyle(SV.text2)
             }

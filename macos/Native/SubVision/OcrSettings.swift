@@ -61,7 +61,7 @@ extension AppModel {
         let d = defaults, o = ocrDefaults
         var p = OcrParams()
         p.fps = d.value(OcrKey.fps, or: o.fps)
-        p.langHint = d.string(forKey: OcrKey.langHint) ?? o.langHint
+        p.langHint = d.string(forKey: OcrKey.langHint) ?? subtitleLanguageDefault
         p.bottomKeepPct = d.value(OcrKey.bottomKeepPct, or: o.bottomKeepPct)
         p.keepWPct = d.value(OcrKey.keepWPct, or: o.keepWPct)
         p.topBand = d.value(OcrKey.topBand, or: o.topBand)
