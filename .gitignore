@@ -29,6 +29,7 @@ tests/.fixtures/
 *.srt
 *.log
 *.review.html
+!tests/fixtures/old-reports/*.html
 *.qc.html
 *.mkv
 *.mp4
