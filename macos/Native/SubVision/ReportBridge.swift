@@ -11,6 +11,11 @@
 // of language while the report is open goes to `window.__subvisionSetLang`);
 // a report written by the 1.x (no bridge of its own) gets one from a user
 // script. `<a download>` is the safety net.
+// A report written before the current template (1.0, the 2.0 builds before
+// report v2) is shown through the copy the engine renders with the current
+// template (`report.upgrade`, in its state folder): `ReportFile.page` is that
+// copy, while the exports, the downloads and `<name>.review.json` stay next
+// to the original (`ReportFile.url`), as for any other report.
 
 import AppKit
 import SVShell
@@ -19,8 +24,15 @@ import WebKit
 /// What the bridge found out about the report file, before loading it.
 struct ReportFile {
     enum Kind { case bridged, legacy }
+    /// The report as the engine wrote it, next to the video: its folder gets the exports and the state.
     var url: URL
+    /// The document the web view loads: `url`, or the engine's upgraded copy of an old report.
+    var page: URL
     var kind: Kind
+    /// The report declares the current template (`ReviewData.isCurrentReport`).
+    var isCurrent: Bool
+    /// What wrote the original of an upgraded copy ("1.x", "2.0"); nil when `page` is `url`.
+    private(set) var upgradedFrom: String?
     /// `DATA.srtName` of the report: the `localStorage` key of the 1.x is built on it.
     var srtName: String?
     /// Lines, lines to re-check and gaps from the report's data (the title band, R1).
@@ -31,7 +43,9 @@ struct ReportFile {
         guard let data = FileManager.default.contents(atPath: url.path),
               let html = String(data: data, encoding: .utf8), html.contains("id=\"qcdata\"") else { return nil }
         self.url = url
+        page = url
         kind = html.contains("messageHandlers.subvision") ? .bridged : .legacy
+        isCurrent = ReviewData.isCurrentReport(html: html)
         counts = ReviewData.counts(html: html)
         if let m = html.firstMatch(of: /"srtName":\s*"((?:[^"\\]|\\.)*)"/) {
             srtName = String(m.1).replacingOccurrences(of: "\\\"", with: "\"").replacingOccurrences(of: "\\\\", with: "\\")
@@ -39,6 +53,16 @@ struct ReportFile {
     }
 
     var folder: URL { url.deletingLastPathComponent() }
+
+    /// The same report shown through `copy`, rendered by the engine with the current
+    /// template (it has the bridge); the rest stays the original's.
+    func upgraded(to copy: URL, from source: String?) -> ReportFile {
+        var file = self
+        file.page = copy
+        file.kind = .bridged
+        file.upgradedFrom = source ?? "old"
+        return file
+    }
 
     /// `<stem>.review.json` next to the report (`a.review.html` → `a.review.json`).
     var stateURL: URL {
@@ -122,7 +146,7 @@ final class ReportBridge: NSObject {
 
     func load() {
         installUserScripts()
-        webView.loadFileURL(file.url, allowingReadAccessTo: file.folder)
+        webView.loadFileURL(file.page, allowingReadAccessTo: file.page.deletingLastPathComponent())
     }
 
     /// The saved state, fresh from the disk, before every load of the document
@@ -402,7 +426,7 @@ extension ReportBridge: WKNavigationDelegate {
             return
         }
         if navigationAction.targetFrame?.isMainFrame ?? true, let url {
-            if url.isFileURL, url.standardizedFileURL == file.url.standardizedFileURL {
+            if url.isFileURL, url.standardizedFileURL == file.page.standardizedFileURL {
                 // The document itself (first load, or the reload after "Reset all").
                 installUserScripts()
                 decisionHandler(.allow, preferences)

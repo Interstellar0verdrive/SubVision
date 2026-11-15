@@ -540,6 +540,8 @@
   "app.report.gone": "La revisione non c’è più: {name}.",
   "app.report.gone_text": "È stata spostata o cancellata. Elabora di nuovo il video per averne una nuova.",
   "app.report.loading": "Carico la revisione…",
+  "app.report.old_version": "Report di una versione precedente: alcune funzioni mancano.",
+  "app.report.old_version_help": "Non riesco a mostrarlo con l’aspetto attuale, quindi si vede come l’ha scritto quella versione. Le modifiche e «Salva SRT revisionato» funzionano lo stesso.",
   "app.report.open_browser": "Apri nel browser",
   "app.report.replace_btn": "Sostituisci",
   "app.report.replace_cancelled": "annullato, l’SRT che c’era resta com’è",
