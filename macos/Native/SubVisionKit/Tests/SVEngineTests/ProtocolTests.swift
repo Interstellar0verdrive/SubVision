@@ -133,6 +133,11 @@ private func reply<T: Decodable>(_ json: String, as type: T.Type = T.self) throw
                                   as: VideoThumbsReply.self)
         #expect(thumbsBad.error == "probe_failed" && thumbsBad.paths.isEmpty)
         #expect(try reply(#"{"out_path":"/v/a-fixed-20261113.srt","count":118}"#, as: SrtFixReply.self).count == 118)
+        #expect(try reply(#"{"path":"/s/tmp/reports/ab/a.review.html","current":false,"cached":true,"source":"1.x"}"#,
+                          as: ReportUpgradeReply.self)
+                == ReportUpgradeReply(path: "/s/tmp/reports/ab/a.review.html", current: false, cached: true, source: "1.x"))
+        #expect(try reply(#"{"path":"/v/a.review.html","current":true}"#, as: ReportUpgradeReply.self)
+                == ReportUpgradeReply(path: "/v/a.review.html", current: true))
         #expect(try reply(#"{"ok":false,"reason":"no_batch"}"#, as: StopReply.self) == StopReply(ok: false, reason: "no_batch"))
         #expect(try event("ready", #"{"version":"2.0.0","protocol":1,"pid":42}"#)
                 == .ready(EngineReady(version: "2.0.0", protocol: 1, pid: 42)))
