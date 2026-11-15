@@ -1,6 +1,10 @@
 # SubVision
 
-<img src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/icon_256.png" alt="SubVision icon" width="128" align="right">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/icon_dark_256.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/icon_256.png">
+  <img src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/icon_dark_256.png" alt="SubVision icon" width="128" align="right">
+</picture>
 
 🇬🇧 English | [🇮🇹 Italiano](README.it.md)
 
@@ -19,6 +23,7 @@ check and fix the few lines the OCR wasn't sure about. It is built for
 as little to fix by hand as possible.
 
 <picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_en.webp">
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_light_en.webp">
   <img alt="SubVision: the Video page running a batch, one file done, one reading its frames with its steps, speed and time left, the batch bar at the bottom and the Parameters panel on the right" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_en.webp">
 </picture>
@@ -85,7 +90,11 @@ its [release page](https://github.com/Interstellar0verdrive/SubVision/releases/t
 
 After that, SubVision opens straight on the Video page and works offline.
 
-<img alt="The first-launch window of SubVision downloading FFmpeg, with uv and Python already ready and the preparation of text recognition waiting" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/first_launch_dark_en.png" width="640">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/first_launch_dark_en.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/first_launch_light_en.png">
+  <img alt="The first-launch window of SubVision downloading FFmpeg, with uv and Python already ready and the preparation of text recognition waiting" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/first_launch_dark_en.png" width="640">
+</picture>
 
 ### Where SubVision keeps its things
 
@@ -125,7 +134,11 @@ list.
 
 ### Video
 
-<img alt="The Video page before a batch: a finished row open with the time of each step, its result and its files, and a checked row to process open with what SubVision knows about it, its estimate and five frames of the video" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_en.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_en.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_light_en.webp">
+  <img alt="The Video page before a batch: a finished row open with the time of each step, its result and its files, and a checked row to process open with what SubVision knows about it, its estimate and five frames of the video" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_en.webp">
+</picture>
 
 - **The list of your videos**, with duration, frame rate and size, kept
   between launches. The strip under the list takes more videos at any time;
@@ -185,11 +198,19 @@ list.
   on the Dock icon, and clicking the icon brings the window back. **⌘Q** asks
   first, then stops the batch; the SRTs already made stay.
 
-<img alt="The end-of-batch sheet in front of the Video page: two SRTs ready, each with its Review button, and one file that failed, with its reason and its log" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_en.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_en.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_light_en.webp">
+  <img alt="The end-of-batch sheet in front of the Video page: two SRTs ready, each with its Review button, and one file that failed, with its reason and its log" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_en.webp">
+</picture>
 
 ### The Parameters panel
 
-<img alt="The Parameters panel on its Bands tab, light appearance: the diagram of the frame with the signs band at the top and the dialogue band at the bottom, their sliders, and one value changed from its default, in amber" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_en.webp" width="360" align="right">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_dark_en.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_en.webp">
+  <img alt="The Parameters panel on its Bands tab: the diagram of the frame with the signs band at the top and the dialogue band at the bottom, their sliders, and one value changed from its default, in yellow (amber in the light appearance)" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_dark_en.webp" width="360" align="right">
+</picture>
 
 On the right of the Video page, Preview included, the **Parameters** panel
 is always open and holds every OCR setting, in three tabs: **Reading**,
@@ -246,7 +267,11 @@ How long it takes, for a 20–24 minute episode on an Apple Silicon Mac:
 
 ### Preview
 
-<img alt="The Preview inside the Video page: the title band with the name of the video and the arrows for the video above and below, a frame with the signs band and the dialogue band drawn on it, two rows of ten thumbnails, and under them the Dialogue and Signs panels after Try OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_en.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_en.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_light_en.webp">
+  <img alt="The Preview inside the Video page: the title band with the name of the video and the arrows for the video above and below, a frame with the signs band and the dialogue band drawn on it, two rows of ten thumbnails, and under them the Dialogue and Signs panels after Try OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_en.webp">
+</picture>
 
 The Preview is where I set the bands before a long batch. It opens inside
 the Video page, over the list (the **Preview** button of a row, a frame in
@@ -276,7 +301,11 @@ right the arrows for the video above and below in the list (⌘↑ ⌘↓).
 
 ### Review
 
-<img alt="A review report open in the Review page: the title band with the name of the video, the report bar with Save reviewed SRT, and lines with their frame, times and duration, one doubtful with its alternative readings and the differing words highlighted" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_en.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_en.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_light_en.webp">
+  <img alt="A review report open in the Review page: the title band with the name of the video, the report bar with Save reviewed SRT, and lines with their frame, times and duration, one doubtful with its alternative readings and the differing words highlighted" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_en.webp">
+</picture>
 
 The **Review** page lists the videos processed, with their lines, the gaps
 without subtitles and when they were processed. A **Reviewed SRT** tag says
@@ -325,7 +354,11 @@ changed.
 
 ### Sub fix
 
-<img alt="The Sub fix page: the selected SRT on the left with what to fix, the values shared with Video on the right, and the green note of the fixed copy just created" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_en.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_en.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_light_en.webp">
+  <img alt="The Sub fix page: the selected SRT on the left with what to fix, the values shared with Video on the right, and the green note of the fixed copy just created" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_en.webp">
+</picture>
 
 **Sub fix** cleans an existing `.srt` **without redoing the OCR**, in a few
 seconds. SRTs made by SubVision are already clean: Sub fix is for the ones

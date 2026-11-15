@@ -1,6 +1,10 @@
 # SubVision
 
-<img src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/icon_256.png" alt="Icona di SubVision" width="128" align="right">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/icon_dark_256.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/icon_256.png">
+  <img src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/icon_dark_256.png" alt="Icona di SubVision" width="128" align="right">
+</picture>
 
 [🇬🇧 English](README.md) | 🇮🇹 Italiano
 
@@ -20,6 +24,7 @@ controllo e correggo le poche righe di cui l'OCR non era sicuro. È fatta per
 sulla velocità, così c'è il meno possibile da sistemare a mano.
 
 <picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_it.webp">
   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_light_it.webp">
   <img alt="SubVision: la pagina Video durante un lotto, un file finito, uno che legge i fotogrammi con le sue tappe, velocità e tempo che manca, la barra del lotto in basso e il pannello Parametri a destra" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_dark_it.webp">
 </picture>
@@ -88,7 +93,11 @@ dalla sua [pagina di release](https://github.com/Interstellar0verdrive/SubVision
 Da lì in poi SubVision si apre direttamente sulla pagina Video e funziona
 offline.
 
-<img alt="La finestra del primo avvio di SubVision mentre scarica FFmpeg, con uv e Python già pronti e la preparazione del riconoscimento in attesa" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/first_launch_dark_it.png" width="640">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/first_launch_dark_it.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/first_launch_light_it.png">
+  <img alt="La finestra del primo avvio di SubVision mentre scarica FFmpeg, con uv e Python già pronti e la preparazione del riconoscimento in attesa" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/first_launch_dark_it.png" width="640">
+</picture>
 
 ### Dove SubVision tiene le sue cose
 
@@ -130,7 +139,11 @@ modo per tornare all'elenco.
 
 ### Video
 
-<img alt="La pagina Video prima di un lotto: una riga finita aperta con il tempo di ogni tappa, il risultato e i file, e una riga spuntata da elaborare aperta con quello che SubVision ne sa, la stima e cinque fotogrammi del video" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_it.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_it.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_light_it.webp">
+  <img alt="La pagina Video prima di un lotto: una riga finita aperta con il tempo di ogni tappa, il risultato e i file, e una riga spuntata da elaborare aperta con quello che SubVision ne sa, la stima e cinque fotogrammi del video" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_rows_dark_it.webp">
+</picture>
 
 - **L'elenco dei tuoi video**, con durata, frame rate e dimensioni, che resta
   fra un avvio e l'altro. La striscia sotto l'elenco accetta altri video in
@@ -191,11 +204,19 @@ modo per tornare all'elenco.
   sull'icona del Dock, e un clic sull'icona riapre la finestra. **⌘Q** prima
   chiede, poi ferma il lotto; gli SRT già fatti restano.
 
-<img alt="Il foglio di fine lotto davanti alla pagina Video: due SRT pronti, ognuno con il suo pulsante Rivedi, e un file non riuscito, con il motivo e il suo log" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_it.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_it.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_light_it.webp">
+  <img alt="Il foglio di fine lotto davanti alla pagina Video: due SRT pronti, ognuno con il suo pulsante Rivedi, e un file non riuscito, con il motivo e il suo log" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/video_finished_dark_it.webp">
+</picture>
 
 ### Il pannello Parametri
 
-<img alt="Il pannello Parametri sulla scheda Bande, in chiaro: lo schema del fotogramma con la banda dei cartelli in alto e quella dei dialoghi in basso, i loro cursori e un valore diverso dal predefinito, in ambra" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_it.webp" width="360" align="right">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_dark_it.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_light_it.webp">
+  <img alt="Il pannello Parametri sulla scheda Bande: lo schema del fotogramma con la banda dei cartelli in alto e quella dei dialoghi in basso, i loro cursori e un valore diverso dal predefinito, in giallo (in ambra nel tema chiaro)" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/parameters_dark_it.webp" width="360" align="right">
+</picture>
 
 A destra della pagina Video, Anteprima compresa, il pannello **Parametri** è
 sempre aperto e raccoglie tutte le impostazioni dell'OCR, in tre schede:
@@ -253,7 +274,11 @@ Quanto ci mette, per un episodio di 20–24 minuti su un Mac Apple Silicon:
 
 ### Anteprima
 
-<img alt="L'Anteprima dentro la pagina Video: la fascia del titolo con il nome del video e le frecce per il video sopra e sotto, un fotogramma con disegnate la banda dei cartelli e quella dei dialoghi, due righe di dieci miniature e sotto i pannelli Dialoghi e Cartelli dopo Prova OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_it.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_it.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_light_it.webp">
+  <img alt="L'Anteprima dentro la pagina Video: la fascia del titolo con il nome del video e le frecce per il video sopra e sotto, un fotogramma con disegnate la banda dei cartelli e quella dei dialoghi, due righe di dieci miniature e sotto i pannelli Dialoghi e Cartelli dopo Prova OCR" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/preview_dark_it.webp">
+</picture>
 
 L'Anteprima è dove regolo le bande prima di un lotto lungo. Si apre dentro
 la pagina Video, sopra l'elenco (il pulsante **Anteprima** di una riga, un
@@ -285,7 +310,11 @@ nell'elenco (⌘↑ ⌘↓).
 
 ### Revisione
 
-<img alt="Un report di revisione aperto nella pagina Revisione: la fascia del titolo con il nome del video, la barra del report con Salva SRT revisionato, e le righe con fotogramma, tempi e durata, una dubbia con le sue letture alternative e le parole diverse evidenziate" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_it.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_it.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_light_it.webp">
+  <img alt="Un report di revisione aperto nella pagina Revisione: la fascia del titolo con il nome del video, la barra del report con Salva SRT revisionato, e le righe con fotogramma, tempi e durata, una dubbia con le sue letture alternative e le parole diverse evidenziate" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/review_dark_it.webp">
+</picture>
 
 La pagina **Revisione** elenca i video elaborati, con le righe, i buchi
 senza sottotitoli e quando sono stati elaborati. L'etichetta **SRT
@@ -333,7 +362,11 @@ lingua dell'app, e il file non viene mai cambiato.
 
 ### Sub fix
 
-<img alt="La pagina Sub fix: a sinistra l'SRT scelto con cosa correggere, a destra i valori condivisi con Video, e la nota verde della copia corretta appena creata" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_it.webp">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_it.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_light_it.webp">
+  <img alt="La pagina Sub fix: a sinistra l'SRT scelto con cosa correggere, a destra i valori condivisi con Video, e la nota verde della copia corretta appena creata" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/subfix_dark_it.webp">
+</picture>
 
 **Sub fix** pulisce un `.srt` esistente **senza rifare l'OCR**, in pochi
 secondi. Gli SRT fatti da SubVision sono già puliti: Sub fix serve per quelli

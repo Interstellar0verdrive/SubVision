@@ -19,6 +19,9 @@
 //                                  background (noshadow: the window's own rectangle), at the screen's scale;
 //                                  nothing behind it or over it (the README captures)
 //   display-home <folder>|off      the folder the paths on screen shorten to "~" in place of the home
+//   tools-feed start|<mb>          the first-launch window over a ready app, as the README shows it (T1):
+//                                  start opens it with the runtime done and FFmpeg starting; <mb> moves FFmpeg
+//                                  to that many MB (the time left comes from the seconds in between)
 //   video-fake before|drawers|batch|failed|outcomes|stopped|off
 //                                  the first three videos of the list in the states of the boards, fed by hand
 //                                  (a batch on the demo clips is over too fast to catch); off puts them back
@@ -31,6 +34,7 @@
 
 #if DEBUG
 import AppKit
+import SVEngine
 import SVShell
 import SwiftUI
 
@@ -103,6 +107,20 @@ enum DebugVideo {
             try? task.run()
             task.waitUntilExit()
             return task.terminationStatus == 0 ? path : "screencapture failed"
+        case "tools-feed":
+            let total = AppConfig.ffmpegMB * 1_000_000
+            if argument == "start" {
+                let empty = FileManager.default.temporaryDirectory.appendingPathComponent("subvision-feed-\(UUID().uuidString)")
+                model.tools.prepareIfFirstLaunch(stateFolder: empty)
+                model.tools.runtimeReady()
+                model.tools.progress(ToolProgress(key: "ffmpeg", state: .running, bytes: 0, total: total))
+            } else if let mb = Int64(argument) {
+                model.tools.progress(ToolProgress(key: "ffmpeg", state: .running, bytes: mb * 1_000_000, total: total))
+            } else {
+                return "usage: tools-feed start|<mb>"
+            }
+            let t = model.tools.totals
+            return "\(model.tools.showsWindow ? "window" : "no window") · \(t.index) of \(t.count) · \(t.done / 1_000_000) of \(t.total / 1_000_000) MB"
         case "display-home":
             DisplayHome.override = argument == "off" || argument.isEmpty ? nil : argument
             return "ok · home \(DisplayHome.path)"

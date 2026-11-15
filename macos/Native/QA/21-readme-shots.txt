@@ -4,8 +4,9 @@
 # neutral work folder, "~/Movies/SubVision demo" on screen (display-home: the
 # scenario's own folder stands in for the home). A third video is a renamed copy.
 # Only the failed file of the end-of-batch sheet is fed by hand (engine-event).
+# Every image in both appearances (the READMEs show the one of the reader's GitHub theme).
 # The PNGs land in $OUT; the WebPs are made from them by hand (cwebp, see the list),
-# parameters_light_* cut from parameters-window_light_* (noshadow): 712 x 1440 px at 2008,106.
+# parameters_* cut from parameters-window_* (noshadow): 712 x 1440 px at 2008,106.
 @state base
 ! mkdir -p "home/Movies/SubVision demo"
 ! cd "home/Movies/SubVision demo" && cp "$DEMO/sintel_ita_hardsub_demo.mp4" "$DEMO/sintel_eng_hardsub_demo.mp4" . && cp "$DEMO/sintel_ita_hardsub_demo.mp4" sintel_cartelli_demo.mp4
@@ -15,6 +16,9 @@
 wait-ready 600
 ? ^ready
 settings-feed clear
+# The demo clips are Italian: Italian is the default subtitle language here, so no value shows as changed
+sublang it-IT
+? it-IT
 display-home $WORK/home
 ? /home$
 lang it
@@ -54,7 +58,15 @@ lang en
 ! sleep 1
 window-shot $OUT/video_rows_dark_en.png
 ? png$
+theme light
+! sleep 1
+window-shot $OUT/video_rows_light_en.png
+? png$
 lang it
+! sleep 1
+window-shot $OUT/video_rows_light_it.png
+? png$
+theme dark
 # 8 · preview (A3): the Preview of the first video on the first frame with text, Try OCR,
 # then the signs band changed: its panel goes out of date. (The demo clips have no signs:
 # the Signs panel reads nothing.)
@@ -75,6 +87,16 @@ lang en
 ! sleep 1
 window-shot $OUT/preview_dark_en.png
 ? png$
+theme light
+! sleep 1
+window-shot $OUT/preview_light_en.png
+? png$
+lang it
+! sleep 1
+window-shot $OUT/preview_light_it.png
+? png$
+theme dark
+lang en
 preview-close
 ? ^ok
 # 7 · parameters (I2): the panel on Bands with one value changed, light; cut from the window
@@ -88,6 +110,15 @@ lang it
 ! sleep 1
 window-shot $OUT/parameters-window_light_it.png noshadow
 ? png$
+theme dark
+! sleep 1
+window-shot $OUT/parameters-window_dark_it.png noshadow
+? png$
+lang en
+! sleep 1
+window-shot $OUT/parameters-window_dark_en.png noshadow
+? png$
+lang it
 inspector-set ocr.topKeepPct 22
 theme dark
 inspector-tab read
@@ -103,6 +134,15 @@ lang en
 ! sleep 2
 window-shot $OUT/review_dark_en.png
 ? png$
+theme light
+! sleep 2
+window-shot $OUT/review_light_en.png
+? png$
+lang it
+! sleep 2
+window-shot $OUT/review_light_it.png
+? png$
+theme dark
 report-close
 lang it
 # 10 · subfix (F2): the first video's SRT fixed
@@ -118,6 +158,15 @@ lang en
 ! sleep 1
 window-shot $OUT/subfix_dark_en.png
 ? png$
+theme light
+! sleep 1
+window-shot $OUT/subfix_light_en.png
+? png$
+lang it
+! sleep 1
+window-shot $OUT/subfix_light_it.png
+? png$
+theme dark
 # Back to Italian before the batch shots (the next two are the _it ones)
 lang it
 tab process
@@ -168,6 +217,15 @@ lang en
 ! sleep 1
 window-shot $OUT/video_finished_dark_en.png
 ? png$
+theme light
+! sleep 1
+window-shot $OUT/video_finished_light_en.png
+? png$
+lang it
+! sleep 1
+window-shot $OUT/video_finished_light_it.png
+? png$
+theme dark
 summary-seen
 lang it
 tab process
@@ -175,3 +233,4 @@ display-home off
 theme system
 params default
 inspector-tab read
+sublang clear
