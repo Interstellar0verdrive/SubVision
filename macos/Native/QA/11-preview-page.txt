@@ -93,9 +93,10 @@ inspector-set ocr.topKeepPct 22
 size 1800x1000
 preview-layout
 ? frame (6[5-9][0-9]|[7-9][0-9]{2}|1[0-9]{3})x[0-9]+ .* panels 232/232 .* · fits$
+# (the demo clips are 2.35:1: the frame grows here too, the panels stay at 232 pt)
 size 1360x920
 preview-layout
-? frame 640x[0-9]+ .* · fits$
+? panels 232/232 .* · fits$
 size 1100x720
 preview-layout
 ? · fits$
