@@ -811,7 +811,7 @@ enum DebugQA {
 
     /// `preview-layout`: what was really drawn, and whether it all fits the content area
     /// (the block inside it, the arrows too, the thumbnail rows as wide as the frame, the
-    /// two panels as tall as each other and at least `PreviewLayout.panelsMin`).
+    /// two panels as tall as each other, at least `PreviewLayout.panelsMin` and at most `panelsIdeal`).
     private static func previewLayout(_ model: AppModel) -> String {
         guard model.previewShown, let window = WindowSizer.main(model.config) else { return "no preview page" }
         let rects = PreviewMetrics.rects
@@ -836,7 +836,8 @@ enum DebugQA {
             let checks: [(String, Bool)] = [
                 ("frame", fits), ("arrows", arrows), ("inside", [thumbs, summary, dialogue, signs].allSatisfy(inside)),
                 ("thumbs", abs(thumbs.width - frame.width) < 0.5), ("panels", abs(dialogue.height - signs.height) < 0.5),
-                ("min", dialogue.height >= PreviewLayout.panelsMin - 1), ("bottom", bottomGap >= PreviewLayout.bottom - 1),
+                ("min", dialogue.height >= PreviewLayout.panelsMin - 1), ("tall", dialogue.height <= PreviewLayout.panelsIdeal + 0.5),
+                ("bottom", bottomGap >= PreviewLayout.bottom - 1),
                 ("edges", abs(dialogue.minX - frame.minX) < 0.5 && abs(signs.maxX - frame.maxX) < 0.5),
                 ("width", frame.width <= PreviewLayout.maxFrameWidth + 0.5), ("centre", abs(frame.midX - content.midX) < 1)]
             fits = checks.allSatisfy(\.1)

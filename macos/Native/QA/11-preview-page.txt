@@ -88,8 +88,12 @@ preview-state
 inspector-set langHint it-IT
 band-set bottom-height 28
 inspector-set ocr.topKeepPct 22
-# The window's sizes: the frame stops at 640 pt and the block stays centred.
+# The window's sizes (P2): in a large window the frame grows past 640 pt and the panels stay at
+# 232 pt; in a small one they give up their room first. The block stays centred.
 size 1800x1000
+preview-layout
+? frame (6[5-9][0-9]|[7-9][0-9]{2}|1[0-9]{3})x[0-9]+ .* panels 232/232 .* · fits$
+size 1360x920
 preview-layout
 ? frame 640x[0-9]+ .* · fits$
 size 1100x720

@@ -358,11 +358,10 @@ struct FromPreview: View {
             } else {
                 Rectangle().fill(SV.raised)
             }
-            HStack(spacing: 2) {
-                if frame.hasDialogue { Circle().fill(SV.green).frame(width: 5, height: 5) }
-                if frame.hasSigns { Circle().fill(signsBlue).frame(width: 5, height: 5) }
+            if frame.hasText {
+                // The same dots as the Preview's thumbnails (P2).
+                BandDots(dialogue: frame.hasDialogue, signs: frame.hasSigns).padding(3)
             }
-            .padding(2)
         }
         .frame(width: 64, height: 36)
         .clipShape(RoundedRectangle(cornerRadius: 4))

@@ -15,9 +15,11 @@ import SVShell
 import SwiftUI
 
 /// The measures of the block in a content area of `size` (C2-A1 at 1280 × 860:
-/// frame 732 × 414, thumbnails 68 × 38, panels 176). The frame is as wide as the
-/// height lets everything fit with the panels at least `panelsMin` tall, never
-/// wider than the area less the arrows, and never wider than `maxFrameWidth`.
+/// frame 732 × 414, thumbnails 68 × 38, panels 176; P2 for large windows). The frame
+/// is as wide as the height lets everything fit with the panels at `panelsIdeal`, or,
+/// in a smaller window, as before P2: the panels from `panelsMin` up and the frame up
+/// to `comfortWidth`. Never wider than the area less the arrows; the panels never grow
+/// past `panelsIdeal` (the room left goes under the block).
 struct PreviewLayout: Equatable {
     static let top: CGFloat = 22
     static let bottom: CGFloat = 22
@@ -37,42 +39,54 @@ struct PreviewLayout: Equatable {
     static let panelsTop: CGFloat = 16
     /// The panels' least height: room for a two-line reading, its line and the stale note.
     static let panelsMin: CGFloat = 170
+    /// The panels' height when there is room (P2): a reading, its line and the stale note
+    /// without scrolling. They never grow past it: the frame takes the room instead.
+    static let panelsIdeal: CGFloat = 232
     static let minFrameWidth: CGFloat = 320
-    /// In a large window the frame stops growing here; the block stays centred.
-    static let maxFrameWidth: CGFloat = 640
+    /// Where the frame stopped growing before P2: below it, the panels give up their room first.
+    static let comfortWidth: CGFloat = 640
+    /// A sanity limit only (P2): the frame grows with the window, the panels do not.
+    static let maxFrameWidth: CGFloat = 1600
 
     var size: CGSize
     var frameWidth: CGFloat
     var frameHeight: CGFloat
     var thumbWidth: CGFloat
     var thumbHeight: CGFloat
+    /// The panels' height: the room left, never more than `panelsIdeal`.
     var panels: CGFloat
+    /// The room left under the summary (more than `panels` when the frame is as wide as the area allows).
+    var room: CGFloat
 
     /// `notes`: the notes over the frame, with their gap (0 without).
     init(size: CGSize, aspect: CGFloat, notes: CGFloat) {
         let a = aspect > 0 ? aspect : 16 / 9
         let g = Self.gap, n = CGFloat(Self.columns)
         let fixed = Self.top + notes + Self.captionTop + Self.caption + Self.captionBottom + CGFloat(Self.rows - 1) * g
-            + Self.summaryTop + Self.summary + Self.panelsTop + Self.panelsMin + Self.bottom
-        // The frame and two rows of thumbnails: w / a + 2 · (w − 9 g) / 10 / a.
+            + Self.summaryTop + Self.summary + Self.panelsTop + Self.bottom
+        // The frame and two rows of thumbnails: w / a + 2 · (w − 9 g) / 10 / a, with panels `p` under them.
         let rows = CGFloat(Self.rows)
-        let byHeight = ((size.height - fixed) * a + rows * (n - 1) * g / n) / (1 + rows / n)
+        func byHeight(_ p: CGFloat) -> CGFloat { ((size.height - fixed - p) * a + rows * (n - 1) * g / n) / (1 + rows / n) }
         let byWidth = size.width - 2 * (Self.arrow + Self.margin)
-        let w = max(Self.minFrameWidth, min(byWidth, byHeight, Self.maxFrameWidth)).rounded(.down)
+        // P2: in a large window the frame takes all the room the panels at `panelsIdeal` leave; in a
+        // smaller one it stays as before (panels from `panelsMin`, the frame up to `comfortWidth`).
+        let w = max(Self.minFrameWidth, min(byWidth, max(byHeight(Self.panelsIdeal), min(byHeight(Self.panelsMin), Self.comfortWidth)),
+                                            Self.maxFrameWidth)).rounded(.down)
         self.size = size
         frameWidth = w
         frameHeight = (w / a).rounded()
         thumbWidth = (w - (n - 1) * g) / n
         thumbHeight = (thumbWidth / a).rounded()
-        panels = size.height - (Self.top + notes + frameHeight + Self.captionTop + Self.caption + Self.captionBottom
+        room = size.height - (Self.top + notes + frameHeight + Self.captionTop + Self.caption + Self.captionBottom
             + rows * thumbHeight + (rows - 1) * g + Self.summaryTop + Self.summary + Self.panelsTop + Self.bottom)
+        panels = min(room, Self.panelsIdeal)
     }
 
     /// Everything in the area, the panels at least their least height (one point of rounding allowed).
-    var fits: Bool { panels >= Self.panelsMin - 1 && frameWidth + 2 * Self.arrow <= size.width }
+    var fits: Bool { room >= Self.panelsMin - 1 && frameWidth + 2 * Self.arrow <= size.width }
 
     /// The area's height that gives the panels `panels` with this frame.
-    func height(panels: CGFloat) -> CGFloat { size.height - self.panels + panels }
+    func height(panels: CGFloat) -> CGFloat { size.height - room + panels }
 }
 
 /// The block, or the box before the frames.
@@ -91,7 +105,7 @@ struct PreviewContent: View {
         GeometryReader { g in
             let layout = PreviewLayout(size: g.size, aspect: aspect, notes: notesHeight)
             // A window too short for the whole block: the panels keep their least height and it scrolls.
-            let fitted = layout.panels >= PreviewLayout.panelsMin - 1 ? layout
+            let fitted = layout.room >= PreviewLayout.panelsMin - 1 ? layout
                 : PreviewLayout(size: CGSize(width: g.size.width, height: layout.height(panels: PreviewLayout.panelsMin)),
                                 aspect: aspect, notes: notesHeight)
             ScrollView(.vertical) {
@@ -456,7 +470,7 @@ struct PreviewThumbnail: View {
             .clipped()
             if f.hasText {
                 BandDots(dialogue: f.hasDialogue, signs: f.hasSigns)
-                    .padding(2)
+                    .padding(3)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -590,10 +604,18 @@ struct BandDots: View {
     var signs: Bool
 
     var body: some View {
-        HStack(spacing: 2) {
-            if dialogue { Circle().fill(BandColors.dialogue).frame(width: 5, height: 5) }
-            if signs { Circle().fill(BandColors.signs).frame(width: 5, height: 5) }
+        // P2: 7 pt dots ringed in white, each on its own round dark halo (11 pt), readable on any frame.
+        HStack(spacing: 1) {
+            if dialogue { dot(BandColors.dialogue) }
+            if signs { dot(BandColors.signs) }
         }
+    }
+
+    private func dot(_ color: Color) -> some View {
+        Circle().fill(color).frame(width: 7, height: 7)
+            .overlay(Circle().strokeBorder(.white.opacity(0.9), lineWidth: 1))
+            .frame(width: 11, height: 11)
+            .background(Circle().fill(.black.opacity(0.62)))
     }
 }
 
