@@ -748,11 +748,13 @@ struct BandSchema: View {
             .frame(width: w, height: h, alignment: .topLeading)
         }
         .frame(height: 174)
-        .background(Self.frameColour)
+        // The frame's grey edge goes under the bands: drawn over them it covered the
+        // outer point of a band's border where the band touches the edge, which then
+        // looked thinner than its other sides.
+        .background(Rectangle().fill(Self.frameColour).overlay(Rectangle().strokeBorder(SV.line)))
         // Square corners (design note 89): a band at 100 % width runs edge to edge,
         // a rounded clip would cut its border and fill at the corners.
         .clipShape(Rectangle())
-        .overlay(Rectangle().strokeBorder(SV.line))
         .accessibilityElement()
         .accessibilityLabel(label)
     }
