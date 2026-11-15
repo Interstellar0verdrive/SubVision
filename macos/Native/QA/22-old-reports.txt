@@ -22,7 +22,7 @@ report-open $WORK/old-1.0-it.revisione.html
 report-file
 ? ^page .*/state/tmp/reports/[0-9a-f]{16}/old-1\.0-it\.revisione\.html · original .*/work/old-1\.0-it\.revisione\.html · state .*/work/old-1\.0-it\.revisione\.review\.json · current false · note none$
 report-page
-? · 4 lines · 2 to re-check · 2 gaps · processed .* · ready · tab review · back on · save on$
+? ^Review of clip-a\.mp4 · 4 lines · 2 to re-check · 2 gaps · processed .* · ready · tab review · back on · save on$
 report-js document.querySelector('meta[name="subvision-report"]').content + ' · ' + document.documentElement.lang + ' · ' + document.documentElement.classList.contains('app') + ' · ' + getComputedStyle(document.querySelector('.legend')).position + ' · ' + getComputedStyle(document.querySelector('.rhead')).position
 ? ^2 · en · true · fixed · sticky$
 report-js document.getElementById('summary').textContent + ' · ' + document.getElementById('gapsTitle').textContent
@@ -68,7 +68,7 @@ capture $OUT/old-2.0-en-light.png
 ? old-2.0-en-light.png$
 lang it
 report-page
-? ^Revisione di .* · 4 righe · 2 da ricontrollare · 2 buchi · elaborato .* · ready
+? ^Revisione di clip-c\.mkv · 4 righe · 2 da ricontrollare · 2 buchi · elaborato .* · ready
 capture $OUT/old-2.0-it-light.png
 ? old-2.0-it-light.png$
 theme dark

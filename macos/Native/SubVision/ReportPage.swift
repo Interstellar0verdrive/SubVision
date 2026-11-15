@@ -58,8 +58,11 @@ final class ReportSession {
     #endif
 
     var name: String { url.lastPathComponent }
-    /// The video's name: the bold part of "Revisione di <video>".
-    var title: String { model.reviewName(for: url) }
+    /// The video's name: the bold part of "Revisione di <video>". The list's video, else the
+    /// name the report's data gives (an old report keeps a date in its file name), else the file's.
+    var title: String { video?.name ?? reportVideoName ?? model.reviewName(for: url) }
+    /// `DATA.videoName` of the report.
+    private(set) var reportVideoName: String?
     var video: VideoItem? { videoID.flatMap { id in model.videos.first { $0.id == id } } }
 
     init(url: URL, videoID: UUID?, model: AppModel) {
@@ -86,6 +89,7 @@ final class ReportSession {
             return
         }
         counts = file.counts
+        reportVideoName = file.videoName.flatMap { $0.isEmpty ? nil : $0 }
         if file.isCurrent {
             start(file)
             return

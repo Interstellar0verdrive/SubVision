@@ -35,6 +35,8 @@ struct ReportFile {
     private(set) var upgradedFrom: String?
     /// `DATA.srtName` of the report: the `localStorage` key of the 1.x is built on it.
     var srtName: String?
+    /// `DATA.videoName` of the report: the band's name when the video is not in the list.
+    var videoName: String?
     /// Lines, lines to re-check and gaps from the report's data (the title band, R1).
     var counts: ReviewData.Counts?
 
@@ -49,6 +51,9 @@ struct ReportFile {
         counts = ReviewData.counts(html: html)
         if let m = html.firstMatch(of: /"srtName":\s*"((?:[^"\\]|\\.)*)"/) {
             srtName = String(m.1).replacingOccurrences(of: "\\\"", with: "\"").replacingOccurrences(of: "\\\\", with: "\\")
+        }
+        if let m = html.firstMatch(of: /"videoName":\s*"((?:[^"\\]|\\.)*)"/) {
+            videoName = String(m.1).replacingOccurrences(of: "\\\"", with: "\"").replacingOccurrences(of: "\\\\", with: "\\")
         }
     }
 
