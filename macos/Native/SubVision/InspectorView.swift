@@ -699,8 +699,10 @@ struct StepField: View {
 /// The frame's schema of the main window's Bande tab (C2-P2): the signs band
 /// at the top and the dialogue band at the bottom, as high and as wide as the
 /// sliders set them, each with its tag and a short light bar for a line of
-/// text; the signs band dashed and faded when it is off. Dark in both themes,
-/// with square corners.
+/// text; the signs band dashed and faded when it is off. Square corners.
+/// Dark in the dark theme; light grey in the light one (design board P3), with
+/// darker bands, dark text bars and filled tags with white text there, so it
+/// reads as a diagram on the white panel, not as a black block.
 struct BandSchema: View {
     var signsOn: Bool
     var topPct: Int
@@ -712,7 +714,19 @@ struct BandSchema: View {
     var dialogue: String
     var label: String
 
-    private static let frameColour = Color(dark: "#0B0C0E", light: "#0B0C0E")
+    private static let frameColour = Color(dark: "#0B0C0E", light: "#E4E7EB")
+    // The bands' colours on the diagram: the Preview's in the dark theme, darker in
+    // the light one (#3DD68C and #4DA3FF are too faint on light grey). BandColors
+    // stays as it is: the Preview draws its bands on the video.
+    private static let signsColour = Color(dark: "#4DA3FF", light: "#2879D0")
+    private static let dialogueColour = Color(dark: "#3DD68C", light: "#17915A")
+    private static let signsFill = Color(dark: "rgba(77,163,255,.12)", light: "rgba(40,121,208,.14)")
+    private static let dialogueFill = Color(dark: "rgba(61,214,140,.12)", light: "rgba(23,145,90,.14)")
+    private static let textBarColour = Color(dark: "rgba(255,255,255,.55)", light: "rgba(22,24,27,.38)")
+    private static let signsTag = Color(dark: "#4DA3FF", light: "#2271C3")
+    private static let dialogueTag = Color(dark: "#3DD68C", light: "#12804F")
+    private static let signsTagText = Color(dark: "#04182E", light: "#FFFFFF")
+    private static let dialogueTagText = Color(dark: "#06210F", light: "#FFFFFF")
 
     var body: some View {
         GeometryReader { g in
@@ -721,14 +735,14 @@ struct BandSchema: View {
             let dW = w * CGFloat(bottomWPct) / 100, dH = h * CGFloat(bottomPct) / 100
             let dX = (w - dW) / 2, dY = h - dH
             ZStack(alignment: .topLeading) {
-                band(BandColors.signs, on: signsOn).frame(width: sW, height: sH).offset(x: sX, y: 0)
+                band(Self.signsColour, fill: Self.signsFill, on: signsOn).frame(width: sW, height: sH).offset(x: sX, y: 0)
                 if signsOn { textBar(min(150, sW * 0.5), w: w, centreY: sH / 2) }
-                tag(signsOn ? signs : signsOff, fill: BandColors.signs, text: BandColors.signsTagText)
+                tag(signsOn ? signs : signsOff, fill: Self.signsTag, text: Self.signsTagText)
                     .opacity(signsOn ? 1 : 0.6)
                     .offset(x: sX + 6, y: sH + 4)
-                band(BandColors.dialogue, on: true).frame(width: dW, height: dH).offset(x: dX, y: dY)
+                band(Self.dialogueColour, fill: Self.dialogueFill, on: true).frame(width: dW, height: dH).offset(x: dX, y: dY)
                 textBar(min(110, dW * 0.37), w: w, centreY: dY + dH / 2)
-                tag(dialogue, fill: BandColors.dialogue, text: BandColors.dialogueTagText)
+                tag(dialogue, fill: Self.dialogueTag, text: Self.dialogueTagText)
                     .offset(x: dX + 4, y: dY - 20)
             }
             .frame(width: w, height: h, alignment: .topLeading)
@@ -743,16 +757,16 @@ struct BandSchema: View {
         .accessibilityLabel(label)
     }
 
-    /// A band: a 1.5 pt border on a 12 % fill; off, dashed, empty and at half strength.
-    private func band(_ colour: Color, on: Bool) -> some View {
-        Rectangle().fill(on ? colour.opacity(0.12) : .clear)
+    /// A band: a 1.5 pt border on a light fill; off, dashed, empty and at half strength.
+    private func band(_ colour: Color, fill: Color, on: Bool) -> some View {
+        Rectangle().fill(on ? fill : .clear)
             .overlay(Rectangle().strokeBorder(colour, style: StrokeStyle(lineWidth: 1.5, dash: on ? [] : [4, 3])))
             .opacity(on ? 1 : 0.5)
     }
 
-    /// The light bar in the middle of a band: a line of text.
+    /// The bar in the middle of a band: a line of text.
     private func textBar(_ width: CGFloat, w: CGFloat, centreY: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 2).fill(Color.white.opacity(0.55))
+        RoundedRectangle(cornerRadius: 2).fill(Self.textBarColour)
             .frame(width: width, height: 4)
             .offset(x: (w - width) / 2, y: centreY - 2)
     }
