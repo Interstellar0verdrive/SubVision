@@ -668,3 +668,15 @@ scaricano al primo avvio.
 Video demo: clip da *Sintel*, open movie della Blender Foundation —
 **© copyright Blender Foundation | durian.blender.org** — licenza
 [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/).
+
+---
+
+<p align="center">
+<a href="https://ko-fi.com/Interstellar0verdrive">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/support_kofi_dark_it.webp">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/support_kofi_light_it.webp">
+  <img alt="Sostieni lo sviluppo indipendente su Ko-fi: offrimi un caffè" src="https://raw.githubusercontent.com/Interstellar0verdrive/SubVision/assets/screenshots/2.0/support_kofi_dark_it.webp" width="560">
+</picture>
+</a>
+</p>
