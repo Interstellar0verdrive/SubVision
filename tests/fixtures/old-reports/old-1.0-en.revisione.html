@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Review — clip-b.mp4</title>
+<style>
+ :root{color-scheme:dark}
+ body{font-family:-apple-system,Helvetica,Arial,sans-serif;margin:0;background:#14161a;color:#e8e8e8}
+ .wrap{max-width:1100px;margin:0 auto;padding:18px 22px 80px}
+ h1{font-size:20px} h2{font-size:16px;margin-top:36px;border-bottom:1px solid #333;padding-bottom:6px}
+ .sum{background:#1d2026;border:1px solid #333;border-radius:10px;padding:12px 16px;line-height:1.7;font-size:14px}
+ .topbar{position:sticky;top:0;z-index:10;background:#14161acc;backdrop-filter:blur(8px);
+        border-bottom:1px solid #333;padding:10px 22px;display:flex;gap:12px;align-items:center}
+ .topbar b{font-size:15px}
+ button{background:#2a6df4;color:#fff;border:0;border-radius:8px;padding:8px 16px;
+        font-size:14px;cursor:pointer}
+ button:hover{filter:brightness(1.15)}
+ button.sec{background:#3a3d45} button.mini{padding:2px 10px;font-size:12px;border-radius:6px}
+ .row{display:flex;gap:12px;border-bottom:1px solid #2a2d33;padding:10px 4px;align-items:flex-start}
+ .row.warn{background:#241f0e} .row.bad{background:#2b1616} .row.excluded{opacity:.45}
+ .row.added{background:#12281a}
+ .cInc{padding-top:4px}
+ .cT{width:120px;flex:none;font-size:12px;color:#9ecbff}
+ .cT input{width:112px;background:#1d2026;border:1px solid #3a3d45;border-radius:5px;
+          color:#9ecbff;font-size:12px;padding:3px 5px;margin-bottom:3px;font-family:ui-monospace,monospace}
+ .cImg{flex:none} .cImg img{max-width:400px;border-radius:6px;display:block}
+ .cTx{flex:1;min-width:220px}
+ textarea{width:100%;box-sizing:border-box;background:#1d2026;border:1px solid #3a3d45;
+         border-radius:6px;color:#e8e8e8;font-size:15px;line-height:1.45;padding:6px 8px;
+         resize:vertical;min-height:38px;font-family:inherit}
+ textarea.edited{border-color:#2a6df4}
+ .cC{width:78px;flex:none;text-align:right;font-size:13px;white-space:nowrap}
+ .dur{color:#777;font-size:11px}
+ .tag{display:inline-block;background:#444;border-radius:4px;font-size:11px;
+      padding:1px 7px;margin:4px 4px 0 0;color:#ddd}
+ .tag.top{background:#2a6df4;color:#fff;font-weight:700;cursor:pointer;
+          border:1px solid #7db1ff;box-shadow:0 0 8px #2a6df499}
+ .tag.top.off{background:#26282e;color:#777;font-weight:400;
+          border:1px dashed #555;box-shadow:none}
+ .chip{display:inline-block;background:#26313f;border:1px solid #3d5470;border-radius:6px;
+       font-size:13px;padding:2px 9px;margin:5px 5px 0 0;color:#bcd6f5;cursor:pointer}
+ .chip:hover{background:#31435a}
+ .chip.orig{border-style:dashed}
+ .hl{background:#f7d154;color:#1a1a1a;border-radius:3px;padding:0 3px;font-weight:600}
+ label.opt{color:#bbb;font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer}
+ .hint{color:#888;font-size:12px;margin-top:4px}
+ .n{color:#888;width:26px;flex:none;padding-top:6px;font-size:13px}
+ .gap{border:1px dashed #665c20;border-radius:8px;margin:10px 0;padding:10px;display:flex;gap:12px}
+ .legend span{margin-right:16px;font-size:13px}
+ .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+ .saved{color:#7fd07f;font-size:13px;margin-left:6px;opacity:0;transition:opacity .3s}
+ .foot{margin-top:48px;padding-top:12px;border-top:1px solid #2a2d33;color:#777;
+       font-size:12px;text-align:center}
+ .foot a{color:#9ecbff;text-decoration:none} .foot a:hover{text-decoration:underline}
+</style></head><body>
+<div class="topbar">
+ <b>🎬 Review — clip-b.mp4</b>
+ <span style="flex:1"></span>
+ <span id="counter" style="color:#aaa;font-size:13px"></span>
+ <label class="opt" title="On save: merges adjacent lines with equal or very similar text (rendered differently by the OCR). If you edited one of the two by hand, your text wins.">
+   <input type="checkbox" id="mergeOnSave" checked> merge duplicates</label>
+ <button class="sec" onclick="resetAll()">↺ Reset all</button>
+ <button onclick="exportSrt()">💾 Save reviewed SRT</button>
+ <span class="saved" id="savedNote">saved ✓</span>
+</div>
+<div class="wrap">
+<div class="sum">SRT: <b>clip-b.srt</b><br>Lines: <b>4</b> · to re-check: <b>2</b> · dropped (recoverable): <b>2</b> · long gaps: <b>2</b><br>Frames: 480 · OCR: 900 · boundaries refined: 6 · time: 01:16
+ <div class="legend" style="margin-top:6px">
+  <span><span class="dot" style="background:#241f0e;border:1px solid #665c20"></span>to re-check</span>
+  <span><span class="dot" style="background:#2b1616;border:1px solid #663333"></span>very doubtful / dropped</span>
+  <span><span class="dot" style="background:#12281a;border:1px solid #2f6b45"></span>line added by hand</span>
+ </div>
+ <div class="hint">Edit the text in the boxes, click an <b>alternative reading</b> to use it,
+ check/uncheck the lines to include. Changes stay saved in this browser.<br>
+ <b>💾 Save reviewed SRT</b> creates <code>name-revisionato-date.srt</code>: with <b>Chrome/Edge</b> the
+ Save dialog opens and <b>remembers the folder</b> (pick the videos folder the first time);
+ with <b>Safari</b> the file goes to Downloads.</div>
+</div>
+<h2>SRT lines <button class="mini sec" onclick="addRow(null)">➕ add line</button></h2>
+<div id="rows"></div>
+<h2>⚠️ Dropped (short flashes / noise) — tick ✔ to recover them into the SRT</h2>
+<div id="dropped"></div>
+<h2>🕳️ Long intervals without subtitles — possibly skipped lines</h2>
+<div id="gaps"></div>
+<div class="foot">Generated with SubVision v1.0.0 — <a href="https://github.com/Interstellar0verdrive/SubVision">github.com/Interstellar0verdrive/SubVision</a></div>
+</div>
+<script type="application/json" id="qcdata">{"srtName": "clip-b.srt", "videoName": "clip-b.mp4", "rows": [{"id": "s1", "n": 1, "start": 1.0, "end": 3.0, "text": "Hello there, Mira.", "top": false, "conf": 0.97, "agree": 1.0, "alts": [], "flags": [], "thumb": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDk6KKK6jA//9k=", "dropped": false, "cls": ""}, {"id": "s2", "n": 2, "start": 3.5, "end": 5.0, "text": "Where are you going?", "top": false, "conf": 0.72, "agree": 0.6, "alts": ["Where are you goinq?", "Wh ere are you going?"], "flags": ["merged across fade/typo"], "thumb": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDj6KKKAP/Z", "dropped": false, "cls": "warn"}, {"id": "s3", "n": 3, "start": 5.0, "end": 7.0, "text": "NORTH GATE", "top": true, "conf": 0.9, "agree": 0.9, "alts": [], "flags": [], "thumb": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDjqKKKxPRP/9k=", "dropped": false, "cls": ""}, {"id": "s4", "n": 4, "start": 20.0, "end": 22.5, "text": "To the river,\nbefore the night.", "top": false, "conf": 0.45, "agree": 0.4, "alts": [], "flags": [], "thumb": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDkqKKK5DhP/9k=", "dropped": false, "cls": "bad"}, {"id": "s5", "n": "✂", "start": 8.0, "end": 8.1, "text": "x", "top": false, "conf": 0.4, "agree": 0.5, "alts": [], "flags": ["dropped: too short"], "thumb": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDzaiiigD//2Q==", "dropped": true, "cls": "bad"}, {"id": "s6", "n": "✂", "start": 9.0, "end": 9.4, "text": ". L", "top": false, "conf": 0.4, "agree": 0.5, "alts": [], "flags": ["dropped: likely graphic noise"], "thumb": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDg6KKKAP/Z", "dropped": true, "cls": "bad"}], "gaps": [{"start": 7.0, "end": 20.0, "thumb": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDkaKKK84s//9k="}, {"start": 22.5, "end": 40.0, "thumb": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAGABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDiqKKK2POP/9k="}]}</script>
+<script>
+const DATA = JSON.parse(document.getElementById('qcdata').textContent);
+const T = {"includeTip": "include in the SRT", "start": "start", "end": "end", "tsFormat": "⚠️ format: HH:MM:SS,mmm", "signOn": "✓ SIGN ↑ {\\an8}", "signOff": "sign ↑ {\\an8}", "signTip": "click to toggle the top position", "altTip": "use this reading (differing words in yellow)", "orig": "↺ original", "counter": "{inc} lines included out of {tot}", "agree": "agreement", "badTimes": "Invalid times in line:", "saved": "saved ✓", "mergedDupes": "duplicates merged", "srtDesc": "SubRip subtitles", "srtSaved": "SRT saved ✓", "srtDownloaded": "SRT downloaded to Downloads", "confirmReset": "Undo all the changes made in this report?", "noneDropped": "None.", "noneGaps": "None.", "gapNoSub": "s without subs", "gapHint": "Thumbnail at mid-interval. If a line was missing here, add it:", "addHere": "➕ add line here", "addedFlag": "added by hand"};
+const LSKEY = 'voc26_rev_' + DATA.srtName;
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(LSKEY) || '{}'); } catch(e) {}
+let addCounter = 0;
+
+function ts(sec){
+  sec = Math.max(0, sec);
+  const ms = Math.round(sec*1000);
+  const h = Math.floor(ms/3600000), m = Math.floor(ms/60000)%60,
+        s = Math.floor(ms/1000)%60, r = ms%1000;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+
+         String(s).padStart(2,'0')+','+String(r).padStart(3,'0');
+}
+function parseTs(t){
+  const m = (t||'').trim().match(/^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})$/);
+  if(!m) return null;
+  return (+m[1])*3600 + (+m[2])*60 + (+m[3]) + (+m[4].padEnd(3,'0'))/1000;
+}
+// ---- similarita' testi (replica della logica Python della pipeline)
+function normCmp(s){
+  return (s||'').toLowerCase().replace(/["“”‘’„«»‹›]/g,'')
+         .replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
+}
+function editDist(a,b){
+  const n=a.length,m=b.length;
+  if(!n||!m) return Math.max(n,m);
+  let dp=Array.from({length:m+1},(_,j)=>j);
+  for(let i=1;i<=n;i++){
+    let prev=dp[0]; dp[0]=i;
+    for(let j=1;j<=m;j++){
+      const cur=dp[j];
+      dp[j]=Math.min(dp[j]+1, dp[j-1]+1, prev+(a[i-1]===b[j-1]?0:1));
+      prev=cur;
+    }
+  }
+  return dp[m];
+}
+function similar(a,b,ratio){
+  ratio = ratio || 0.18;
+  a=normCmp(a); b=normCmp(b);
+  if(a===b) return true;
+  if(!a||!b) return false;
+  const s=a.length<=b.length?a:b, l=a.length<=b.length?b:a;
+  if(s.length>=10 && l.includes(s)) return true;
+  const L=Math.max(a.length,b.length);
+  return editDist(a,b) <= Math.max(2, Math.round(L*ratio));
+}
+// ---- diff a parole (LCS): ritorna i token di b marcando quelli diversi da a
+function wordDiff(a,b){
+  const A=(a||'').split(/\s+/).filter(Boolean), B=(b||'').split(/\s+/).filter(Boolean);
+  const m=A.length,n=B.length;
+  const dp=Array.from({length:m+1},()=>new Array(n+1).fill(0));
+  for(let i=m-1;i>=0;i--)for(let j=n-1;j>=0;j--)
+    dp[i][j]=(normCmp(A[i])===normCmp(B[j])&&normCmp(B[j]))?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+  const out=[]; let i=0,j=0;
+  while(i<m&&j<n){
+    if(normCmp(A[i])===normCmp(B[j])&&normCmp(B[j])){out.push([B[j],false]);i++;j++;}
+    else if(dp[i+1][j]>=dp[i][j+1]) i++;
+    else {out.push([B[j],true]); j++;}
+  }
+  while(j<n){out.push([B[j],true]);j++;}
+  return out;
+}
+function state(id){ return saved[id] || {}; }
+function setState(id, patch){
+  saved[id] = Object.assign({}, saved[id]||{}, patch);
+  localStorage.setItem(LSKEY, JSON.stringify(saved));
+  const n = document.getElementById('savedNote');
+  n.style.opacity = 1; setTimeout(()=>n.style.opacity=0, 900);
+  updateCounter();
+}
+function rowValues(r){
+  const s = state(r.id);
+  return {
+    text: (s.text !== undefined) ? s.text : r.text,
+    start: (s.start !== undefined) ? s.start : r.start,
+    end: (s.end !== undefined) ? s.end : r.end,
+    included: (s.included !== undefined) ? s.included : !r.dropped,
+    top: (s.top !== undefined) ? s.top : !!r.top,
+  };
+}
+
+function makeRow(r, container){
+  const v = rowValues(r);
+  const div = document.createElement('div');
+  div.className = 'row ' + (r.added ? 'added' : r.cls || '');
+  if(!v.included) div.classList.add('excluded');
+  div.dataset.id = r.id;
+
+  const inc = document.createElement('div'); inc.className='cInc';
+  const cb = document.createElement('input'); cb.type='checkbox'; cb.checked=v.included;
+  cb.title=T.includeTip;
+  cb.onchange = () => { setState(r.id,{included:cb.checked});
+                        div.classList.toggle('excluded', !cb.checked); };
+  inc.appendChild(cb); div.appendChild(inc);
+
+  const num = document.createElement('div'); num.className='n'; num.textContent=r.n||''; div.appendChild(num);
+
+  const ct = document.createElement('div'); ct.className='cT';
+  const ti1 = document.createElement('input'); ti1.value = ts(v.start); ti1.title=T.start;
+  const ti2 = document.createElement('input'); ti2.value = ts(v.end); ti2.title=T.end;
+  const dur = document.createElement('div'); dur.className='dur';
+  const updDur = () => {
+    const a=parseTs(ti1.value), b=parseTs(ti2.value);
+    dur.textContent = (a!=null && b!=null) ? (b-a).toFixed(2)+'s' : T.tsFormat;
+  };
+  updDur();
+  ti1.onchange = () => { const t=parseTs(ti1.value); if(t!=null) setState(r.id,{start:t}); updDur(); };
+  ti2.onchange = () => { const t=parseTs(ti2.value); if(t!=null) setState(r.id,{end:t}); updDur(); };
+  ct.append(ti1, ti2, dur); div.appendChild(ct);
+
+  if(r.thumb){
+    const ci = document.createElement('div'); ci.className='cImg';
+    const img = document.createElement('img'); img.src='data:image/jpeg;base64,'+r.thumb;
+    ci.appendChild(img); div.appendChild(ci);
+  }
+
+  const cx = document.createElement('div'); cx.className='cTx';
+  const ta = document.createElement('textarea'); ta.value = v.text;
+  ta.rows = Math.max(1, v.text.split('\n').length);
+  if(v.text !== r.text) ta.classList.add('edited');
+  ta.oninput = () => { setState(r.id,{text:ta.value});
+                       ta.classList.toggle('edited', ta.value !== r.text); };
+  cx.appendChild(ta);
+
+  const tags = document.createElement('div');
+  const an8 = document.createElement('span');
+  const an8Label = on => on ? T.signOn : T.signOff;
+  an8.className = 'tag top' + (v.top?'':' off');
+  an8.textContent = an8Label(v.top);
+  an8.title=T.signTip;
+  an8.onclick = () => { const nv=!(state(r.id).top!==undefined?state(r.id).top:!!r.top);
+                        setState(r.id,{top:nv}); an8.classList.toggle('off',!nv);
+                        an8.textContent = an8Label(nv); };
+  tags.appendChild(an8);
+  (r.flags||[]).forEach(f => { const t=document.createElement('span');
+                               t.className='tag'; t.textContent=f; tags.appendChild(t); });
+  cx.appendChild(tags);
+
+  if((r.alts||[]).length || r.text){
+    const alt = document.createElement('div');
+    (r.alts||[]).forEach(a => {
+      const c = document.createElement('span'); c.className='chip'; c.dataset.txt=a;
+      c.title=T.altTip;
+      // evidenzia le parole che differiscono dal testo originale della riga
+      wordDiff((r.text||'').replace(/\n/g,' '), a.replace(/\n/g,' ')).forEach(([w,d],k)=>{
+        if(k) c.appendChild(document.createTextNode(' '));
+        const s=document.createElement('span');
+        if(d) s.className='hl';
+        s.textContent=w;
+        c.appendChild(s);
+      });
+      c.onclick = () => { ta.value=c.dataset.txt; ta.dispatchEvent(new Event('input')); };
+      alt.appendChild(c);
+    });
+    if(r.text){
+      const o = document.createElement('span'); o.className='chip orig'; o.textContent=T.orig;
+      o.onclick = () => { ta.value=r.text; ta.dispatchEvent(new Event('input')); };
+      alt.appendChild(o);
+    }
+    cx.appendChild(alt);
+  }
+  div.appendChild(cx);
+
+  const cc = document.createElement('div'); cc.className='cC';
+  cc.innerHTML = r.conf!=null ? Math.round(r.conf*100)+'%<div class="dur">'+T.agree+' '+
+                 Math.round((r.agree||1)*100)+'%</div>' : '—';
+  div.appendChild(cc);
+
+  container.appendChild(div);
+  return div;
+}
+
+function addRow(gap){
+  addCounter++;
+  const id = 'new'+Date.now()+'_'+addCounter;
+  const base = gap ? {start: gap.start+0.5, end: Math.min(gap.end-0.5, gap.start+2.5)}
+                   : {start: 0, end: 2};
+  const r = {id:id, n:'+', start:base.start, end:base.end, text:'', alts:[],
+             flags:[T.addedFlag], conf:null, added:true, dropped:false,
+             thumb: gap ? gap.thumb : ''};
+  DATA.extraRows.push(r);
+  setState(id, {text:'', start:base.start, end:base.end, included:true, added:true});
+  const div = makeRow(r, document.createElement('div'));   // creato staccato...
+  if(gap) gap._el.after(div);                              // ...poi spostato dove serve
+  else document.getElementById('rows').appendChild(div);
+  div.querySelector('textarea').focus();
+}
+
+function updateCounter(){
+  let inc=0, tot=0;
+  document.querySelectorAll('.row').forEach(d => {
+    tot++; if(!d.classList.contains('excluded')) inc++;
+  });
+  document.getElementById('counter').textContent =
+    T.counter.replace('{inc}', inc).replace('{tot}', tot);
+}
+
+function collectRows(){
+  const rows = [];
+  const all = DATA.rows.concat(DATA.extraRows);
+  for(const r of all){
+    const v = rowValues(r);
+    if(!v.included) continue;
+    const text = (v.text||'').trim();
+    if(!text) continue;
+    if(v.start==null || v.end==null || v.end<=v.start){
+      alert(T.badTimes + ' "'+text.slice(0,40)+'"'); return null;
+    }
+    rows.push({start:v.start, end:v.end, text:text, top:v.top,
+               edited: text !== (r.text||'')});
+  }
+  rows.sort((a,b)=>a.start-b.start);
+  return rows;
+}
+
+// unisce righe adiacenti (stessa banda) con testo uguale/simile:
+// vince il testo editato a mano; a parita', quello della riga piu' lunga.
+function mergeRows(rows, gap){
+  gap = gap==null ? 0.6 : gap;
+  const out=[]; let merged=0;
+  for(const r of rows){
+    const p=out[out.length-1];
+    if(p && p.top===r.top && (r.start-p.end)<=gap && similar(p.text, r.text)){
+      const keep = (r.edited && !p.edited) ? r.text
+                 : (p.edited && !r.edited) ? p.text
+                 : ((r.end-r.start) > (p.end-p.start) ? r.text : p.text);
+      p.text=keep; p.end=Math.max(p.end, r.end); p.edited=p.edited||r.edited;
+      merged++;
+    } else out.push(Object.assign({}, r));
+  }
+  return [out, merged];
+}
+
+function buildSrt(){
+  let rows = collectRows();
+  if(!rows) return null;
+  window._lastMergeInfo = 0;
+  if(document.getElementById('mergeOnSave')?.checked){
+    const [m, count] = mergeRows(rows);
+    rows = m; window._lastMergeInfo = count;
+  }
+  let out='', i=0;
+  for(const r of rows){
+    i++;
+    const body = (r.top && !r.text.startsWith('{\\an8}')) ? '{\\an8}'+r.text : r.text;
+    out += i+'\n'+ts(r.start)+' --> '+ts(r.end)+'\n'+body+'\n\n';
+  }
+  return out;
+}
+function stamp(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes());
+}
+function flash(msg){
+  const n = document.getElementById('savedNote');
+  n.textContent = msg; n.style.opacity = 1;
+  setTimeout(()=>{ n.style.opacity=0; n.textContent=T.saved; }, 2500);
+}
+async function exportSrt(){
+  const out = buildSrt();
+  if(out == null) return;
+  const fname = DATA.srtName.replace(/\.srt$/i,'') + '-revisionato-' + stamp() + '.srt';
+  const mi = window._lastMergeInfo || 0;
+  const mergeNote = mi > 0 ? ' · ' + mi + ' ' + T.mergedDupes : '';
+  // Chrome/Edge: dialogo "Salva" che RICORDA la cartella (id) -> dalla seconda
+  // volta propone direttamente la cartella dei video. Safari: fallback Download.
+  if(window.showSaveFilePicker){
+    try{
+      const h = await showSaveFilePicker({
+        suggestedName: fname, id: 'voc26-srt',
+        types: [{description:T.srtDesc, accept:{'text/plain':['.srt']}}]
+      });
+      const w = await h.createWritable();
+      await w.write(out); await w.close();
+      flash(T.srtSaved + ' (' + fname + ')' + mergeNote);
+      return;
+    }catch(e){
+      if(e && e.name === 'AbortError') return;   // annullato dall'utente
+      // altri errori (es. API bloccata su file://) -> fallback download
+    }
+  }
+  const blob = new Blob([out], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fname;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  flash(T.srtDownloaded + ' (' + fname + ')' + mergeNote);
+}
+
+function resetAll(){
+  if(!confirm(T.confirmReset)) return;
+  localStorage.removeItem(LSKEY); location.reload();
+}
+
+// ---- render
+DATA.extraRows = [];
+const rowsEl = document.getElementById('rows');
+DATA.rows.filter(r=>!r.dropped).forEach(r => makeRow(r, rowsEl));
+const dropEl = document.getElementById('dropped');
+const droppedRows = DATA.rows.filter(r=>r.dropped);
+if(droppedRows.length) droppedRows.forEach(r => makeRow(r, dropEl));
+else dropEl.innerHTML = '<div class="hint">'+T.noneDropped+'</div>';
+const gapsEl = document.getElementById('gaps');
+if(DATA.gaps.length){
+  DATA.gaps.forEach((g,gi) => {
+    const d = document.createElement('div'); d.className='gap'; g._el = d;
+    const img = g.thumb ? '<img src="data:image/jpeg;base64,'+g.thumb+
+                '" style="max-width:400px;border-radius:6px">' : '';
+    d.innerHTML = '<div class="cT">'+ts(g.start)+'<br>→ '+ts(g.end)+
+                  '<div class="dur">'+(g.end-g.start).toFixed(1)+T.gapNoSub+'</div></div>'+
+                  '<div>'+img+'</div><div style="flex:1"><div class="hint">'+
+                  T.gapHint+'</div></div>';
+    const btn = document.createElement('button'); btn.className='mini'; btn.textContent=T.addHere;
+    btn.onclick = () => addRow(g);
+    d.lastElementChild.appendChild(btn);
+    gapsEl.appendChild(d);
+  });
+} else gapsEl.innerHTML = '<div class="hint">'+T.noneGaps+'</div>';
+
+// ripristina righe aggiunte in sessioni precedenti
+for(const [id, s] of Object.entries(saved)){
+  if(s.added && !DATA.rows.find(r=>r.id===id) && !DATA.extraRows.find(r=>r.id===id)){
+    const r = {id:id, n:'+', start:s.start||0, end:s.end||2, text:s.text||'', alts:[],
+               flags:[T.addedFlag], conf:null, added:true, dropped:false, thumb:''};
+    DATA.extraRows.push(r);
+    makeRow(r, rowsEl);
+  }
+}
+updateCounter();
+</script>
+</body></html>

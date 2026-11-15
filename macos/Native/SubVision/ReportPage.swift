@@ -6,6 +6,10 @@
 // the top when the page scrolls and the legend fixed at the bottom. While it
 // loads, a spinner; a report no longer on disk, a red note (R3). The session
 // and its bridge live in `AppModel.report` while the report is open.
+// A report written before the current template (1.0, the 2.0 builds before
+// report v2) is shown through the engine's upgraded copy (`report.upgrade`),
+// asked for while the spinner is up; when the engine cannot make it the
+// original shows as it is, with a neutral note at the bottom.
 
 import AppKit
 import SVShell
@@ -39,6 +43,13 @@ final class ReportSession {
     @ObservationIgnored private var stateFailing = false
     /// The last export, for the debug commands (the report bar shows it itself, R2).
     private(set) var lastExport: URL?
+    /// An old report the engine could not upgrade: it shows as its version wrote it, and the
+    /// neutral note says so (until closed).
+    private(set) var oldVersionNote = false
+    /// Every load counts: an upgrade that comes back after another load, or after the page went
+    /// back to the list, is dropped.
+    @ObservationIgnored private var loadCount = 0
+    @ObservationIgnored private var closed = false
     unowned let model: AppModel
     #if DEBUG
     /// Debug: the answer to "Choose where to save…" without the alert and the panel
@@ -47,8 +58,11 @@ final class ReportSession {
     #endif
 
     var name: String { url.lastPathComponent }
-    /// The video's name: the bold part of "Revisione di <video>".
-    var title: String { model.reviewName(for: url) }
+    /// The video's name: the bold part of "Revisione di <video>". The list's video, else the
+    /// name the report's data gives (an old report keeps a date in its file name), else the file's.
+    var title: String { video?.name ?? reportVideoName ?? model.reviewName(for: url) }
+    /// `DATA.videoName` of the report.
+    private(set) var reportVideoName: String?
     var video: VideoItem? { videoID.flatMap { id in model.videos.first { $0.id == id } } }
 
     init(url: URL, videoID: UUID?, model: AppModel) {
@@ -58,10 +72,14 @@ final class ReportSession {
     }
 
     /// Reads the file and starts the load; the phase says what the page shows.
+    /// An old report waits for the engine's upgraded copy first (still `.loading`).
     func load() {
         bridge?.detach()
         bridge = nil
         phase = .loading
+        oldVersionNote = false
+        closed = false
+        loadCount += 1
         guard FileManager.default.fileExists(atPath: url.path) else {
             phase = .gone
             return
@@ -71,6 +89,28 @@ final class ReportSession {
             return
         }
         counts = file.counts
+        reportVideoName = file.videoName.flatMap { $0.isEmpty ? nil : $0 }
+        if file.isCurrent {
+            start(file)
+            return
+        }
+        let count = loadCount
+        Task { [weak self, model, url] in
+            let reply = await model.upgradedReport(url)
+            guard let self, count == self.loadCount, !self.closed else { return }
+            if let reply, !reply.current {
+                self.start(file.upgraded(to: URL(fileURLWithPath: reply.path), from: reply.source))
+            } else {
+                // No copy: the original as its version wrote it (a "current" answer, the marker
+                // misread here, shows it as it is too, without the note).
+                self.oldVersionNote = reply == nil
+                self.start(file)
+            }
+        }
+    }
+
+    /// The bridge for `file` (the original, or the upgraded copy of an old report), and its load.
+    private func start(_ file: ReportFile) {
         let bridge = ReportBridge(file: file, language: model.language, t: { [model] key, values in model.t(key, values) })
         bridge.onNavigationFinished = { [weak self] in self?.phase = .ready }
         bridge.onNavigationFailed = { [weak self] error in
@@ -83,12 +123,14 @@ final class ReportSession {
         bridge.askWhereToSave = { [weak self] name in self?.askWhereToSave(name) }
         bridge.onStateWrite = { [weak self] ok in self?.stateWritten(ok) }
         self.bridge = bridge
-        model.log.info("report open \(file.url.lastPathComponent) (\(file.kind == .bridged ? "2.0" : "1.x"))")
+        let origin = file.upgradedFrom.map { "upgraded from \($0)" } ?? (file.kind == .bridged ? "2.0" : "1.x")
+        model.log.info("report open \(file.url.lastPathComponent) (\(origin))")
         bridge.load()
     }
 
     /// The page went back to the list: the bridge lets the web view go.
     func close() {
+        closed = true
         bridge?.detach()
     }
 
@@ -104,6 +146,8 @@ final class ReportSession {
     }
 
     func hideStateWarning() { stateWarning = false }
+
+    func hideOldVersionNote() { oldVersionNote = false }
 
     /// R3: the export could not be written next to the original.
     private func askWhereToSave(_ name: String) -> URL? {
@@ -122,8 +166,10 @@ final class ReportSession {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
+    /// The original, next to the video (not the upgraded copy of an old report).
     func showInFinder() { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-    func openInBrowser() { NSWorkspace.shared.open(url) }
+    /// What the page shows: the upgraded copy of an old report, so the browser has the new look too.
+    func openInBrowser() { NSWorkspace.shared.open(bridge?.file.page ?? url) }
 }
 
 extension AppModel {
@@ -231,7 +277,18 @@ struct ReportPage: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .overlay(alignment: .bottom) {
+            if session.oldVersionNote, !session.stateWarning {
+                StateWarning(text: model.t("app.report.old_version"), closeHelp: model.t("app.common.dismiss"),
+                             close: { session.hideOldVersionNote() }, tone: .neutral, symbol: "info.circle")
+                    .help(model.t("app.report.old_version_help"))
+                    // An old report has no legend fixed at the bottom.
+                    .padding(.bottom, 16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .animation(.easeOut(duration: 0.25), value: session.stateWarning)
+        .animation(.easeOut(duration: 0.25), value: session.oldVersionNote)
     }
 
     /// R3: the red note, 640 pt, a little under the band, with the way back to the list.
@@ -245,16 +302,18 @@ struct ReportPage: View {
     }
 }
 
-/// The pill at the bottom of the report, in yellow with a close button: the
-/// review state is not being saved.
+/// The pill at the bottom of the report with a close button: in yellow, the review
+/// state is not being saved; neutral, an old report shown as its version wrote it.
 struct StateWarning: View {
     var text: String
     var closeHelp: String
     var close: () -> Void
+    var tone: SVTone = .yellow
+    var symbol = "exclamationmark.triangle"
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle").svFont(14).foregroundStyle(SVTone.yellow.text)
+            Image(systemName: symbol).svFont(14).foregroundStyle(tone.text)
             Text(verbatim: text).svFont(12.5).foregroundStyle(SV.text).lineLimit(1)
             Button(action: close) {
                 Image(systemName: "xmark").svFont(10, .semibold).foregroundStyle(SV.text2)
@@ -266,7 +325,7 @@ struct StateWarning: View {
         }
         .padding(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 8))
         .background(Capsule().fill(SV.alert))
-        .overlay(Capsule().strokeBorder(SVTone.yellow.line, lineWidth: 1))
+        .overlay(Capsule().strokeBorder(tone.line, lineWidth: 1))
         .shadow(color: SV.shadow.opacity(0.4), radius: 16, y: 12)
     }
 }

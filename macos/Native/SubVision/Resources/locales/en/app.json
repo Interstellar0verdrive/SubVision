@@ -540,6 +540,8 @@
   "app.report.gone": "The review isn’t there any more: {name}.",
   "app.report.gone_text": "It was moved or deleted. Process the video again to get a new one.",
   "app.report.loading": "Loading the review…",
+  "app.report.old_version": "Report from an earlier version: some features are missing.",
+  "app.report.old_version_help": "I can’t show it with the current look, so it shows as that version wrote it. Edits and “Save reviewed SRT” still work.",
   "app.report.open_browser": "Open in Browser",
   "app.report.replace_btn": "Replace",
   "app.report.replace_cancelled": "cancelled, the SRT that was there is unchanged",

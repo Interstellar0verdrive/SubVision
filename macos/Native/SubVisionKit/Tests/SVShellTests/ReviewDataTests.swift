@@ -34,6 +34,17 @@ struct ReviewDataTests {
         #expect(ReviewData.counts(html: html) == .init(lines: 1, toCheck: nil, dropped: 1, gaps: 0))
     }
 
+    @Test func templateVersion() {
+        // The engine's marker (core.REPORT_VERSION): an old report has none and is upgraded first.
+        let current = #"<html lang="it"><head><meta charset="utf-8">\n<meta name="viewport" content="width=device-width">\n<meta name="subvision-report" content="2">"#
+        #expect(ReviewData.reportVersion(html: current) == 2 && ReviewData.isCurrentReport(html: current))
+        #expect(ReviewData.isCurrentReport(html: current.replacingOccurrences(of: "\"2\"", with: "\"3\"")))
+        let older = current.replacingOccurrences(of: "\"2\"", with: "\"1\"")
+        #expect(ReviewData.reportVersion(html: older) == 1 && !ReviewData.isCurrentReport(html: older))
+        let none = Self.report(#"{"rows": []}"#)
+        #expect(ReviewData.reportVersion(html: none) == 0 && !ReviewData.isCurrentReport(html: none))
+    }
+
     @Test func noDataNoCounts() {
         #expect(ReviewData.counts(html: "<html><body>nothing</body></html>") == nil)
         #expect(ReviewData.counts(html: Self.report("not json")) == nil)

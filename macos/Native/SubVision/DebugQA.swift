@@ -352,7 +352,15 @@ enum DebugQA {
             model.openReport(URL(fileURLWithPath: argument))
             guard let session = model.report.session else { return "no report" }
             _ = await wait(15) { session.phase != .loading }
-            return "\(session.phase) · \(session.name) · \(session.bridge.map { "\($0.file.kind)" } ?? "-")"
+            // An old report: "· upgraded from 1.x" (the engine's copy) or "· old version note" (none).
+            let upgraded = session.bridge?.file.upgradedFrom.map { " · upgraded from \($0)" } ?? ""
+            return "\(session.phase) · \(session.name) · \(session.bridge.map { "\($0.file.kind)" } ?? "-")" + upgraded
+                + (session.oldVersionNote ? " · old version note" : "")
+        case "report-file":
+            // The files behind the report in the page: what the web view loads, the original, the state.
+            guard let file = model.report.session?.bridge?.file else { return "no report" }
+            return "page \(file.page.path) · original \(file.url.path) · state \(file.stateURL.path)"
+                + " · current \(file.isCurrent) · note \(model.report.session?.oldVersionNote == true ? "shown" : "none")"
         case "report-page":
             return reportPage(model)
         case "report-back":

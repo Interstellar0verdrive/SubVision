@@ -129,7 +129,39 @@ extension AppModel {
         if video.reviewReport != nil { review(video) } else { tab = .review }
     }
 
-    func openReportInBrowser(_ url: URL) { NSWorkspace.shared.open(url) }
+    /// The engine's answer for a report written before the current template (`report.upgrade`):
+    /// the copy rendered with the current template, in the engine's state folder. Waits a little
+    /// for an engine still starting; nil when there is no engine or no copy (the error is logged).
+    func upgradedReport(_ url: URL) async -> ReportUpgradeReply? {
+        for _ in 0..<150 where status == .starting { try? await Task.sleep(for: .milliseconds(200)) }
+        do {
+            let reply = try await engine.reportUpgrade(path: url.path)
+            if !reply.current, !FileManager.default.fileExists(atPath: reply.path) {
+                log.error("report upgrade \(url.lastPathComponent): no copy at \(reply.path)")
+                return nil
+            }
+            log.info("report upgrade \(url.lastPathComponent): "
+                     + (reply.current ? "current" : "\(reply.cached == true ? "cached" : "made") from \(reply.source ?? "?")"))
+            return reply
+        } catch {
+            log.error("report upgrade \(url.lastPathComponent): \(error)")
+            return nil
+        }
+    }
+
+    /// ⋯ › Open in Browser of the list: an old report opens as its upgraded copy, like the
+    /// band's button (the browser gets the new look too); the original when there is none.
+    func openReportInBrowser(_ url: URL) {
+        let html = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        guard html.contains("id=\"qcdata\""), !ReviewData.isCurrentReport(html: html) else {
+            NSWorkspace.shared.open(url)
+            return
+        }
+        Task {
+            let reply = await upgradedReport(url)
+            NSWorkspace.shared.open(reply.map { URL(fileURLWithPath: $0.path) } ?? url)
+        }
+    }
 
     func showReportInFinder(_ url: URL) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
 }

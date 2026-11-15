@@ -547,3 +547,22 @@ def test_reset_asks_first(tmp_path: Path):
       return {asked: asked};
     """)
     assert out == {"asked": [expected]}
+
+
+def test_report_declares_its_template_version(tmp_path: Path):
+    """The app tells a current report from an old one by this marker (report_upgrade.py)."""
+    html = _fixed_report(tmp_path, "it")
+    assert f'<meta name="subvision-report" content="{core.REPORT_VERSION}">' in html
+    assert core.REPORT_VERSION >= 2
+    assert "__REPORT_VERSION__" not in html
+
+
+def test_render_without_run_stats(tmp_path: Path):
+    """An upgraded old report may not know the run figures: the summary leaves them out."""
+    rows = [{"id": "s1", "n": 1, "start": 1.0, "end": 2.0, "text": "a", "top": False, "conf": 1.0,
+             "agree": 1.0, "alts": [], "flags": [], "thumb": "", "dropped": False, "cls": ""}]
+    html = core.render_qc_html("v.mp4", "v.srt", rows, [{"start": 2.0, "end": 9.0, "thumb": ""}],
+                               6.0, 0, None, "en")
+    summary = _i18n_block(html)["en"]["summary"]
+    assert summary.endswith("gaps over 6 s <b>1</b>") and "frames" not in summary
+    assert _data_block(html)["gaps"][0]["edge"] == "end"

@@ -27,6 +27,7 @@ public enum EngineMethod {
     public static let previewStop = "preview.stop"
     public static let previewTest = "preview.test"
     public static let srtFix = "srt.fix"
+    public static let reportUpgrade = "report.upgrade"
     public static let shutdown = "shutdown"
 }
 
@@ -226,6 +227,24 @@ public struct OcrTestReply: Decodable, Sendable, Equatable {
 public struct SrtFixReply: Decodable, Sendable, Equatable {
     public var outPath: String
     public var count: Int
+}
+
+/// `report.upgrade`: the page to show for a review report. `current`: the report has
+/// the current template and `path` is its own; otherwise `path` is a copy rendered with
+/// the current template in the engine's state folder (`cached`: made before), and
+/// `source` says what wrote the original ("1.x", "2.0": a build before report v2).
+public struct ReportUpgradeReply: Decodable, Sendable, Equatable {
+    public var path: String
+    public var current: Bool
+    public var cached: Bool?
+    public var source: String?
+
+    public init(path: String, current: Bool, cached: Bool? = nil, source: String? = nil) {
+        self.path = path
+        self.current = current
+        self.cached = cached
+        self.source = source
+    }
 }
 
 // MARK: - Events
@@ -562,6 +581,12 @@ extension EngineClient {
                             useCorrections: Bool = true) async throws -> OcrTestReply {
         try await call(EngineMethod.previewTest, params: [
             "frame": frame, "params": params.dictionary, "use_ignore": useIgnore, "use_corrections": useCorrections])
+    }
+
+    /// The page to show for the review report at `path` (an old one: a copy with the
+    /// current template). Never busy. Error `not_found` or `report_unreadable`.
+    public func reportUpgrade(path: String) async throws -> ReportUpgradeReply {
+        try await call(EngineMethod.reportUpgrade, params: ["path": path])
     }
 
     /// Never busy: works during a batch. Error `no_valid_segments` or `not_found`.

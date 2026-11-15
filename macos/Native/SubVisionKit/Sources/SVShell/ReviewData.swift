@@ -31,6 +31,20 @@ public enum ReviewData {
         }
     }
 
+    /// The version of the engine's report template the app shows as it is
+    /// (`core.REPORT_VERSION`): a report that declares less is upgraded first.
+    public static let currentReportVersion = 2
+
+    /// The template version a report declares (`<meta name="subvision-report" content="N">`);
+    /// 0 for a report written before the marker (1.0, the 2.0 builds before report v2).
+    public static func reportVersion(html: String) -> Int {
+        guard let m = html.firstMatch(of: #/<meta\s+name="subvision-report"\s+content="(\d+)"/#) else { return 0 }
+        return Int(m.1) ?? 0
+    }
+
+    /// The report has the current template (or a newer one).
+    public static func isCurrentReport(html: String) -> Bool { reportVersion(html: html) >= currentReportVersion }
+
     /// The JSON of `<script type="application/json" id="qcdata">` in a report,
     /// with the engine's `<\/` escape undone; nil when there is none.
     public static func dataJSON(html: String) -> String? {

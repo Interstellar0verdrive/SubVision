@@ -493,6 +493,31 @@ def test_srt_fix_errors(sidecar: Sidecar, work: dict):
     assert exc.value.code == "bad_srt" and exc.value.error["line"] == 1
 
 
+def test_report_upgrade(sidecar: Sidecar, work: dict):
+    """An old report: a copy with the current template in the state folder; errors with their code."""
+    folder = work["root"] / "old-report"
+    folder.mkdir()
+    old = folder / "old-1.0-it.revisione.html"
+    shutil.copy2(Path(__file__).parent / "fixtures" / "old-reports" / old.name, old)
+    res = sidecar.call("report.upgrade", {"path": str(old)})
+    assert res["current"] is False and res["cached"] is False and res["source"] == "1.x"
+    copy = Path(res["path"])
+    assert copy.is_file() and str(work["state"] / "tmp" / "reports") in str(copy)
+    assert f'<meta name="subvision-report" content="{core.REPORT_VERSION}">' in copy.read_text(encoding="utf-8")
+    assert sorted(p.name for p in folder.iterdir()) == [old.name]
+    assert sidecar.call("report.upgrade", {"path": str(old)}) == {**res, "cached": True}
+    assert sidecar.call("report.upgrade", {"path": str(copy)}) == {"path": str(copy), "current": True}
+    with pytest.raises(SidecarError) as exc:
+        sidecar.call("report.upgrade", {"path": str(folder / "missing.review.html")})
+    assert exc.value.code == "not_found"
+    junk = folder / "junk.review.html"
+    junk.write_text("<html>no data</html>", encoding="utf-8")
+    with pytest.raises(SidecarError) as exc:
+        sidecar.call("report.upgrade", {"path": str(junk)})
+    assert exc.value.code == "report_unreadable" and exc.value.error["path"] == str(junk)
+    assert _bad(sidecar, "report.upgrade", {})["data"]["field"] == "path"
+
+
 def test_batch_failed_file_carries_the_details(sidecar: Sidecar, work: dict):
     bogus = work["root"] / "broken.mp4"
     bogus.write_bytes(b"not a video")
